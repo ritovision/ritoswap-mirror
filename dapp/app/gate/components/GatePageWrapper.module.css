@@ -1,0 +1,115 @@
+/* app/gate/components/GatePageWrapper.module.css */
+.container {
+  min-height: 100vh;
+  position: relative;
+  display: flex;
+  border-bottom: 2px solid var(--secondary-color);
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 990; /* Below nav elements */
+  opacity: 1;
+  transition: opacity 2s ease-in-out;
+}
+
+.modalOverlay.fadeOut {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.modalOverlay.hidden {
+  display: none;
+}
+
+.contentWrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 4rem 2rem 2rem 2rem;
+  opacity: 0;
+  transition: opacity 2s ease-in-out;
+  pointer-events: none;
+}
+
+.contentWrapper.fadeIn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.contentWrapper.fadeOut {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Completion modal - fixed positioned */
+.completionArea {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  max-width: 600px;
+  padding: 0 2rem;
+  opacity: 0;
+  transition: opacity 2s ease-in-out;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.completionArea.fadeIn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modalWrapper {
+  position: relative;
+  z-index: 999;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+  }
+  
+  .contentWrapper {
+    padding: 3rem 1rem 2rem 1rem;
+  }
+  
+  
+  .completionArea {
+    /* make the fixed area cover the viewport so flex-centering works */
+    inset: 0;                 /* top:0; right:0; bottom:0; left:0; */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 1rem;         /* keep small horizontal gutters */
+    transform: none;         /* remove translate-based centering */
+    top: 0;
+    left: 0;
+  }
+
+  /* allow the inner modal to size itself (use its max-width) instead of forcing full width) */
+  .completionArea > * {
+    width: auto;             /* use intrinsic width up to max-width */
+    max-width: 600px;        /* preserve desktop max */
+    box-sizing: border-box;
+  }
+}
+
+
+
+
+

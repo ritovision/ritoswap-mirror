@@ -1,0 +1,81 @@
+{
+  "compilerOptions": {
+    "target": "es2020",
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "types": [
+      "vitest/globals",
+      "node",
+      "msw",
+      "vite/client"
+    ],
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@app/*": [
+        "./app/*"
+      ],
+      "@config/*": [
+        "./app/config/*"
+      ],
+      "@components/*": [
+        "./components/*"
+      ],
+      "@providers/*": [
+        "./components/providers/*"
+      ],
+      "@hooks/*": [
+        "./app/hooks/*"
+      ],
+      "@lib/*": [
+        "./app/lib/*"
+      ],
+      "@storybook-utils/*": [
+        "./app/lib/storybook/*"
+      ],
+      "@logger": [
+        "./app/lib/logger/logger"
+      ],
+      "@store/*": [
+        "./app/store/*"
+      ],
+      "@Contract/*": [
+        "../ContractAddresses/*"
+      ],
+      "@schemas/*": [
+        "./app/schemas/*"
+      ]
+    }
+  },
+  "include": [
+    "next-env.d.ts",
+    "**/*.ts",
+    "**/*.tsx",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "storybook-static/**"
+  ]
+}

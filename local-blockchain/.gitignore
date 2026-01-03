@@ -1,0 +1,17 @@
+# Ignore log files
+/logs/
+
+# Ignore the environment file
+/.env
+
+# Ignore node modules
+/node_modules/
+
+# Ignore Blockscout build output
+/blockscout/
+
+# Ignore config directory
+/config/
+
+# Ignore data directory
+/data/

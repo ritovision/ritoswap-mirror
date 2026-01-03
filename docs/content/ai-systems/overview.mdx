@@ -1,0 +1,122 @@
+---
+title: AI Systems
+description: Overview of the multi-modal agentic stack that powers RapBotRito
+---
+
+import { Cards, Callout, FileTree } from 'nextra/components'
+
+# Multi-Modal AI Systems
+
+<img
+  src="/brand/glitchy-rapbotrito.jpg"
+  alt="Glitchy RapBotRito portrait"
+  style={{ width: '100%', maxWidth: 400, borderRadius: '12px', margin: '1.5rem auto' }}
+/>
+
+RapBotRito is the RitoSwap AI experience: an NFT-gated, multi-modal, tool-using agent built to feel like a distinct piece of Rito, not a generic chat box. The intent is presence with consequence, grounded in a real runtime that blends **Next.js streaming** (`dapp/app/lib/llm/handler.ts`), a **Model Context Protocol server** (`dapp/app/lib/mcp/server/index.ts`), and dozens of inline UI affordances (`dapp/components/chatBot`). This page frames the why and the how before you dive into the detailed architecture.
+
+## Why RapBotRito Exists
+
+Rito comes from infotainment rap and spoken-word performance, so the goal is not just to answer questions but to deliver a high-energy experience that can teach, flex, and entertain without collapsing into another neutral interface. RapBotRito is designed to feel opinionated and recognizable, even though any single response only carries a slice of the full context.
+
+## Presence by Design
+
+Personality is not a style layer here, it is structural. Chat modes (`dapp/app/lib/llm/modes/configs/*.ts`) change tool access and prompt rules so behavior shifts at the system level, not just in wording. Semantic retrieval (`pinecone_search`) reinforces Rito's voice and lore, giving the model real material to pull from instead of hard-coded lines.
+
+## Memory Layers
+
+Rito uses three memory layers that serve different roles in the stack:
+
+- **Chat history** keeps the immediate thread coherent inside the current session.
+- **Context management** injects tool schemas, wallet and NFT state, and mode rules so the model knows what it can do.
+- **Semantic retrieval (Pinecone)** supplies durable lore, memes, GIFs, and image metadata on demand.
+
+Together, history handles continuity, context enforces authority, and Pinecone powers long-term recall.
+
+## Tools With Consequence
+
+Presence comes from actions that matter. The tool stack can end a session and keep it ended (`mark_key_used` + `<goodbye />`), and it can initiate limited crypto transfers on gated, quota-controlled flows. JWTs, durable quotas, and mode-based tool exposure keep these actions safe while still letting the agent feel powerful.
+
+## Multimodal Performance Layer
+
+RapBotRito is built to perform, not just reply. Inline tools render GIFs, images, chain badges, and a Music Bar so the experience reads like a show with visible tool activity, not a plain transcript.
+
+<Cards>
+  <Cards.Card
+    title="Runtime Surfaces"
+    href="./foundation/architecture"
+  >
+    Next.js route handlers stream tokens via Server-Sent Events, while the client `ToolAwareTransport` mirrors tool lifecycle events into the inline chip UI.
+  </Cards.Card>
+  <Cards.Card
+    title="Governed Agent"
+    href="./operations/quotas"
+  >
+    JWT-gated access, Redis-like durable quotas, and Pinecone-backed semantics keep the agent safe while still acknowledging on-chain context.
+  </Cards.Card>
+  <Cards.Card
+    title="Extensible Tools"
+    href="./mcp-stack"
+  >
+    Tools are registered centrally, authenticated per-call, and surfaced to the model based on chat mode.
+  </Cards.Card>
+  <Cards.Card
+    title="Inline Tools"
+    href="./chat-ui/inline-tools"
+  >
+    Media renderers, goodbye timers, and the Music Bar make the experience feel live while mirroring tool activity.
+  </Cards.Card>
+  <Cards.Card
+    title="Semantic Database"
+    href="./pinecone"
+  >
+    Pinecone indexes power meme, rhyme, and image retrieval through the MCP search tool.
+  </Cards.Card>
+</Cards>
+
+## Code Map
+
+Use this mental map while reading the detailed pages:
+
+<FileTree>
+  <FileTree.Folder name="dapp/app/lib">
+    <FileTree.Folder name="llm">
+      <FileTree.File name="handler.ts" />
+      <FileTree.File name="client/ToolAwareTransport.ts" />
+      <FileTree.File name="modes/" />
+      <FileTree.File name="providers/registry.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="mcp">
+      <FileTree.File name="server/" />
+      <FileTree.File name="tools/" />
+      <FileTree.File name="tool-activity/" />
+    </FileTree.Folder>
+    <FileTree.Folder name="quotas">
+      <FileTree.File name="token-quota.ts" />
+      <FileTree.File name="crypto-quota.ts" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="dapp/components">
+    <FileTree.Folder name="chatBot">
+      <FileTree.File name="index.tsx" />
+      <FileTree.File name="ToolActivity/" />
+      <FileTree.File name="forms/" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="dapp/cloudflare/src">
+    <FileTree.File name="durable/state.ts" />
+  </FileTree.Folder>
+</FileTree>
+
+## Key Capabilities
+
+<Callout type="info" icon="💡">
+  **Multi-provider orchestration.** `ai.server.ts` lets you switch between OpenAI and local LM Studio models, define dedicated vision models, and configure the image generation backend.
+</Callout>
+
+- **Agentic chat modes** - `dapp/app/lib/llm/modes/configs/*.ts` define aggressive rap battles, freestyle sessions, and agent battles, each with bespoke tool allow-lists.
+- **Inline tooling UX** - `dapp/components/chatBot/ToolActivity` renders per-tool chips, while `useHydrateToolImages.ts` feeds base64 images to the client without ever placing large blobs in the chat stream.
+- **Semantic context** - `pinecone.config.ts`, the seeding scripts under `dapp/pinecone`, and the MCP `pinecone_search` tool let the agent pull memes, rhymes, and lore on demand. See the [Pinecone database](./pinecone) for index layout and seeding.
+- **Crypto-aware automation** - `send-crypto.ts`, `send-crypto-agent.ts`, and `mark-key-used.ts` demonstrate how JWT claims, quotas, and chain configs combine to gate real transfers.
+
+Continue with **Runtime Architecture** to see how these pieces stream together.

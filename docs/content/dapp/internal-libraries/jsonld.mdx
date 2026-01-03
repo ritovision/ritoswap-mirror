@@ -1,0 +1,323 @@
+---
+title: JSON-LD
+description: Complete documentation for implementing structured data with JSON-LD in our Next.js application
+date: 2025-01-23
+author: Technical Documentation Team
+tags: [seo, json-ld, structured-data, next.js]
+---
+
+import { FileTree, Steps, Tabs } from 'nextra/components'
+
+# JSON-LD Implementation in Next.js
+
+This documentation covers our JSON-LD (JavaScript Object Notation for Linked Data) implementation, which provides structured data for search engines to better understand our content. Our approach ensures that JSON-LD scripts are **server-side rendered and injected early in the HTML**, making them immediately available to search engine crawlers before JavaScript loads.
+
+## Overview
+
+Our project implements two distinct JSON-LD loading strategies:
+
+1. **Global JSON-LD**: Site-wide structured data loaded in the root layout
+2. **Page-specific JSON-LD**: Dynamic structured data for individual pages
+
+### Key Advantage: Server-Side Prerendering
+
+The most important aspect of our implementation is that **JSON-LD scripts are prerendered on the server**. This means:
+
+- Search engines can read the structured data immediately when they crawl the page
+- The data is present in the initial HTML response, not added later by JavaScript
+- There's no risk of crawlers missing the structured data due to JavaScript execution timing
+- The `beforeInteractive` strategy ensures scripts are placed optimally in the document head
+
+## File Structure
+
+<FileTree>
+  <FileTree.Folder name="app" defaultOpen>
+    <FileTree.File name="layout.tsx" />
+    <FileTree.Folder name="_data" defaultOpen>
+      <FileTree.Folder name="jsonld" defaultOpen>
+        <FileTree.Folder name="global">
+          <FileTree.File name="navigation.json" />
+          <FileTree.File name="index.ts" />
+        </FileTree.Folder>
+        <FileTree.Folder name="homepage">
+          <FileTree.File name="breadcrumb.json" />
+          <FileTree.File name="index.ts" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="lib" defaultOpen>
+      <FileTree.Folder name="jsonld" defaultOpen>
+        <FileTree.File name="loadJsonFromIndex.ts" />
+        <FileTree.File name="getHomepageJsonLd.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="[page-route]" defaultOpen>
+      <FileTree.Folder name="jsonld">
+        <FileTree.File name="breadcrumb.json" />
+        <FileTree.File name="index.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="public">
+    <FileTree.Folder name="jsonld">
+      <FileTree.Folder name="homepage-jsonld">
+        <FileTree.File name="*.txt" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Core Utilities
+
+### 1. loadJsonFromIndex.ts
+
+This utility creates React script elements from JSON-LD data arrays. It's the primary method for injecting structured data into pages.
+
+```typescript
+// app/lib/jsonld/loadJsonFromIndex.ts
+import React from 'react';
+
+export function loadJsonLdScripts(
+  jsonLdArray: any[],
+  idPrefix = 'jsonld'
+): React.ReactElement[] {
+  return jsonLdArray.map((jsonLd, idx) =>
+    React.createElement('script', {
+      key: `${idPrefix}-${idx}`,
+      id: `${idPrefix}-${idx}`,
+      type: 'application/ld+json',
+      strategy: 'beforeInteractive',  // Critical for early injection          
+      dangerouslySetInnerHTML: { __html: JSON.stringify(jsonLd) },
+    })
+  );
+}
+```
+
+**Key Features:**
+- Uses `React.createElement` for build-time script generation
+- `beforeInteractive` strategy ensures scripts load before page hydration
+- Each script gets a unique ID for debugging
+- Returns an array of React elements that can be directly rendered
+
+### 2. getHomepageJsonLd.ts (Alternative Approach)
+
+This utility reads JSON-LD files from the public directory at build time. It's used for homepage-specific structured data.
+
+```typescript
+// app/lib/jsonld/getHomepageJsonLd.ts
+import fs from "fs";
+import path from "path";
+
+export function getHomepageJsonLd() {
+  // Reads .txt files containing JSON-LD from public/jsonld/homepage-jsonld/
+  // Validates JSON structure and returns parsed objects
+  // Provides detailed console warnings for debugging
+}
+```
+
+**Note:** This approach uses Node.js filesystem APIs, so it only works at build time.
+
+## Implementation Patterns
+
+### Global JSON-LD (Site-wide)
+
+Global structured data is loaded once in the root layout and appears on every page.
+
+<Steps>
+
+### Step 1: Create JSON-LD data files
+
+Create individual JSON files for each type of structured data:
+
+```json
+// app/_data/jsonld/global/navigation.json
+{
+  "@context": "https://schema.org",
+  "@type": "SiteNavigationElement",
+  "name": "Main Navigation",
+  "url": "https://ritoswap.com",
+  "hasPart": [
+    {
+      "@type": "WebPage",
+      "name": "Home",
+      "url": "https://ritoswap.com"
+    }
+    // ... other navigation items
+  ]
+}
+```
+
+### Step 2: Create an index file to aggregate data
+
+```typescript
+// app/_data/jsonld/global/index.ts
+import navigation from './navigation.json';
+
+const jsonLdData = [
+  navigation,
+  // Add other global JSON-LD files here
+];
+
+export default jsonLdData;
+```
+
+### Step 3: Import and inject in layout.tsx
+
+```tsx
+// app/layout.tsx
+import { loadJsonLdScripts } from "@lib/jsonld/loadJsonFromIndex"
+import globalJsonLdData from "./_data/jsonld/global"
+
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <head>
+        {/* Inject global JSON-LD (site navigation) */}
+        {loadJsonLdScripts(globalJsonLdData, "global-jsonld")}
+      </head>
+      <body>
+        {/* ... rest of layout */}
+      </body>
+    </html>
+  )
+}
+```
+
+</Steps>
+
+### Page-specific JSON-LD
+
+Individual pages can have their own structured data following a similar pattern.
+
+<Steps>
+
+### Step 1: Create page-specific JSON-LD directory
+
+For each page route, create a `jsonld` folder:
+
+```
+app/
+  terms/
+    page.tsx
+    jsonld/
+      breadcrumb.json
+      index.ts
+```
+
+### Step 2: Define page-specific structured data
+
+```json
+// app/terms/jsonld/breadcrumb.json
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "name": "Home",
+      "item": "https://ritoswap.com"
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "name": "Terms",
+      "item": "https://ritoswap.com/terms"
+    }
+  ]
+}
+```
+
+### Step 3: Create page index file
+
+```typescript
+// app/terms/jsonld/index.ts
+import breadcrumb from './breadcrumb.json';
+
+const jsonLdData = [
+  breadcrumb,
+  // Add other page-specific JSON-LD here
+];
+
+export default jsonLdData;
+```
+
+### Step 4: Import in page component
+
+```tsx
+// app/terms/page.tsx
+import { loadJsonLdScripts } from "@lib/jsonld/loadJsonFromIndex"
+import pageJsonLdData from "./jsonld"
+
+export default function TermsPage() {
+  return (
+    <>
+      {loadJsonLdScripts(pageJsonLdData, "terms-jsonld")}
+      {/* Page content */}
+    </>
+  );
+}
+```
+
+</Steps>
+
+## Import Types and Build Behavior
+
+| Import Type | When Executed | Use Case |
+|------------|---------------|----------|
+| JSON imports | Build time | Static structured data that doesn't change |
+| loadJsonLdScripts | Build time (SSG) / Request time (SSR) | Converting JSON data to script elements |
+| getHomepageJsonLd | Build time only | Reading external JSON-LD files from filesystem |
+
+## Best Practices
+
+1. **Always validate JSON-LD**: Use Google's [Rich Results Test](https://search.google.com/test/rich-results) to validate your structured data
+
+2. **Use TypeScript interfaces**: Define types for your JSON-LD objects to catch errors at compile time
+
+3. **Keep data DRY**: Reuse common patterns like breadcrumbs across pages
+
+4. **Monitor performance**: While JSON-LD is lightweight, excessive structured data can impact page size
+
+5. **Test prerendering**: View page source (not DevTools) to confirm JSON-LD appears in the initial HTML
+
+## Rendering Process Timeline
+
+The beauty of our implementation is how early JSON-LD gets injected:
+
+1. **Build Time**: JSON files are imported and bundled
+2. **Server Render**: `loadJsonLdScripts` creates script elements 
+3. **HTML Generation**: Scripts are included in the `<head>` with `beforeInteractive`
+4. **Client Receives HTML**: JSON-LD is already present before any JavaScript executes
+5. **Search Engine Crawl**: Structured data is immediately available
+
+This approach guarantees that search engines will always see your structured data, regardless of their JavaScript execution capabilities.
+
+## Common JSON-LD Types
+
+Here are the most commonly used structured data types in our application:
+
+- **Organization**: Company information
+- **WebSite**: Site-level data with search action
+- **SiteNavigationElement**: Main navigation structure
+- **BreadcrumbList**: Page hierarchy
+- **Product**: For marketplace items
+- **FAQPage**: Frequently asked questions
+- **Article**: Blog posts and documentation
+
+## Troubleshooting
+
+### JSON-LD not appearing in page source
+- Check that you're importing and calling `loadJsonLdScripts` correctly
+- Ensure JSON files are valid (no trailing commas, proper quotes)
+- Verify the import path is correct
+
+### Build errors with getHomepageJsonLd
+- This function uses Node.js APIs and only works at build time
+- Ensure the directory `public/jsonld/homepage-jsonld/` exists
+- Check that .txt files contain valid JSON
+
+### Scripts loading too late
+- Confirm `strategy: 'beforeInteractive'` is set
+- Check that scripts are rendered in `<head>` or early in the body
+- Use View Source (not DevTools) to verify presence in initial HTML

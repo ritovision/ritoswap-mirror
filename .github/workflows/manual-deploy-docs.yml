@@ -1,0 +1,31 @@
+name: Manual - Deploy Docs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy-docs:
+    runs-on: ubuntu-latest
+    environment: docs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          pnpm-version: '10.13.1'
+          working-directory: .
+
+      - name: Install dependencies (docs + dapp)
+        working-directory: .
+        run: pnpm install --filter docs --filter ritoswap --frozen-lockfile
+
+      - name: Deploy to Vercel (docs)
+        uses: ./.github/actions/vercel-deploy
+        with:
+          mode: 'prebuilt'
+          production: 'true'
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: .  # Run from repo root - Vercel project settings have Root Directory = docs

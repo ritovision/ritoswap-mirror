@@ -1,0 +1,114 @@
+---
+title: "State Worker"
+description: "Cloudflare Worker + Durable Object that powers rate limiting, SIWE nonces, quotas, and email relays."
+---
+
+import { FileTree, Tabs, Callout } from 'nextra/components'
+
+# Cloudflare State Worker
+
+The `dapp/cloudflare` workspace hosts the Worker that backs every stateful concern of the token gate:
+
+- **Rate limiting** (`ratelimit:check`)
+- **SIWE nonce storage** (`nonce:set`, `nonce:get`, `nonce:consume`)
+- **Quota management** for AI/crypto features (`quota:*`)
+- **Email relay** (top-level fetch handler) when `USE_CLOUDFLARE_WORKER=true`
+
+A Durable Object (`StateDurableObject`) provides strongly-consistent storage plus per-request isolation, ensuring that whichever Vercel region handles the Next.js route still sees the same counters.
+
+## Repository Layout
+
+<FileTree>
+  <FileTree.Folder name="cloudflare" defaultOpen>
+    <FileTree.File name="wrangler.toml" />
+    <FileTree.File name="package.json" />
+    <FileTree.Folder name="src" defaultOpen>
+      <FileTree.File name="index.ts" />
+      <FileTree.Folder name="routes" defaultOpen>
+        <FileTree.File name="state.ts" />
+        <FileTree.File name="email.ts" />
+      </FileTree.Folder>
+      <FileTree.Folder name="durable" defaultOpen>
+        <FileTree.File name="state.ts" />
+      </FileTree.Folder>
+      <FileTree.Folder name="types">
+        <FileTree.File name="global.d.ts" />
+        <FileTree.File name="types.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Entry Point (`src/index.ts`)
+
+Routes requests based on the pathname:
+
+- `/<anything>` → `handleEmailRequest`
+- `/state` → `handleStateRequest` which authenticates the request (`Authorization: Bearer STATE_SERVICE_AUTH_TOKEN`), selects the `StateDurableObject`, and forwards the body.
+
+This separation lets you deploy one Worker that does both email relay and state management, while still locking down the `/state` surface.
+
+## Durable Object (`src/durable/state.ts`)
+
+The Durable Object stores three types of data:
+
+1. **Nonces** – stored with a per-entry expiration, deleted once consumed.
+2. **Rate limits** – per `(limiter, identifier)` buckets storing timestamp arrays. Sliding-window logic ensures accurate resets.
+3. **Quotas** – general-purpose windows (limit, duration, resetAt) for future AI/usage tracking needs.
+
+Each action handler (`nonce:set`, `ratelimit:check`, `quota:increment`, etc.) returns a typed `JsonResult` to keep the client-side code simple.
+
+## Email Route (`src/routes/email.ts`)
+
+When `USE_CLOUDFLARE_WORKER=true`, `/api/form-submission-gate` posts directly to `CLOUDFLARE_WORKER_URL`. The worker:
+
+1. Validates the payload (`tokenId`, `message`, `address`, `timestamp`)
+2. Sends the formatted email via Brevo's REST API
+3. Returns `{ success: true, messageId }` or `{ error: string }`
+
+Because this happens out-of-band from the Next.js API, form submissions can return quickly even if Brevo is slow.
+
+## Deployment
+
+```bash
+cd dapp/cloudflare
+pnpm install
+pnpm dev        # wrangler dev
+pnpm test       # vitest suite covering routes + DO logic
+pnpm deploy     # publish worker + durable object
+```
+
+Secrets:
+
+```bash
+pnpm secret:brevo
+pnpm secret:sender
+pnpm secret:receiver
+pnpm secret:state
+```
+
+<Callout type="info">
+`STATE_SERVICE_AUTH_TOKEN` must match the `STATE_WORKER_API_KEY` configured in the Next.js app. Without it, `handleStateRequest` returns 401 and all SIWE/rate limit checks will fail.
+</Callout>
+
+## Next.js Client (`dapp/app/lib/state/client.ts`)
+
+The state client lazily instantiates a `CloudflareStateClient` that posts JSON payloads to the worker using the server env metadata (`serverConfig.stateService`). Every rate-limit/nonce helper calls `getStateClient()` to avoid creating multiple fetchers per request.
+
+Key exports:
+
+- `getStateClient()` – memoized singleton used by rate limiting, SIWE, and quota modules.
+- `isStateServiceEnabled()` – ensures secrets are present before any network calls are attempted.
+- `__setStateClientMock()` – aids in Vitest integration tests.
+
+## Environment Checklist
+
+| Variable | Purpose |
+| --- | --- |
+| `NEXT_PUBLIC_ENABLE_STATE_WORKER` | Enables SIWE + rate limiting on the Next.js side |
+| `STATE_WORKER_URL` | Fully-qualified `/state` endpoint for rate limit + nonce actions |
+| `STATE_WORKER_API_KEY` | Shared secret injected into the `Authorization` header |
+| `USE_CLOUDFLARE_WORKER` | When `true`, `/api/form-submission-gate` delegates email delivery |
+| `CLOUDFLARE_WORKER_URL` | Email relay endpoint exposed by the same Worker |
+
+Keep these values in sync across deployments—Vercel, local `.env`, and the Worker’s `wrangler secret` store. If any field is missing, `isRateLimitEnabled()` and `isSiweEnabled()` return `false`, and the app falls back to legacy behavior.

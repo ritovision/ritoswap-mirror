@@ -1,0 +1,37 @@
+# Slither Docker image for Hardhat projects
+FROM python:3.11-slim
+
+# Install Node.js and npm
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && \
+    pip install -r requirements.txt
+
+# Copy package files and install Node dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Copy Hardhat config and contracts
+COPY hardhat.config.* ./
+COPY tsconfig.json ./
+COPY contracts ./contracts
+COPY .slither.json ./
+
+# Compile contracts with Hardhat
+RUN npm run compile
+
+# Set entrypoint to slither
+ENTRYPOINT ["slither"]
+# Default command shows help
+CMD ["--help"]

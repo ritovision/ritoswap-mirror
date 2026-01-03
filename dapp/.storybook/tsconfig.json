@@ -1,0 +1,15 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "..",
+    "types": ["vite/client", "node"]
+  },
+  "include": [
+    "../.storybook/**/*",
+    "../app/**/*",
+    "../components/**/*",
+    "../styles/**/*",
+    "../lib/**/*"
+  ]
+}
+

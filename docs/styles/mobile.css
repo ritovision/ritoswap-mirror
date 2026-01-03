@@ -1,0 +1,16 @@
+/* docs/styles/mobile.css */
+/* override mobile nav background */
+.nextra-mobile-nav {
+  background-color: var(--primary-color) !important;
+}
+/* override the left-border pseudo-element on your mobile sidebar lists */
+.nextra-mobile-nav ul::before {
+  background-color: var(--secondary-color) !important;
+}
+
+/* mobile only: background = secondary blue */
+@media (max-width: 767px) {
+  .nextra-search input {
+    background-color: var(--secondary-color) !important;
+  }
+}

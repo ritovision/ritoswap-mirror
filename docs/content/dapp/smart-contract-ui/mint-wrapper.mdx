@@ -1,0 +1,179 @@
+---
+title: "Mint / Burn Wrapper"
+description: "Event-bridge container for the NFT mint screen and transfer notifications"
+---
+
+import { Cards, Callout, Steps } from 'nextra/components'
+
+# MintPageWrapper
+
+The MintPageWrapper component (`dapp/app/mint/components/MintPageWrapper.tsx`) is now a lean event bridge that renders the mint UI shell, subscribes to ERC-721 `Transfer` events, and funnels refresh/notification requests into the shared NFT data layer. Wallet-state mutations, account switching, and cache invalidation all live inside [`useNFTData`](../../smart-contract-data/nft-data-hook) and the [`useNFTStore`](../../smart-contract-data/nft-store); MintPageWrapper only reads the current wagmi `address` so it can filter the contract events it receives. This page documents the hand-off between those layers and the mint UI container.
+
+## Role in the Mint Experience
+
+```
+MintPageWrapper
+├── TokenStatus   (read-only status panel)
+├── NFTScreen     (visualization)
+└── ButtonSection (action controls + manual refresh)
+```
+
+The wrapper provides layout scaffolding (see `MintPageWrapper.module.css`) and injects a shared `forceRefresh` callback into `ButtonSection`. Token data flows down via the store selectors inside each child; MintPageWrapper never receives props and never mutates global state.
+
+```tsx
+export default function MintPageWrapper() {
+  const { address } = useAccount()
+  const { forceRefresh } = useNFTData()
+
+  useWatchContractEvent({ /* Transfer watcher */ })
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.content}>
+        <TokenStatus />
+        <NFTScreen />
+        <ButtonSection onRefresh={forceRefresh} />
+      </div>
+    </div>
+  )
+}
+```
+
+## Transfer Watcher
+
+`useWatchContractEvent` keeps the UI synchronized with on-chain transfers that involve the connected wallet. The hook watches the `Transfer` event on `KEY_TOKEN_ADDRESS` with the canonical `fullKeyTokenAbi`.
+
+```tsx
+useWatchContractEvent({
+  address: KEY_TOKEN_ADDRESS,
+  abi: fullKeyTokenAbi,
+  eventName: 'Transfer',
+  onLogs(logs) {
+    if (!address) return
+    for (const log of logs) {
+      const args = log.args as { from?: Address; to?: Address }
+      if (!args?.from || !args?.to) continue
+      const involvesUser = args.from === address || args.to === address
+      if (!involvesUser) continue
+      // notify + refresh (see below)
+    }
+  },
+})
+```
+
+<Steps>
+### Filter logs
+Reject logs without `from`/`to` or logs unrelated to the connected `address`.
+
+### Categorize direction
+If `args.to === address`, the user just received an NFT (minted or transferred in).  
+If `args.from === address`, the user just sent/burned an NFT.
+
+### Notify user
+Emit `sendNotificationEvent('NFT_RECEIVED' | 'NFT_TRANSFERRED', { source: 'watcher' })` so both toast and browser channels reflect the transfer.
+
+### Refresh data
+Use a 1.5s timeout before calling `forceRefresh()` to give RPC nodes time to index the block. The timeout resets if another relevant log arrives.
+</Steps>
+
+This logic keeps the UI reactive without introducing duplicate reads or competing with wagmi polling intervals configured inside `useNFTData`.
+
+## Refresh + Store Coordination
+
+`forceRefresh` comes from `useNFTData` (`dapp/app/hooks/useNFTData.ts`). That hook owns:
+
+- Blockchain reads for `getTokenOfOwner` and `getTokenColors`
+- Token status API queries with TanStack Query
+- Account-switch detection, cache clearing, and store synchronization
+- Loading-state orchestration and `completeAccountSwitch` transitions
+
+MintPageWrapper’s only responsibilities are to call `forceRefresh` (after the debounce) and pass the same callback into `ButtonSection` so users can trigger a manual refresh that exercises the exact same pipeline.
+
+```tsx
+<ButtonSection onRefresh={forceRefresh} />
+```
+
+<Callout type="info">
+`MintPageWrapper.test.tsx` asserts that the wrapper does **not** call `setCurrentAddress`, `startAccountSwitch`, or `resetState`. If you ever feel tempted to touch the store from this component, move that logic into `useNFTData` instead.
+</Callout>
+
+## Notification Routing
+
+Instead of calling toast utilities directly, MintPageWrapper routes everything through the notification manager:
+
+```tsx
+if (args.to === address) {
+  sendNotificationEvent('NFT_RECEIVED', { source: 'watcher' })
+} else if (args.from === address) {
+  sendNotificationEvent('NFT_TRANSFERRED', { source: 'watcher' })
+}
+```
+
+`NOTIFICATION_EVENTS` defines these presets (`dapp/app/lib/notifications/events.ts`) so the watcher automatically emits both toast + browser notifications (channels=`both`) with consistent messaging. Because the source is marked as `watcher`, downstream analytics can differentiate between user-initiated notifications (ButtonSection success) and background detections.
+
+## Cleanup and Timing
+
+A single `useEffect` cleans up the debounce timer when the component unmounts. This prevents stale timers from calling `forceRefresh` after the user navigates away.
+
+```tsx
+useEffect(() => {
+  return () => {
+    if (transferTimeoutRef.current) clearTimeout(transferTimeoutRef.current)
+  }
+}, [])
+```
+
+If a burst of logs arrives (e.g., batch transfers), the watcher clears the existing timeout, queues a fresh one, and ultimately issues one `forceRefresh` once the chain has finalized the relevant block.
+
+## Usage Example
+
+`app/mint/page.tsx` renders MintPageWrapper alongside JSON-LD, instructions, and the music widget:
+
+```tsx
+export default function MintPage() {
+  return (
+    <>
+      {loadJsonLdScripts(jsonLdData, 'mint-jsonld')}
+      <MintPageWrapper />
+      <Instructions />
+      <div style={{ width: '90%', margin: '0 auto', display: 'flex', justifyContent: 'center' }}>
+        <Music />
+      </div>
+    </>
+  )
+}
+```
+
+No additional props or providers are required—MintPageWrapper relies on the global wagmi client and the Zustand store already configured in `app/layout.tsx`.
+
+## Testing Coverage
+
+`dapp/app/mint/components/__tests__/MintPageWrapper.test.tsx` locks down the contract:
+
+- Child components render as placeholders when the wrapper mounts.
+- Store mutations are delegated to `useNFTData`; connecting, switching, and disconnecting wallets do **not** trigger setter mocks.
+- Transfer logs that involve the user fire the correct notification event and call `forceRefresh` after 1.5 seconds.
+- Logs unrelated to the user are ignored entirely.
+
+The tests mock wagmi hooks and capture the `onLogs` callback so regression failures surface quickly if the watcher logic changes.
+
+## Related Data Layers
+
+<Cards num={2}>
+  <Cards.Card
+    title="NFT Store"
+    href="/dapp/smart-contract-data/nft-store"
+    arrow
+  >
+    Zustand-backed global state for token data, account switching, and persistence.
+  </Cards.Card>
+  <Cards.Card
+    title="useNFTData Hook"
+    href="/dapp/smart-contract-data/nft-data-hook"
+    arrow
+  >
+    Blockchain + API orchestration layer that MintPageWrapper leans on for refreshes.
+  </Cards.Card>
+</Cards>
+
+MintPageWrapper stays intentionally small so these foundational data layers remain the single source of truth for wallet state and NFT metadata. Treat it as the event bridge that connects blockchain activity to the presentation layer.

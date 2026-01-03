@@ -1,0 +1,513 @@
+---
+title: "useNFTData Hook"
+description: "Real-time blockchain data synchronization with intelligent caching"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+
+# useNFTData Hook
+
+The `useNFTData` hook serves as the primary orchestration layer for NFT data management in RitoSwap. This custom hook combines wagmi's blockchain queries, TanStack Query's intelligent caching, and Zustand state management to provide real-time, synchronized NFT data throughout the application. By abstracting the complexity of multichain data fetching and state synchronization, it enables components to focus on presentation logic rather than data management.
+
+## Hook API
+
+The hook provides a clean interface for NFT data operations:
+
+```typescript
+interface UseNFTDataResult {
+  forceRefresh(): Promise<void>;
+  isLoading: boolean;
+  refetchToken(): Promise<QueryObserverResult>;
+  refetchColors(): Promise<QueryObserverResult>;
+  tokenUsageData?: TokenStatusResponse;
+  tokenUsageError?: Error;
+}
+
+function useNFTData(disablePolling?: boolean): UseNFTDataResult
+```
+
+- **`forceRefresh`** - Manually triggers a complete data refresh from all sources
+- **`isLoading`** - Indicates when any blockchain query is in progress
+- **`refetchToken` / `refetchColors`** - Directly re-run the underlying wagmi reads
+- **`tokenUsageData` / `tokenUsageError`** - Latest token usage response and any associated API error
+
+## Hook Architecture
+
+The `useNFTData` hook implements a sophisticated data flow that coordinates multiple asynchronous operations while maintaining consistency and performance. It leverages the strengths of each underlying technology to create a seamless developer experience and responsive user interface.
+
+### Core Responsibilities
+
+The hook manages four primary areas of functionality that work together to provide comprehensive NFT data management. First, it queries the blockchain for current token ownership and metadata using wagmi's typed contract hooks. Second, it synchronizes this on-chain data with off-chain usage records through API calls managed by TanStack Query. Third, it automatically updates the centralized NFT store to trigger UI updates across all subscribed components. Finally, it handles error states and loading indicators to ensure a smooth user experience during data fetching operations.
+
+### Technology Integration
+
+The hook orchestrates three key technologies to achieve its functionality. Wagmi provides type-safe blockchain interactions through its React hooks, enabling reliable contract queries with automatic retries and error handling. TanStack Query adds an intelligent caching layer that deduplicates requests and manages stale data, significantly reducing unnecessary API calls. The NFT store maintains the current state and propagates updates to UI components, ensuring consistent rendering across the application.
+
+## Hook Implementation
+
+The implementation demonstrates careful consideration of edge cases and performance optimizations:
+
+```typescript
+export function useNFTData(disablePolling = false) {
+  const { address } = useAccount();
+  const {
+    setHasNFT,
+    setTokenData,
+    setLoading,
+    setHasUsedTokenGate,
+    hasNFT,
+    tokenId,
+    isSwitchingAccount,
+    completeAccountSwitch
+  } = useNFTStore();
+
+  const chainId = getTargetChainId();
+```
+
+The hook accepts a `disablePolling` parameter that allows components to opt out of automatic data refreshing when real-time updates are not required, improving performance in scenarios like static displays or archived views.
+
+### Blockchain Queries
+
+The hook uses two primary blockchain queries that work in sequence to gather complete NFT information:
+
+#### Token Ownership Query
+
+```typescript
+const {
+  data: tokenData,
+  refetch: refetchToken,
+  isLoading: loadingToken,
+  isRefetching: refetchingToken
+} = useReadContract({
+  address: KEY_TOKEN_ADDRESS,
+  abi: fullKeyTokenAbi,
+  functionName: 'getTokenOfOwner',
+  args: address ? [address] : undefined,
+  chainId,
+  query: {
+    enabled: !!address,
+    refetchInterval: disablePolling
+      ? false
+      : isSwitchingAccount
+      ? 1000
+      : 2000
+  }
+});
+```
+
+This query checks whether the connected address owns a Colored Key NFT and retrieves its token ID. The refetch interval adapts based on context, polling more frequently during account switches to ensure rapid UI updates.
+
+#### Token Colors Query
+
+```typescript
+const {
+  data: tokenColors,
+  refetch: refetchColors,
+  isLoading: loadingColors
+} = useReadContract({
+  address: KEY_TOKEN_ADDRESS,
+  abi: fullKeyTokenAbi,
+  functionName: 'getTokenColors',
+  args: tokenData && tokenData[1] ? [tokenData[0]] : undefined,
+  chainId,
+  query: {
+    enabled: !!tokenData && tokenData[1],
+    refetchInterval: disablePolling
+      ? false
+      : isSwitchingAccount
+      ? 1000
+      : 2000
+  }
+});
+```
+
+This dependent query fetches the algorithmically generated colors for the owned token. It only executes when token ownership is confirmed, preventing unnecessary blockchain calls.
+
+### API Integration with TanStack Query
+
+The hook leverages TanStack Query for efficient API communication with intelligent request deduplication:
+
+```typescript
+const currentTokenId = tokenData && tokenData[1] ? Number(tokenData[0]) : null;
+
+const {
+  data: tokenUsageData,
+  error: tokenUsageError,
+  isLoading: isLoadingUsage
+} = useQuery({
+  queryKey: tokenStatusQueryKey(currentTokenId, address),
+  queryFn: () => {
+    if (!currentTokenId) {
+      throw new Error('No token ID available');
+    }
+    return fetchTokenStatus(currentTokenId);
+  },
+  enabled: !!currentTokenId && isConnected && !!address,
+  staleTime: 0,          // Always treat usage data as stale
+  gcTime: 0,             // Do not retain cached entries
+  refetchOnMount: 'always',
+  refetchOnWindowFocus: false,
+});
+```
+
+The query intentionally disables caching because token usage is highly dynamic, especially during rapid account switches or mint/burn flows. Combined with the hook's explicit cache invalidation on disconnect or account change, this guarantees every fetch reflects the latest on-chain usage even if multiple components mount simultaneously.
+
+### State Synchronization
+
+The hook maintains store synchronization through carefully orchestrated effects:
+
+#### API Data Synchronization
+
+```typescript
+useEffect(() => {
+  if (tokenUsageData && tokenUsageData.used !== undefined) {
+    setHasUsedTokenGate(tokenUsageData.used);
+  }
+}, [tokenUsageData, setHasUsedTokenGate]);
+```
+
+This effect updates the token gate usage status whenever new data arrives from the API, ensuring the UI reflects the current usage state.
+
+#### Automatic On-Chain Data Synchronization
+
+```typescript
+useEffect(() => {
+  if (tokenData !== undefined && !isSwitchingAccount) {
+    const [tid, owned] = tokenData;
+    const changed = owned !== hasNFT || (owned && Number(tid) !== tokenId);
+    if (changed) {
+      setHasNFT(owned);
+      if (owned) {
+        if (tokenColors) {
+          setTokenData(Number(tid), tokenColors[0], tokenColors[1]);
+        }
+      } else {
+        setTokenData(null, null, null);
+        setHasUsedTokenGate(false);
+      }
+    }
+  }
+}, [
+  tokenData,
+  tokenColors,
+  hasNFT,
+  tokenId,
+  isSwitchingAccount,
+  setTokenData,
+  setHasNFT,
+  setHasUsedTokenGate
+]);
+```
+
+This critical effect automatically synchronizes the store with on-chain data changes. When token ownership or color data updates from blockchain queries, the store is updated without requiring manual refresh calls. This ensures components always reflect the current blockchain state, even when changes occur from external sources like other dApps or direct contract interactions.
+
+#### Loading State Management
+
+```typescript
+useEffect(() => {
+  if (!loadingToken && !refetchingToken && !loadingColors) {
+    setLoading(false);
+  }
+}, [loadingToken, refetchingToken, loadingColors, setLoading]);
+```
+
+This effect coordinates loading states from multiple blockchain queries, ensuring the global loading indicator only clears when all contract operations complete. This prevents premature loading state dismissal during complex query sequences.
+
+### Manual Refresh Mechanism
+
+The hook provides a `forceRefresh` function for scenarios requiring immediate data updates:
+
+```typescript
+const forceRefresh = useCallback(async () => {
+  setLoading(true);
+  try {
+    queryClient.removeQueries({ queryKey: ['token-status'] });
+    
+    await new Promise((r) => setTimeout(r, isSwitchingAccount ? 500 : 1000));
+    const tok = await refetchToken();
+    if (tok.data) {
+      const [tid, owned] = tok.data;
+      if (owned) {
+        setHasNFT(true);
+        try {
+          const usage = await fetchTokenStatus(Number(tid));
+          setHasUsedTokenGate(usage.exists ? usage.used : false);
+        } catch (err) {
+          console.error('Error fetching token usage in forceRefresh:', err);
+          setHasUsedTokenGate(false);
+        }
+        
+        const colors = await refetchColors();
+        if (colors.data) {
+          setTokenData(Number(tid), colors.data[0], colors.data[1]);
+        }
+      } else {
+        setTokenData(null, null, null);
+        setHasNFT(false);
+        setHasUsedTokenGate(false);
+      }
+    }
+    if (isSwitchingAccount) {
+      completeAccountSwitch();
+    }
+  } catch (e) {
+    console.error('Error in forceRefresh', e);
+  } finally {
+    setLoading(false);
+  }
+}, [/* dependencies */]);
+```
+
+The refresh mechanism aggressively invalidates cached token usage data, adds a short delay to let blockchain state settle, and replays the full ownership/colors pipeline before writing a single coherent snapshot to the store. This keeps UI state consistent even while users mint, burn, or rapidly switch accounts.
+
+## Usage Patterns
+
+The hook supports various usage patterns depending on component requirements:
+
+### Basic Usage
+
+Components typically use the hook for loading states and manual refresh capabilities:
+
+```typescript
+function NFTManager() {
+  const { forceRefresh, isLoading } = useNFTData();
+  const { hasNFT, tokenId } = useNFTStore();
+  
+  return (
+    <div>
+      {isLoading && <LoadingSpinner />}
+      {hasNFT ? (
+        <TokenDisplay id={tokenId} onRefresh={forceRefresh} />
+      ) : (
+        <MintPrompt />
+      )}
+    </div>
+  );
+}
+```
+
+### Polling Control
+
+Components can disable polling for performance optimization:
+
+```typescript
+function StaticNFTDisplay() {
+  // Disable polling for static displays
+  useNFTData(true);
+  const { tokenId, backgroundColor, keyColor } = useNFTStore();
+  
+  return <NFTVisualization {...{ tokenId, backgroundColor, keyColor }} />;
+}
+```
+
+### Transaction Integration
+
+The hook integrates seamlessly with blockchain transactions:
+
+```typescript
+function MintButton() {
+  const { forceRefresh } = useNFTData();
+  const { setLoading } = useNFTStore();
+  
+  const { isSuccess: isMintSuccess } = useWaitForTransactionReceipt({
+    hash: mintHash,
+  });
+  
+  useEffect(() => {
+    if (isMintSuccess) {
+      // Delay ensures blockchain state propagation
+      setTimeout(() => {
+        forceRefresh();
+      }, 2000);
+    }
+  }, [isMintSuccess, forceRefresh]);
+}
+```
+
+### Direct Query Access
+
+For advanced use cases, components can access individual query functions:
+
+```typescript
+function AdvancedNFTPanel() {
+  const { refetchToken, refetchColors } = useNFTData();
+  
+  const handleTokenRefresh = async () => {
+    await refetchToken();
+  };
+  
+  const handleColorsRefresh = async () => {
+    await refetchColors();
+  };
+  
+  return (
+    <div>
+      <button onClick={handleTokenRefresh}>Refresh Ownership</button>
+      <button onClick={handleColorsRefresh}>Refresh Colors</button>
+    </div>
+  );
+}
+```
+
+## Performance Characteristics
+
+The hook implements several strategies to optimize performance while maintaining data freshness:
+
+### Intelligent Polling
+
+The polling strategy adapts to user activity and application state. During normal operation, the hook polls every 2 seconds to detect external changes like transfers or mints from other interfaces. During account switches, polling accelerates to 1 second for more responsive updates. When polling is disabled, the hook only fetches data on mount and manual refresh, suitable for static displays.
+
+### Request Deduplication
+
+TanStack Query still deduplicates simultaneous requests for the same cache key, so two components mounting on the same render frame share a single `fetchTokenStatus` call. Beyond that initial coalescing, the hook sets `staleTime` and `gcTime` to zero and proactively clears the cache during account switches or manual refreshes, guaranteeing every subsequent read reflects the latest usage data.
+
+### Automatic Synchronization
+
+The hook's automatic synchronization effect eliminates the need for manual store updates in most scenarios. Components can rely on the store state updating automatically when blockchain data changes, reducing the need for imperative refresh calls and improving code clarity.
+
+### Cascade Prevention
+
+The hook prevents cascading updates through careful effect dependencies. Each effect only triggers when its specific data changes, preventing unnecessary re-renders and API calls. The atomic store updates through `setTokenData` ensure that related data changes together, avoiding intermediate states.
+
+## Error Handling
+
+The hook implements comprehensive error handling to maintain application stability:
+
+### Blockchain Query Errors
+
+When blockchain queries fail, the hook preserves the last known good state while logging errors for debugging. This approach ensures the UI remains functional even during temporary RPC issues:
+
+```typescript
+try {
+  const tok = await refetchToken();
+  // Process successful response
+} catch (e) {
+  console.error('Error in forceRefresh', e);
+  // Preserve existing state
+}
+```
+
+### API Error Handling
+
+TanStack Query automatically retries failed API requests with exponential backoff. The hook respects these retry mechanics while providing appropriate error states to components. Failed requests do not corrupt the store state, maintaining UI stability.
+
+### Loading State Management
+
+The hook carefully manages loading states to prevent stuck indicators. The coordinated loading effect ensures loading states clear appropriately, and the `finally` block in `forceRefresh` ensures loading states clear even when errors occur, preventing indefinite loading spinners.
+
+## Integration with Account Switching
+
+The hook plays a crucial role in smooth account transitions by adapting its behavior during switches:
+
+### Accelerated Polling
+
+When `isSwitchingAccount` is true, the hook increases polling frequency to 1 second, ensuring rapid detection of new account data. This acceleration provides responsive feedback during wallet switches.
+
+### Transition Completion
+
+The hook automatically calls `completeAccountSwitch()` when new data arrives for a switched account, signaling the end of the transition period and allowing the UI to update smoothly.
+
+### State Preservation
+
+During switches, the hook works with the store's previous data mechanism to maintain visual continuity while fetching new account information in the background.
+
+## Testing Considerations
+
+Testing the `useNFTData` hook requires mocking multiple dependencies:
+
+### Mocking Blockchain Queries
+
+```typescript
+vi.mock('wagmi', () => ({
+  useAccount: vi.fn(() => ({ address: '0x123...' })),
+  useReadContract: vi.fn((config) => {
+    if (config.functionName === 'getTokenOfOwner') {
+      return { data: [BigInt(42), true], isLoading: false };
+    }
+    if (config.functionName === 'getTokenColors') {
+      return { data: ['#FF0000', '#00FF00'], isLoading: false };
+    }
+  })
+}));
+```
+
+### Mocking API Calls
+
+```typescript
+// Mock fetch for token status API
+global.fetch = vi.fn(() =>
+  Promise.resolve({
+    ok: true,
+    json: () => Promise.resolve({ used: false, exists: true })
+  })
+);
+```
+
+### Testing State Updates
+
+```typescript
+test('updates store with fetched data', async () => {
+  const { result } = renderHook(() => useNFTData());
+  
+  await waitFor(() => {
+    const state = useNFTStore.getState();
+    expect(state.hasNFT).toBe(true);
+    expect(state.tokenId).toBe(42);
+    expect(state.backgroundColor).toBe('#FF0000');
+  });
+});
+```
+
+### Testing Automatic Synchronization
+
+```typescript
+test('automatically syncs store when blockchain data changes', async () => {
+  const mockSetTokenData = vi.fn();
+  vi.mocked(useNFTStore).mockReturnValue({
+    setTokenData: mockSetTokenData,
+    // ... other store methods
+  });
+  
+  const { rerender } = renderHook(() => useNFTData());
+  
+  // Simulate blockchain data change
+  vi.mocked(useReadContract).mockReturnValue({
+    data: [BigInt(123), true],
+    // ... other properties
+  });
+  
+  rerender();
+  
+  await waitFor(() => {
+    expect(mockSetTokenData).toHaveBeenCalledWith(123, expect.any(String), expect.any(String));
+  });
+});
+```
+
+## Best Practices
+
+When using the `useNFTData` hook, follow these guidelines for optimal results:
+
+### Component Design
+
+Call the hook at the top level of components that need NFT data, not in event handlers or conditional blocks. This ensures consistent behavior and prevents hook order violations. Components should subscribe to specific store fields rather than the entire state to minimize re-renders.
+
+### Leveraging Automatic Synchronization
+
+Rely on the hook's automatic synchronization for most use cases rather than calling `forceRefresh` manually. The automatic effects handle most state updates efficiently, reserving manual refresh for post-transaction scenarios or explicit user actions.
+
+### Performance Optimization
+
+Disable polling in components that display static NFT data or archived information. Use the `forceRefresh` function judiciously, particularly after transactions, to avoid overwhelming the blockchain RPC. Consider implementing debouncing for user-triggered refreshes to prevent rapid successive calls.
+
+### Error Recovery
+
+Always provide fallback UI for error states rather than crashing the component. Implement retry mechanisms for critical operations while respecting rate limits. Log errors appropriately for debugging while maintaining a smooth user experience.
+
+<Callout type="warning">
+The hook's polling mechanism can generate significant RPC traffic in applications with many concurrent users. Consider implementing request batching or moving to event-based updates for production deployments with high user counts.
+</Callout>
+
+## Summary
+
+The `useNFTData` hook represents a sophisticated solution to the complex challenge of synchronizing blockchain state with application UI. Through its intelligent orchestration of wagmi queries, TanStack Query caching, and Zustand state management, it provides a seamless developer experience while maintaining optimal performance. The hook's adaptive polling, automatic synchronization effects, comprehensive error handling, and smooth account switching support make it a critical component in delivering RitoSwap's real-time, multichain NFT experience. By abstracting the complexity of blockchain data management and providing automatic state synchronization, it enables developers to focus on building engaging user interfaces rather than managing asynchronous state coordination.

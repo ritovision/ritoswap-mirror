@@ -1,0 +1,234 @@
+---
+title: Environments and Variables
+description: GitHub Environments, secrets, and vars used by CI/CD.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# Environments and Variables
+
+This page lists the GitHub Environments and the secrets/vars used by the pipelines and manual workflows.
+
+## Environments and site mapping
+
+<Table>
+  <thead>
+    <tr>
+      <th>Environment</th>
+      <th>Site URL</th>
+      <th>Primary workflows</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>mainnet</td>
+      <td><code>https://ritoswap.com</code></td>
+      <td>DApp pipeline, Manual deploy mainnet</td>
+    </tr>
+    <tr>
+      <td>testnet</td>
+      <td><code>https://testnet.ritoswap.com</code></td>
+      <td>DApp pipeline, Manual deploy testnet, Manual smoke tests</td>
+    </tr>
+    <tr>
+      <td>docs</td>
+      <td><code>https://docs.ritoswap.com</code></td>
+      <td>Docs and Storybook pipeline, Manual deploy docs</td>
+    </tr>
+    <tr>
+      <td>storybook</td>
+      <td><code>https://ui.ritoswap.com</code></td>
+      <td>Docs and Storybook pipeline, Manual deploy storybook</td>
+    </tr>
+  </tbody>
+</Table>
+
+<Callout type="info">
+  Secrets and vars are environment-scoped. The names stay the same across environments, but values
+  (like <code>VERCEL_PROJECT_ID</code>) differ per environment.
+</Callout>
+
+## Mirror dispatch environment
+
+<Table>
+  <thead>
+    <tr>
+      <th>Environment</th>
+      <th>Repo</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ci-dispatch</td>
+      <td><code>ritovision/ritoswap-mirror</code></td>
+      <td>Stores the PAT used to trigger private pipelines</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Secrets (GitHub)
+
+<Table>
+  <thead>
+    <tr>
+      <th>Secret</th>
+      <th>Used for</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>VERCEL_TOKEN</td>
+      <td>All Vercel deploys and rollbacks</td>
+    </tr>
+    <tr>
+      <td>VERCEL_ORG_ID</td>
+      <td>All Vercel deploys and rollbacks</td>
+    </tr>
+    <tr>
+      <td>VERCEL_PROJECT_ID</td>
+      <td>All Vercel deploys and rollbacks</td>
+    </tr>
+    <tr>
+      <td>PRIVATE_KEY_PLAYWRIGHT</td>
+      <td>Playwright smoke tests</td>
+    </tr>
+    <tr>
+      <td>PRIVATE_KEY_API</td>
+      <td>Supertest API smoke tests</td>
+    </tr>
+    <tr>
+      <td>TOKEN_ID</td>
+      <td>Supertest API smoke tests</td>
+    </tr>
+    <tr>
+      <td>CODECOV_TOKEN</td>
+      <td>Codecov uploads when tokens are required (for example, protected branches)</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Mirror secrets (ritovision/ritoswap-mirror)
+
+<Table>
+  <thead>
+    <tr>
+      <th>Secret</th>
+      <th>Used for</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>RITOSWAP_PAT</td>
+      <td>Cross-repo dispatch for private pipelines</td>
+    </tr>
+    <tr>
+      <td>CODECOV_TOKEN</td>
+      <td>Codecov uploads for the mirror repo</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Vars (GitHub)
+
+<Table>
+  <thead>
+    <tr>
+      <th>Var</th>
+      <th>Used for</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>TEST_BASE_URL</td>
+      <td>Base URL for smoke tests (currently the testnet build URL)</td>
+    </tr>
+    <tr>
+      <td>CHAIN_ID</td>
+      <td>Chain ID for Supertest API tests</td>
+    </tr>
+    <tr>
+      <td>NEXT_PUBLIC_ENABLE_STATE_WORKER</td>
+      <td>Toggle used by Supertest API tests</td>
+    </tr>
+    <tr>
+      <td>NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT</td>
+      <td>Toggle used by Supertest API tests</td>
+    </tr>
+  </tbody>
+</Table>
+
+<Callout type="info">
+  For production, set <code>NEXT_PUBLIC_ENABLE_STATE_WORKER=true</code> and
+  <code>NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT=true</code> for
+  <code>dapp/e2e/supertest/api.test.ts</code> and <code>dapp/e2e/supertest/pinecone.test.ts</code>.
+  The base URL used by smoke tests is <code>TEST_BASE_URL</code> and can be changed if needed.
+</Callout>
+
+## Predeploy E2E defaults
+
+The predeploy E2E action sets a test-focused environment during local builds. These are defaults in
+<code>.github/actions/run-predeploy-e2e/action.yml</code> and do not come from secrets.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Default value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>DATABASE_URL</td>
+      <td><code>postgresql://testuser:testpass@localhost:5432/testdb?schema=public</code></td>
+    </tr>
+    <tr>
+      <td>NEXT_PUBLIC_ACTIVE_CHAIN</td>
+      <td><code>Sepolia</code></td>
+    </tr>
+    <tr>
+      <td>JWT_ISS</td>
+      <td><code>https://ritoswap.local</code></td>
+    </tr>
+    <tr>
+      <td>JWT_AUD</td>
+      <td><code>https://api.ritoswap.local</code></td>
+    </tr>
+    <tr>
+      <td>JWT_SECRET</td>
+      <td><code>test-secret-minimum-32-characters-long-for-hs256-algorithm</code></td>
+    </tr>
+    <tr>
+      <td>JWT_ALG</td>
+      <td><code>HS256</code></td>
+    </tr>
+    <tr>
+      <td>AI_PROVIDER</td>
+      <td><code>lmstudio</code></td>
+    </tr>
+    <tr>
+      <td>AI_BASE_URL</td>
+      <td><code>http://127.0.0.1:1234</code></td>
+    </tr>
+    <tr>
+      <td>AI_LOCAL_MODEL_1</td>
+      <td><code>llama-3.1-8b-lexi-uncensored-v2</code></td>
+    </tr>
+    <tr>
+      <td>AI_IMAGE_PROVIDER</td>
+      <td><code>openai</code></td>
+    </tr>
+    <tr>
+      <td>OPENAI_API_KEY</td>
+      <td><code>sk-test_dummy_key_for_build_only</code></td>
+    </tr>
+    <tr>
+      <td>OPENAI_IMAGE_MODEL</td>
+      <td><code>gpt-image-1</code></td>
+    </tr>
+    <tr>
+      <td>NEXT_PUBLIC_ACTIVATE_WORKER</td>
+      <td><code>false</code></td>
+    </tr>
+  </tbody>
+</Table>

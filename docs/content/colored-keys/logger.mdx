@@ -1,0 +1,204 @@
+---
+title: Winston Logger
+description: Detailed documentation for the Colored Keys Logger using Winston
+---
+
+import { FileTree, Tabs, Cards, Callout } from 'nextra/components'
+
+# Colored Keys Logger (Winston)
+
+## File Location
+
+<FileTree>
+  <FileTree.Folder name="lib" defaultOpen>
+    <FileTree.Folder name="logger">
+      <FileTree.File name="logger.config.ts" />
+      <FileTree.File name="logger.ts" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## What It Is
+
+Library: [Winston](https://github.com/winstonjs/winston)
+
+## Purpose
+
+Made for:
+- Readable console output during development
+- Structured JSON logs in files for production/post-mortems
+- Quiet tests by default (opt-in to see logs)
+
+## TL;DR Usage
+
+### With Module Tag
+
+```typescript
+import { createLogger } from '../lib/logger/logger';
+
+const log = createLogger('deploy'); // adds module tag
+
+log.info('Starting deploy…');
+log.debug('Config loaded', { network: process.env.HARDHAT_NETWORK });
+
+try {
+  // …
+} catch (err) {
+  log.error('Deploy failed', err as Error); // error details are captured in meta
+}
+```
+
+### Without Module Tag
+
+```typescript
+import logger from '../lib/logger/logger';
+logger.warn('Low balance for gas', { address: '0xabc…' });
+```
+
+## Where Logs Go
+
+### Console (enabled unless muted in "test mode")
+
+- Colorized level
+- HH:mm:ss timestamp
+- Optional [module]
+- Message
+
+Not strictly single-line: message is on one line, but metadata is pretty-printed and may span multiple lines.
+
+### Files (when `ENABLE_FILE_LOGS` is true)
+
+- `logs/contracts.log`: Records entries at or above configured global level
+- `logs/error.log`: Error level only
+
+#### Rotation
+- 5 MB per file
+- 3 files kept
+- Timestamp is time-only: "HH:mm:ss"
+
+## Format Details
+
+### Console Format
+
+```
+{timestamp} [optional-module] [level]: message {stringifiedMeta}
+```
+
+#### Example
+
+```
+12:04:31 [deploy] [info]: Starting deploy…
+12:04:31 [deploy] [debug]: Config loaded {
+  "network": "sepolia",
+  "gasPrice": "15 gwei"
+}
+12:04:32 [deploy] [error]: Deploy failed {
+  "stack": "Error: nonce too low\n  at ...",
+  "message": "nonce too low",
+  "name": "Error"
+}
+```
+
+### File Format (JSON)
+
+```json
+{
+  "level":"error",
+  "message":"Deploy failed",
+  "service":"colored-keys",
+  "network":"sepolia",
+  "module":"deploy",
+  "timestamp":"12:04:32",
+  "stack":"Error: nonce too low\n  at ...",
+  "name":"Error"
+}
+```
+
+## Environment Variables
+
+| Variable | Values | Effect |
+|----------|--------|--------|
+| `NODE_ENV` | `development` `production` `test` | Controls default `LOG_LEVEL` (debug outside production, info in production) |
+| `LOG_LEVEL` | `error` `warn` `info` `debug` `verbose` | Overrides computed level |
+| `HARDHAT_NETWORK` | e.g. `hardhat` `sepolia` | Added to default metadata, also toggles “test mode” when set to `hardhat` |
+| `ENABLE_FILE_LOGS` | `true` / `false` | Opt-in flag for file transports (`false` by default) |
+| `SHOW_TEST_LOGS` | `true` / `false` | Forces console logs even when running Hardhat tests |
+
+### File-logging Decision
+
+```
+const enableFileLogs = loggerConfig.ENABLE_FILE_LOGS; // boolean parsed from env
+```
+
+File transports are disabled unless you explicitly export `ENABLE_FILE_LOGS=true`.
+
+### "Test Mode" Conditions
+
+Console is silent when either `NODE_ENV === 'test'` or `HARDHAT_NETWORK === 'hardhat'`, unless `SHOW_TEST_LOGS=true`.
+
+## Default Metadata
+
+Every log includes:
+```json
+{
+  "service": "colored-keys", 
+  "network": process.env.HARDHAT_NETWORK || "hardhat"
+}
+```
+
+`createLogger('my-module')` adds:
+```json
+{
+  "module": "my-module"
+}
+```
+
+## API Surface
+
+### Available Methods
+- `error`
+- `warn`
+- `info`
+- `http`
+- `verbose`
+- `debug`
+- `silly`
+
+## Operational Notes
+
+<Callout type="warning">
+- Log directory (`./logs`) is created automatically
+- Avoid logging huge objects in tight loops
+- Ensure `logs/` is ignored in version control
+</Callout>
+
+## Extending the Logger
+
+```typescript
+import winston from 'winston';
+import logger from '../lib/logger/logger';
+
+logger.add(new winston.transports.Http({
+  host: 'log-collector.internal',
+  path: '/ingest',
+  ssl: true,
+  level: 'info',
+}));
+```
+
+## Troubleshooting
+
+### Common Issues
+
+- **No log files in development?** 
+  - Set `ENABLE_FILE_LOGS=true`
+  - (Optional) Switch to `NODE_ENV=production` so default log level drops to `info`
+
+- **Empty test output?** 
+  - Set `SHOW_TEST_LOGS=true`
+
+- **Missing module name?** 
+  - Use `createLogger('your-module')`
+
+- **Need different verbosity?** 
+  - Set `LOG_LEVEL` (debug for max detail, info for production)

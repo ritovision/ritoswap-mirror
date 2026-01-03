@@ -1,0 +1,203 @@
+/* Modal backdrop with blur */
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 2000; /* sits below the modal wrapper */
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Modal wrapper for centering on-screen */
+.modalWrapper {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999; /* above everything else */
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -45%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Main modal container */
+.modal {
+  width: 400px;
+  max-width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--primary-color);
+  position: relative;
+  border-radius: 10px;
+  overflow: hidden; /* ensure border-radius clips contents */
+}
+
+/* Top section */
+.topSection {
+  background: var(--primary-color);
+  border: var(--default-border);
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+  padding: 1.5rem 2rem;
+  position: relative;
+}
+
+.title {
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1.5rem;
+  margin: 0;
+  text-align: center;
+}
+
+.closeButton {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+
+.closeButton:hover {
+  opacity: 0.7;
+}
+
+.closeIcon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Scrollable middle section */
+.middleSection {
+  background: var(--primary-color);
+  border-left: var(--default-border);
+  border-right: var(--default-border);
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: 400px;
+  position: relative;
+}
+
+/* Custom scrollbar styles */
+.middleSection::-webkit-scrollbar {
+  width: 8px;
+}
+.middleSection::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+.middleSection::-webkit-scrollbar-thumb {
+  background: var(--secondary-color);
+  border-radius: 4px;
+}
+.middleSection::-webkit-scrollbar-thumb:hover {
+  background: rgba(4, 66, 108, 0.8);
+}
+
+.networksContainer {
+  padding: 0 2rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Bottom gradient overlay */
+.bottomSection {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3rem;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgba(3, 29, 49, 0)   0%,
+    rgba(3, 29, 49, 0.5) 30%,
+    rgba(3, 29, 49, 0.8) 60%,
+    rgba(3, 29, 49, 1)   100%
+  );
+  border-bottom: var(--default-border);
+  border-left: var(--default-border);
+  border-right: var(--default-border);
+  border-radius: 0 0 10px 10px;
+}
+
+/* Network button styles */
+.networkButton {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: var(--default-border);
+  border-radius: 200px;
+  cursor: pointer;
+  transition: background-color 1s ease;
+  width: 100%;
+}
+.networkButton:hover,
+.networkButton.active {
+  background-color: var(--secondary-color);
+}
+
+.chainLogo {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.chainName {
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .modal {
+    width: 95vw;
+  }
+
+  .topSection,
+  .networksContainer {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+.closeButton:focus,
+.closeButton:focus-visible {
+  outline: none;
+}
+
+/* Network buttons still get a visible outline when tabbing */
+.networkButton:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 2px;
+}

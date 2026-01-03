@@ -1,0 +1,43 @@
+{
+  "@context": "https://schema.org",
+  "@type": "SiteNavigationElement",
+  "name": "Main Navigation",
+  "url": "https://ritoswap.com",
+  "hasPart": [
+    {
+      "@type": "WebPage",
+      "name": "Home",
+      "url": "https://ritoswap.com"
+    },
+    {
+      "@type": "WebPage",
+      "name": "Swap",
+      "url": "https://ritoswap.com/swap"
+    },
+    {
+      "@type": "WebPage",
+      "name": "Privacy",
+      "url": "https://ritoswap.com/privacy"
+    },
+    {
+      "@type": "WebPage",
+      "name": "Terms",
+      "url": "https://ritoswap.com/terms"
+    },
+    {
+      "@type": "WebPage",
+      "name": "Portfolio",
+      "url": "https://ritoswap.com/portfolio"
+    },
+    {
+      "@type": "WebPage",
+      "name": "Mint",
+      "url": "https://ritoswap.com/mint"
+    },
+    {
+      "@type": "WebPage",
+      "name": "Gate",
+      "url": "https://ritoswap.com/gate"
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+.walletsContainer {
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.walletsContainer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.walletsContainer::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.walletsContainer::-webkit-scrollbar-thumb {
+  background: var(--secondary-color);
+  border-radius: 4px;
+}
+
+.walletButton {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: var(--default-border);
+  border-radius: 200px;
+  cursor: pointer;
+  transition: background-color 1s ease;
+  width: 100%;
+  font-family: var(--font-primary);
+}
+
+.walletButton:hover {
+  background-color: var(--secondary-color);
+}
+
+.walletButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.walletButton:disabled:hover {
+  background-color: transparent;
+}
+
+.walletIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.walletName {
+  color: white;
+  font-size: 1rem;
+  flex: 1;
+  text-align: left;
+}
+
+.noWalletButton {
+  background: none;
+  border: none;
+  color: var(--primary-body);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  margin: 1rem auto 0;
+  display: block;
+  transition: opacity 0.2s ease;
+}
+
+.noWalletButton:hover {
+  opacity: 0.7;
+}
+
+@media (max-width: 730px) {
+  .walletsContainer {
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .walletIcon {
+    width: 24px;
+    height: 24px;
+  }
+  .walletButton {
+    padding: 0.6rem 1rem;
+  }
+}

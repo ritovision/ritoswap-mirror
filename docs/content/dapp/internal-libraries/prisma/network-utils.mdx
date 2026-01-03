@@ -1,0 +1,391 @@
+---
+title: "Network-Aware Database Utils"
+description: "Dynamic routing for multichain token tracking with prismaNetworkUtils"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+
+# Network-Aware Database Utils
+
+The `prismaNetworkUtils` module provides an elegant abstraction layer that automatically routes database operations to the correct network-specific table. This critical infrastructure component enables RitoSwap to support multiple blockchain networks while maintaining clean, network-agnostic code throughout the application.
+
+## Core Concept
+
+In a multichain dApp, the same token ID can exist across different networks, representing entirely different assets. Token #42 on Ethereum mainnet is not the same as token #42 on Sepolia testnet. The prismaNetworkUtils module solves this challenge by providing a unified interface that automatically selects the appropriate database table based on the current network context.
+
+### The Problem It Solves
+
+Without this abstraction, every database query would need to manually determine which table to use:
+
+```typescript
+// ❌ Without prismaNetworkUtils - Error prone and repetitive
+let token;
+const chainId = getTargetChainId();
+if (chainId === 1) {
+  token = await prisma.tokenEthereum.findUnique({ where: { tokenId: 42 } });
+} else if (chainId === 11155111) {
+  token = await prisma.tokenSepolia.findUnique({ where: { tokenId: 42 } });
+} else if (chainId === 90999999) {
+  token = await prisma.tokenRitonet.findUnique({ where: { tokenId: 42 } });
+}
+
+// ✅ With prismaNetworkUtils - Clean and maintainable
+const tokenModel = getTokenModel();
+const token = await tokenModel.findUnique({ where: { tokenId: 42 } });
+```
+
+## Module Exports
+
+The prismaNetworkUtils module exports two primary functions:
+
+### getTokenModel()
+
+Returns a unified interface for token operations that internally routes to the correct Prisma model based on the current chain ID.
+
+```typescript
+interface TokenOperations {
+  findUnique: (args: { where: { tokenId: number } }) => Promise<any>
+  findMany: (args?: any) => Promise<any[]>
+  upsert: (args: {
+    where: { tokenId: number }
+    update: any
+    create: any
+  }) => Promise<any>
+}
+```
+
+**Usage Example:**
+```typescript
+import { getTokenModel } from '@/app/lib/prisma/prismaNetworkUtils'
+
+// In an API route or server component
+const tokenModel = getTokenModel();
+
+// Find a specific token
+const token = await tokenModel.findUnique({
+  where: { tokenId: 123 }
+});
+
+// Find all used tokens
+const usedTokens = await tokenModel.findMany({
+  where: { used: true },
+  orderBy: { usedAt: 'desc' }
+});
+
+// Create or update a token record
+const updatedToken = await tokenModel.upsert({
+  where: { tokenId: 456 },
+  update: { used: true, usedBy: address, usedAt: new Date() },
+  create: { tokenId: 456, used: true, usedBy: address, usedAt: new Date() }
+});
+```
+
+### getChainConfig()
+
+Returns the active-network metadata sourced from `dapp/app/config/chain.ts`. The object includes the numeric chain ID plus the RPC/WebSocket URLs pulled from validated env vars:
+
+```typescript
+type ChainConfig = {
+  chainId: number
+  name: string
+  rpcUrl: string
+  wssUrl?: string
+  explorerUrl?: string
+  explorerName?: string
+  isTestnet: boolean
+}
+```
+
+**Usage Example:**
+```typescript
+import { getChainConfig } from '@/app/lib/prisma/prismaNetworkUtils'
+import { createPublicClient, defineChain, http } from 'viem'
+
+const cfg = getChainConfig()
+const chain = defineChain({
+  id: cfg.chainId,
+  name: cfg.name,
+  network: cfg.name.toLowerCase().replace(/\s+/g, '-'),
+  nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+  rpcUrls: { default: { http: [cfg.rpcUrl] } },
+  blockExplorers: cfg.explorerUrl
+    ? { default: { name: cfg.explorerName ?? 'Explorer', url: cfg.explorerUrl } }
+    : undefined,
+  testnet: cfg.isTestnet,
+})
+
+const publicClient = createPublicClient({ chain, transport: http(cfg.rpcUrl) })
+```
+
+## Implementation Details
+
+### Network Detection
+
+The module relies on the `getActiveChain()` function from `chainConfig.ts`, which reads the validated `NEXT_PUBLIC_ACTIVE_CHAIN` environment variable (`ethereum`, `sepolia`, or `ritonet`).
+
+### Table Mapping
+
+Each supported network maps to a specific Prisma model:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Network</th>
+      <th>Chain ID</th>
+      <th>Prisma Model</th>
+      <th>Database Table</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>RitoNet</td>
+      <td>90999999* </td>
+      <td>`prisma.tokenRitonet`</td>
+      <td>`token_ritonet`</td>
+    </tr>
+    <tr>
+      <td>Sepolia</td>
+      <td>11155111</td>
+      <td>`prisma.tokenSepolia`</td>
+      <td>`token_sepolia`</td>
+    </tr>
+    <tr>
+      <td>Ethereum</td>
+      <td>1</td>
+      <td>`prisma.tokenEthereum`</td>
+      <td>`token_ethereum`</td>
+    </tr>
+  </tbody>
+</Table>
+
+<Callout type="info">
+*The RitoNet/local chain ID defaults to `90999999`, but you can override it via `NEXT_PUBLIC_LOCAL_CHAIN_ID`. Any value set there propagates through `CHAIN_IDS.ritonet` and into `getChainConfig()`.
+</Callout>
+
+### Error Handling
+
+The module implements defensive programming practices to handle edge cases:
+
+```typescript
+export function getTokenModel(): TokenOperations {
+  const chainId = getTargetChainId()
+
+  switch (chainId) {
+    case CHAIN_IDS.RITONET:
+      // ... return RitoNet operations
+    case CHAIN_IDS.SEPOLIA:
+      // ... return Sepolia operations
+    case CHAIN_IDS.ETHEREUM:
+      // ... return Ethereum operations
+    default:
+      throw new Error(`Unsupported chain ID: ${chainId}`)
+  }
+}
+```
+
+If an unsupported chain ID is detected, the function throws a descriptive error rather than silently failing or returning undefined behavior.
+
+### RPC Configuration
+
+The `getChainConfig()` function assembles RPC configurations dynamically based on environment variables:
+
+<Callout type="info">
+**Environment Variables Required:**
+- `NEXT_PUBLIC_LOCAL_BLOCKCHAIN_RPC` - RPC endpoint for local RitoNet
+- `NEXT_PUBLIC_ALCHEMY_API_KEY` - API key for Alchemy (used for Sepolia and Ethereum)
+- `NEXT_PUBLIC_LOCAL_CHAIN_ID` - Chain ID for RitoNet (defaults to 90999999)
+- `NEXT_PUBLIC_LOCAL_BLOCKCHAIN_NAME` - Display name for RitoNet (defaults to "RitoNet")
+</Callout>
+
+## Common Usage Patterns
+
+### Pattern 1: Token Status Checking
+
+The most common use case involves checking whether a token exists and has been used:
+
+```typescript
+// In /api/token-status/[tokenId]/route.ts
+export async function GET(request: NextRequest, { params }: { params: { tokenId: string } }) {
+  const tokenId = parseInt(params.tokenId, 10);
+  const tokenModel = getTokenModel();
+  
+  // Check database first
+  const token = await tokenModel.findUnique({
+    where: { tokenId }
+  });
+  
+  if (token) {
+    return NextResponse.json({
+      exists: true,
+      used: token.used,
+      usedBy: token.usedBy,
+      usedAt: token.usedAt
+    });
+  }
+  
+  // Token not in database, check blockchain...
+}
+```
+
+### Pattern 2: Marking Tokens as Used
+
+When processing token-gated access, the pattern involves verification followed by status update:
+
+```typescript
+// In /api/gate-access/route.ts
+export async function POST(request: NextRequest) {
+  const { tokenId, address } = await request.json();
+  
+  // Verify ownership on-chain first
+  const chainConfig = getChainConfig();
+  const publicClient = createPublicClient({
+    chain: chainConfig.chain,
+    transport: http(chainConfig.transport)
+  });
+  
+  // ... ownership verification logic ...
+  
+  // Update database
+  const tokenModel = getTokenModel();
+  await tokenModel.upsert({
+    where: { tokenId },
+    update: { 
+      used: true, 
+      usedBy: address, 
+      usedAt: new Date() 
+    },
+    create: { 
+      tokenId, 
+      used: true, 
+      usedBy: address, 
+      usedAt: new Date() 
+    }
+  });
+}
+```
+
+### Pattern 3: Bulk Operations
+
+For administrative or analytical purposes, bulk operations are straightforward:
+
+```typescript
+// Find all unused tokens
+const tokenModel = getTokenModel();
+const unusedTokens = await tokenModel.findMany({
+  where: { used: false },
+  orderBy: { tokenId: 'asc' }
+});
+
+// Get usage statistics
+const usageStats = await tokenModel.findMany({
+  where: { used: true },
+  select: {
+    usedAt: true,
+    usedBy: true
+  }
+});
+```
+
+## Testing Strategies
+
+The module includes comprehensive test coverage demonstrating best practices for testing network-aware code:
+
+### Mock Setup
+
+Tests use Vitest's mocking capabilities to isolate the module from external dependencies:
+
+```typescript
+vi.mock('@/app/utils/chainConfig', () => ({
+  getTargetChainId: vi.fn(),
+  CHAIN_IDS: { RITONET: 1, SEPOLIA: 2, ETHEREUM: 3 }
+}))
+
+vi.mock('@/app/lib/prisma/prisma', () => ({
+  prisma: {
+    tokenRitonet: { findUnique: vi.fn(), findMany: vi.fn(), upsert: vi.fn() },
+    tokenSepolia: { findUnique: vi.fn(), findMany: vi.fn(), upsert: vi.fn() },
+    tokenEthereum: { findUnique: vi.fn(), findMany: vi.fn(), upsert: vi.fn() },
+  }
+}))
+```
+
+### Test Scenarios
+
+Key test cases verify:
+1. Correct model selection for each supported chain ID
+2. Proper parameter passing to underlying Prisma methods
+3. Error handling for unsupported chain IDs
+4. Configuration assembly with environment variables
+
+## Performance Considerations
+
+The prismaNetworkUtils module is designed for optimal performance:
+
+### Minimal Overhead
+
+The routing logic uses a simple switch statement with constant-time lookup, adding negligible overhead to database operations.
+
+### Connection Reuse
+
+By routing through the singleton Prisma client, all operations benefit from connection pooling and query optimization.
+
+### Edge Caching
+
+When used with Prisma Accelerate, frequently accessed tokens benefit from global edge caching, reducing database load and improving response times.
+
+## Migration and Maintenance
+
+When adding support for new networks:
+
+<Steps>
+### Step 1: Update Chain Configuration
+Add the new chain ID to `CHAIN_IDS` in `chainConfig.ts`.
+
+### Step 2: Create Database Table
+Add a new model to `schema.prisma` following the existing pattern:
+```prisma
+model TokenNewNetwork {
+  tokenId  Int       @id
+  used     Boolean   @default(false)
+  usedBy   String?   
+  usedAt   DateTime?
+  
+  @@map("token_newnetwork")
+}
+```
+
+### Step 3: Update Network Utils
+Add a new case to both `getTokenModel()` and `getChainConfig()` functions.
+
+### Step 4: Run Migrations
+Generate and apply the database migration to create the new table.
+
+### Step 5: Update Tests
+Add test coverage for the new network in `prismaNetworkUtils.test.ts`.
+</Steps>
+
+## Troubleshooting
+
+Common issues and their solutions:
+
+### "Unsupported chain ID" Error
+
+**Cause:** The application is configured for a network not yet supported by prismaNetworkUtils.
+
+**Solution:** Verify environment variables are set correctly. If adding a new network, follow the migration steps above.
+
+### Database Connection Errors
+
+**Cause:** The Prisma client cannot connect to the database.
+
+**Solution:** Check that `DATABASE_URL` is set correctly and the database is accessible. For Prisma Accelerate, verify the connection string includes the API key.
+
+### Type Errors in TypeScript
+
+**Cause:** The TypeScript types don't match the actual Prisma schema.
+
+**Solution:** Run `pnpm prisma generate` to regenerate Prisma client types after schema changes.
+
+## Summary
+
+The prismaNetworkUtils module exemplifies thoughtful abstraction design in a multichain environment. By providing a unified interface that transparently handles network-specific routing, it enables developers to write cleaner, more maintainable code while ensuring data isolation between networks. Combined with comprehensive testing and clear error handling, it forms a robust foundation for RitoSwap's multichain token tracking infrastructure.

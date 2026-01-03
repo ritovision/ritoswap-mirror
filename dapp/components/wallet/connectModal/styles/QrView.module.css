@@ -1,0 +1,171 @@
+.qrContent {
+  padding: 2rem;
+  position: relative;
+}
+
+.qrTitle {
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1.5rem;
+  margin: 0 0 2rem 0;
+  text-align: center;
+  padding: 0 3rem;
+}
+
+.backButton {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: opacity 0.2s ease;
+}
+
+.backButton:hover {
+  opacity: 0.7;
+}
+
+.backButton svg {
+  width: 24px;
+  height: 24px;
+}
+
+.qrContainer {
+  margin: 2rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+.qrWrapper {
+  position: relative;
+  display: inline-block;
+  width: 220px;
+  height: 220px;
+}
+
+.placeholderLayer,
+.qrLayer {
+  position: absolute;
+  inset: 0;
+  border-radius: 10px;
+  transition: opacity 0.6s ease;
+}
+
+.placeholderLayer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: var(--font-primary);
+  border: var(--default-border);
+  background: #000000;
+  animation: qrShimmer 1s ease-in-out infinite;
+  will-change: filter, box-shadow;
+  opacity: 1;
+}
+
+.qrLayer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+}
+
+.isReady .placeholderLayer {
+  opacity: 0;
+}
+
+.isReady .qrLayer {
+  opacity: 1;
+  animation: qrFadeIn 0.6s ease forwards;
+}
+
+.qrCodeContainer {
+  position: absolute;
+  inset: 0;
+  background: #000000;
+  border: 2px solid #000000;
+  border-radius: 10px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.qrCodeContainer svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.qrLogoContainer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.qrLogo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.copyButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: var(--default-border);
+  border-radius: 200px;
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 1s ease;
+  text-decoration: none;
+}
+
+.copyButton:hover {
+  background-color: var(--secondary-color);
+}
+
+.copyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.copyButton:disabled:hover {
+  background-color: transparent;
+}
+
+.copyIcon {
+  width: 20px;
+  height: 20px;
+}
+
+@media (max-width: 730px) {
+  .qrContent {
+    padding: 1rem;
+  }
+}
+
+@keyframes qrFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes qrShimmer {
+  0%, 100% { filter: brightness(1); box-shadow: 0 0 0 rgba(255, 255, 255, 0); }
+  50% { filter: brightness(1.25); box-shadow: 0 0 16px rgba(255, 255, 255, 0.08); }
+}

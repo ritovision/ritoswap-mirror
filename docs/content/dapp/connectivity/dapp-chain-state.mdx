@@ -1,0 +1,89 @@
+---
+title: "Dapp Chain State"
+description: "View-only chain selection used for balances and UI without forcing wallet switches"
+---
+
+import { Callout, FileTree, Table } from 'nextra/components'
+
+# Dapp Chain State
+
+The dapp chain is a view-only chain selection used to render balances, logos, and network labels inside the UI. It is intentionally separate from the connected wallet chain so users can browse network data without forcing their wallet to switch.
+
+## Terminology
+
+<Table>
+  <thead>
+    <tr>
+      <th>Term</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Dapp chain</td>
+      <td>UI view chain used for balances and network labels (`dappChainId`).</td>
+    </tr>
+    <tr>
+      <td>Wallet chain</td>
+      <td>The network your wallet is currently connected to.</td>
+    </tr>
+    <tr>
+      <td>Active chain</td>
+      <td>The contract target chain defined by `NEXT_PUBLIC_ACTIVE_CHAIN`.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Provider and hook
+
+The dapp chain state lives in `DappChainProvider` and is accessed via `useDappChain`:
+
+<FileTree>
+  <FileTree.Folder name="components" defaultOpen>
+    <FileTree.Folder name="providers" defaultOpen>
+      <FileTree.File name="DappChainProvider.tsx" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+```tsx
+const {
+  dappChainId,
+  setDappChainId,
+  resetToActiveChain,
+  isOnActiveChain,
+} = useDappChain()
+```
+
+## Lifecycle rules
+
+- On connect, the dapp chain resets to the active chain. If the active chain changes while connected, the dapp chain also resets to match.
+- The provider makes a one-time wallet switch attempt if the wallet is on a different chain.
+- On disconnect, the switch attempt flag resets.
+
+The dapp chain can then be changed freely in the UI without changing the wallet network.
+
+## UI integrations
+
+- `NetworkModal` calls `setDappChainId` to change the view chain.
+- `NetworkWidget` uses `dappChainId` for balances, symbols, and logos.
+- `AccountModal` uses `dappChainId` for balances and network labels.
+
+## Transaction and signing flows
+
+Wallet-triggering flows reset the dapp chain to the active chain before they ask the wallet to sign or send a transaction:
+
+- `useMintBurn` (mint and burn)
+- `GateModal` (gate unlock signature)
+- `GatePageWrapper` (gated submission signature)
+
+This only resets the view chain. It does not force a wallet switch during the action. If your flow requires wallet-chain validation, add a guard before calling the action.
+
+<Callout type="info">
+The dapp chain lets users view balances on any supported chain while keeping wallet switching explicit and deliberate.
+</Callout>
+
+## Related docs
+
+- [Wallet UI Overview](/dapp/wallet-ui)
+- [Smart Contract Data Overview](/dapp/smart-contract-data)

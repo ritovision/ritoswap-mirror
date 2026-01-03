@@ -1,0 +1,307 @@
+---
+title: Colored Keys Smart Contracts
+description: ERC-721 NFT implementation with on-chain SVG generation and one-token-per-wallet restriction
+---
+
+import versions from '@lib/versions';
+import { Cards, Callout, Table } from 'nextra/components'
+
+# Colored Keys Smart Contracts
+**Version: {versions['colored-keys']}**  
+**Solidity: 0.8.20**  
+**OpenZeppelin: 5.3.0**
+
+## Overview
+
+Colored Keys is an ERC-721 NFT system with two main features: on-chain SVG generation and a one-token-per-wallet restriction. All metadata and images are generated directly in the smart contract without external dependencies.
+
+The system consists of two contracts:
+- **KeyToken.sol** - Base ERC-721 with on-chain SVG generation
+- **OnePerWalletKeyToken.sol** - Production contract that restricts ownership to one token per wallet
+
+## Quick Start
+
+```bash
+git clone https://github.com/ritovision/ritoswap.git
+cd ritoswap/colored-keys
+pnpm install
+pnpm compile
+```
+
+Configure environment variables:
+```bash
+cp .env.example .env
+# Add your PRIVATE_KEY, RECEIVER_ADDRESS, and API keys
+```
+
+## Contract Specifications
+
+<Table>
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th>Value</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Runtime Bytecode</td>
+      <td>18,565 bytes</td>
+      <td>75.5% of EIP-170 limit</td>
+    </tr>
+    <tr>
+      <td>Deployment Gas</td>
+      <td>4,127,918</td>
+      <td>Measured on testnet</td>
+    </tr>
+    <tr>
+      <td>Mint Gas</td>
+      <td>~247,000</td>
+      <td>Including color generation and storage</td>
+    </tr>
+    <tr>
+      <td>Transfer Gas</td>
+      <td>~83,000</td>
+      <td>Standard ERC-721 plus balance check</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Core Features
+
+### On-Chain Generation
+- SVG images generated directly in contract code
+- Deterministic colors based on token ID, block data, and minter address
+- Complete metadata generated without external dependencies
+- Base64-encoded data URIs for full compatibility
+
+### One-Token-Per-Wallet Restriction
+The production contract enforces ownership limits through an `_update` function override:
+
+```solidity
+function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
+    address from = _ownerOf(tokenId);
+    if (to != address(0) && balanceOf(to) > 0 && from != to) {
+        revert WouldExceedMaxTokensPerWallet(to);
+    }
+    return super._update(to, tokenId, auth);
+}
+```
+
+This check intercepts all token movements (minting, transferring, burning) while allowing self-transfers.
+
+### Color Generation Algorithm
+Colors are generated using keccak256 hashing with multiple seeds:
+
+```solidity
+backgroundColor = generateColor(tokenId, block.timestamp, minter);
+keyColor = generateColor(tokenId * 2, block.number, minter);
+```
+
+If colors are identical, the key color is inverted to ensure contrast. Note: this only detects exact matches, not visual similarity.
+
+## Deployment
+
+### Network Commands
+
+```bash
+# Local development
+pnpm deploy:hardhat
+pnpm deploy:local-blockchain
+
+# Testnets
+pnpm deploy:sepolia
+
+# Mainnet (uses Viem v2, limited scripts)
+pnpm deploy:mainnet
+```
+
+Contract addresses are automatically saved to `ContractAddresses/{network}.json` in the repository root.
+
+<Callout type="info">
+Mainnet deployment uses Viem v2 for enhanced reliability. Mainnet interaction is primarily intended through the dApp, so only deployment and verification scripts are provided.
+</Callout>
+
+### Contract Verification
+
+```bash
+pnpm verify:sepolia    # Requires ETHERSCAN_API_KEY
+pnpm verify:mainnet    # Requires ETHERSCAN_API_KEY
+```
+
+## Contract Interaction
+
+Basic operations using the deployed contract addresses:
+
+```bash
+# Mint one token (enforced by contract)
+pnpm mint:sepolia
+
+# Check ownership and supply
+pnpm check-supply:sepolia
+
+# Burn token (allows minting a new one)
+pnpm burn:sepolia
+
+# Transfer to RECEIVER_ADDRESS
+pnpm transfer:sepolia
+```
+
+## Testing
+
+<Callout type="info">
+The contracts have comprehensive test coverage including unit tests, gas profiling, and security analysis.
+</Callout>
+
+```bash
+# Run all tests
+pnpm test
+
+# Generate coverage report
+pnpm test:coverage
+
+# Gas consumption analysis
+pnpm test:gas
+
+# Security analysis
+pnpm slither
+pnpm mythril
+pnpm echidna
+```
+
+### Coverage Results
+
+| Contract | Statements | Branches | Functions | Lines |
+|----------|------------|----------|-----------|-------|
+| OnePerWalletKeyToken | 100% | 100% | 100% | 100% |
+| KeyToken | 95.83% | 100% | 88.89% | 96.15% |
+| SVGGenerator | 100% | 100% | 100% | 100% |
+| ColorGenerator | 57.89% | 16.67% | 66.67% | 62.5% |
+
+Lower coverage in ColorGenerator is due to private utility functions tested indirectly through public interfaces.
+
+## Architecture
+
+The contracts use standard OpenZeppelin inheritance with minimal custom logic:
+
+```
+ERC721 + ERC721Enumerable + ERC721Burnable
+    ↓
+KeyToken (adds color generation and SVG creation)
+    ↓
+OnePerWalletKeyToken (adds ownership restriction)
+```
+
+Supporting libraries:
+- **ColorGenerator.sol** - Pure functions for color generation and hex conversion
+- **SVGGenerator.sol** - Programmatic SVG construction
+
+## Key Functions
+
+### Public Functions
+- `mint()` - Mint one token (checks one-per-wallet rule)
+- `mintBatch(uint256)` - Batch minting (limited to quantity=1 in production)
+- `burn(uint256)` - Burn owned token
+- `tokenURI(uint256)` - Returns complete Base64-encoded JSON metadata
+- `getTokenColors(uint256)` - Returns background and key colors
+- `getTokenOfOwner(address)` - Returns tokenId and ownership status
+
+### View Functions
+- `balanceOf(address)` - Token count (always 0 or 1 in production)
+- `tokensOfOwner(address)` - Array of owned tokens
+- `totalSupply()` - Current supply
+
+## Technical Details
+
+### Storage Pattern
+Each token stores minimal data:
+```solidity
+struct ColorData {
+    string backgroundColor;  // Generated hex color
+    string keyColor;        // Generated hex color
+    address minter;         // Original minter
+    uint256 mintedAt;      // Block timestamp
+}
+```
+
+All other properties (SVG, metadata) are computed on-demand.
+
+### SVG Generation
+The SVG creates a simple key design with four elements:
+- Background rectangle (200x200)
+- Key ring (circle at 60,100 with radius 20)
+- Key shaft (rectangle from 80,95)
+- Two teeth elements (positioned at x=145 and x=165)
+
+## Integration
+
+### dApp Integration
+The contracts integrate with the RitoSwap dApp through standard ERC-721 interfaces plus custom view functions.
+
+<Cards num={2}>
+  <Cards.Card
+    title="Smart Contract Data Layer"
+    href="/dapp/smart-contract-data"
+    arrow
+  />
+  <Cards.Card
+    title="Smart Contract UI Components"  
+    href="/dapp/smart-contract-ui"
+    arrow
+  />
+</Cards>
+
+### Local Blockchain Support
+For local development, contracts can be deployed to the custom local blockchain:
+
+<Cards.Card
+  title="Local Blockchain Setup Guide"
+  href="/local-blockchain/dapp"
+  arrow
+/>
+
+## Documentation
+
+<Cards num={2}>
+  <Cards.Card
+    title="Contract Architecture"
+    href="/colored-keys/architecture"
+    arrow
+  />
+  <Cards.Card
+    title="Testing & Analysis"
+    href="/colored-keys/testing" 
+    arrow
+  />
+</Cards>
+
+<Cards num={3}>
+  <Cards.Card
+    title="Slither Analysis"
+    href="/colored-keys/security/slither"
+  />
+  <Cards.Card
+    title="Mythril Analysis"
+    href="/colored-keys/security/mythril"
+  />
+  <Cards.Card
+    title="Echidna Fuzzing"
+    href="/colored-keys/security/echidna"
+  />
+</Cards>
+
+## Limitations
+
+- **Color similarity detection**: Only checks for identical colors, not visual similarity
+- **Batch minting**: Limited to quantity=1 in production contract
+- **No upgradability**: Contracts are immutable by design
+- **One per address**: Restriction applies to addresses, not wallets (one wallet can control multiple addresses)
+
+## Development Features
+
+The base KeyToken contract includes `mintBatch(uint256)` for development testing of color generation across multiple tokens. In production, this is overridden to enforce quantity=1.
+
+## Summary
+
+Colored Keys provides a simple ERC-721 implementation with on-chain generation and ownership restrictions. The contracts prioritize simplicity and security over complex features, using proven OpenZeppelin foundations with minimal custom logic. The one-token-per-wallet mechanism creates scarcity while the on-chain generation ensures permanent availability.

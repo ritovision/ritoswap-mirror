@@ -1,0 +1,22 @@
+.container {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 99.25%;
+  height: 60px;
+  background-color: var(--primary-color);
+  border-top: var(--default-border);
+  border-left: var(--default-border);
+  border-right: var(--default-border);
+  box-shadow: 0 -2px 5px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+}
+
+.walletContainer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

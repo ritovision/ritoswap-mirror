@@ -1,0 +1,265 @@
+/* dapp/components/utilities/chatBot/modals/modals.module.css */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 10; 
+  background: rgba(0, 0, 0, 0.30);
+}
+
+.modal {
+  position: relative;
+  max-width: 90%;
+  max-height: 90vh;
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+/* ProcessingModal behavior: don't show a focus ring on the modal container */
+.modal:focus {
+  outline: none;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.modeSelectModal {
+  background: var(--primary-color);
+  border: 2px solid var(--secondary-color);
+  border-radius: 10px;
+  padding: 2rem;
+  width: auto;
+  max-width: 90%;
+  max-height: 85%;
+  overflow-y: auto;
+}
+
+.modalTitle {
+  font-family: var(--font-primary);
+  font-size: 2rem;
+  color: white;
+  text-align: center;
+  margin: 0 0 2rem;
+  text-transform: uppercase;
+}
+
+.modeGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modeButton {
+  font-family: var(--font-primary);
+  background: transparent;
+  border: 2px solid var(--secondary-color);
+  border-radius: 200px;
+  color: white;
+  padding: 1.5rem 2rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  text-transform: uppercase;
+}
+
+@media (max-width: 500px) {
+  .modeButton {
+    border-radius: 10px;
+  }
+}
+    
+
+.modeButton:hover {
+  background: var(--secondary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(252, 24, 25, 0.3);
+}
+
+.modeButtonTitle {
+  font-size: 1.5rem;
+  font-weight: bold;
+  letter-spacing: 1px;
+}
+
+.modeButtonDesc {
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  opacity: 0.8;
+  text-transform: none;
+}
+
+.errorModal {
+  background: black;
+  border: var(--error-border);
+  border-radius: 10px;
+  width: auto;
+  max-width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.errorModalContent {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 1.5rem;
+}
+
+.errorTitle {
+  font-family: var(--font-primary);
+  color: var(--accent-color);
+  font-size: 1.75rem;
+  margin: 0 0 1rem;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.errorScrollArea {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+  padding-right: 0.5rem;
+}
+
+.errorScrollArea::-webkit-scrollbar {
+  width: 8px;
+}
+.errorScrollArea::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+.errorScrollArea::-webkit-scrollbar-thumb {
+  background: var(--accent-color);
+  border-radius: 4px;
+}
+
+.errorMessage {
+  font-family: var(--font-body);
+  color: white;
+  line-height: 1.6;
+  margin: 0 0 1rem;
+}
+
+.errorDetails {
+  font-family: monospace;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(252, 24, 25, 0.3);
+  border-radius: 4px;
+  padding: 1rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.85rem;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.errorFooter {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+  flex-shrink: 0;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(252, 24, 25, 0.3);
+}
+
+.retryButton,
+.dismissButton {
+  font-family: var(--font-primary);
+  padding: 0.75rem 2rem;
+  border-radius: 200px;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 1rem;
+  transition: all 0.2s;
+}
+
+.retryButton {
+  background: transparent;
+  border: 2px solid var(--accent-color);
+  color: var(--accent-color);
+}
+.retryButton:hover { background: var(--accent-color); color: white; }
+
+.dismissButton {
+  background: transparent;
+  border: 2px solid var(--secondary-color);
+  color: white;
+}
+.dismissButton:hover { background: var(--secondary-color); }
+
+.confirmModal {
+  background: var(--primary-color);
+  border: 2px solid var(--secondary-color);
+  border-radius: 10px;
+  padding: 2rem;
+  width: auto;
+  max-width: 90%;
+  text-align: center;
+}
+
+.confirmTitle {
+  font-family: var(--font-primary);
+  color: white;
+  font-size: 1.75rem;
+  margin: 0 0 1.5rem;
+  text-transform: uppercase;
+}
+
+.confirmText {
+  font-family: var(--font-body);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 1rem;
+  line-height: 1.6;
+  margin: 0 0 2rem;
+}
+
+.confirmButtons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+}
+
+.deleteButton,
+.cancelButton {
+  font-family: var(--font-primary);
+  padding: 0.75rem 2rem;
+  border-radius: 200px;
+  cursor: pointer;
+  text-transform: uppercase;
+  font-size: 1rem;
+  transition: all 0.2s;
+  min-width: 120px;
+}
+
+.deleteButton {
+  background: transparent;
+  border: 2px solid var(--accent-color);
+  color: var(--accent-color);
+}
+.deleteButton:hover { background: rgba(252, 24, 25, 0.1); transform: scale(1.05); }
+
+.cancelButton {
+  background: transparent;
+  border: 2px solid var(--secondary-color);
+  color: white;
+}
+.cancelButton:hover { background: var(--secondary-color); transform: scale(1.05); }
+
+.modal button:focus,
+.modal a:focus {
+  outline: none;
+}
+
+.modal button:focus-visible,
+.modal a:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 3px;
+}

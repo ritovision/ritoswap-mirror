@@ -1,0 +1,9 @@
+{
+  "exclude": ["contracts/test/"],
+  "detectors": {
+    "reentrancy": true,
+    "unused-state": true,
+    "low-level-calls": false
+  },
+  "output": { "text": "slither-report.txt" }
+}

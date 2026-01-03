@@ -1,0 +1,355 @@
+---
+title: "dApp API Overview"
+description: "How the RitoSwap dApp HTTP APIs are structured, documented with OpenAPI, and covered by automated tests."
+---
+
+import { Cards, Callout, FileTree, Steps, Table } from 'nextra/components'
+
+# dApp API Overview
+
+This section describes **how the RitoSwap dApp APIs are put together** and how the individual endpoint pages (Token Status, Nonce, Gate Access, Form Submission Gate, Logger) relate to the underlying code.
+
+The goal of this page is to give contributors a mental model:
+
+- Where the API handlers live
+- How request/response contracts are defined
+- How the **OpenAPI spec is generated from Zod**
+- How everything is deployed as **Next.js + Vercel serverless functions**
+- How the APIs are covered by **Vitest** (unit/integration) and **Supertest** (E2E)
+
+Each route then has its own dedicated MDX page for deeper, endpoint‑specific details.
+
+## Runtime & hosting
+
+The dApp API surface is implemented using the **Next.js App Router** and deployed as Vercel serverless functions.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Concern</th>
+      <th>Implementation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Framework</td>
+      <td>Next.js App Router (`next@^14.2.33`, 15-style `app/` directory)</td>
+    </tr>
+    <tr>
+      <td>Runtime</td>
+      <td>Node.js (serverless functions on Vercel)</td>
+    </tr>
+    <tr>
+      <td>Primary dApp workspace</td>
+      <td>`dapp/` (Next.js app + API routes)</td>
+    </tr>
+    <tr>
+      <td>API route handlers</td>
+      <td>`dapp/app/api/**/route.ts`</td>
+    </tr>
+    <tr>
+      <td>OpenAPI route</td>
+      <td>`dapp/app/api/openapi/route.ts`</td>
+    </tr>
+    <tr>
+      <td>Swagger UI page</td>
+      <td>`dapp/app/api-docs/page.tsx`</td>
+    </tr>
+  </tbody>
+</Table>
+
+Each HTTP endpoint documented in this section corresponds directly to a Next.js `route.ts` file under `dapp/app/api`. The docs on this site are meant to **describe behavior and usage**, while the OpenAPI spec is the **single source of truth for the exact contracts**.
+
+<Callout type="info">
+  The dApp API pages focus **exclusively on the blockchain-relevant Next.js HTTP endpoints**.
+  
+  If you're looking for the **Cloudflare Worker APIs** (durable state + email relay) or the 
+  **AI backend APIs** (LangChain chat pipeline and MCP server), those are documented in separate sections — see the cards below.
+</Callout>
+
+
+<Cards>
+  <Cards.Card
+    title="Cloudflare Worker APIs"
+    href="/dapp/cloudflare"
+    arrow
+  >
+    Durable state and email relay endpoints for `/state` actions, quotas, rate limits, and the Brevo email relay.
+  </Cards.Card>
+
+  <Cards.Card
+    title="Chat & LangChain Backend"
+    href="/ai-systems/operations/chat"
+    arrow
+  >
+    AI chat orchestration, LangChain flows, and model-facing HTTP endpoints.
+  </Cards.Card>
+
+  <Cards.Card
+    title="MCP Server & Tools"
+    href="/ai-systems/operations/mcp"
+    arrow
+  >
+    The MCP server, tools, and agent integrations.
+  </Cards.Card>
+</Cards>
+
+## Schema-first API design with Zod & OpenAPI
+
+All request/response contracts are defined with **Zod v4** and converted into an OpenAPI document with **@asteasolutions/zod-to-openapi**.
+
+Key packages:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Package</th>
+      <th>Version</th>
+      <th>Role</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`zod`</td>
+      <td>`^4.0.17`</td>
+      <td>Core schema and validation library</td>
+    </tr>
+    <tr>
+      <td>`@asteasolutions/zod-to-openapi`</td>
+      <td>`^8.1.0`</td>
+      <td>Converts Zod schemas into an OpenAPI 3 document</td>
+    </tr>
+    <tr>
+      <td>`swagger-ui-react`</td>
+      <td>`^5.27.1`</td>
+      <td>Renders the interactive OpenAPI console in the browser</td>
+    </tr>
+  </tbody>
+</Table>
+
+Directory layout for schemas:
+
+<FileTree>
+  <FileTree.Folder name="dapp/app/schemas">
+    <FileTree.Folder name="domain">
+      <FileTree.File name="*.domain.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="dto">
+      <FileTree.File name="*.dto.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="openapi">
+      <FileTree.File name="openapi.ts" />
+      <FileTree.File name="tags.ts" />
+      <FileTree.File name="components.ts" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+At a high level:
+
+- **Domain schemas** (`dapp/app/schemas/domain`) capture core business rules independent of transport (validation helpers, shared guards, value objects).
+- **DTO schemas** (`dapp/app/schemas/dto`) describe the HTTP layer (request bodies, query params, path params, and responses per route).
+- **OpenAPI schemas** (`dapp/app/schemas/openapi`) stitch the domain/DTO schemas into a full OpenAPI document.
+
+### extendZodWithOpenApi
+
+The OpenAPI pipeline is built around `extendZodWithOpenApi`, which augments the Zod namespace with OpenAPI metadata helpers.
+
+Typical pattern:
+
+1. <strong>Extend Zod:</strong> Call `extendZodWithOpenApi(z)` once in the OpenAPI bootstrap file.
+2. <strong>Annotate schemas:</strong> Tag DTO/domain schemas with OpenAPI metadata (examples, descriptions, parameter hints).
+3. <strong>Generate spec:</strong> Use `generateOpenApiDocument` (or equivalent) to emit a full `openapi.json` into `public/`.
+4. <strong>Serve spec:</strong> `/api/openapi` reads that JSON, adjusts the `servers` array based on the current request/host, and returns it.
+
+In other words: **Zod is the single source of truth**, and OpenAPI/Swagger are derived artifacts.
+
+<Callout type="info">
+  If you need to change a request/response shape, update the corresponding `*.dto.ts` or `*.domain.ts` file first, then regenerate the OpenAPI document. The HTTP handlers and tests should import the same Zod schemas to stay in lockstep.
+</Callout>
+
+## Documentation surfaces
+
+There are two layers of documentation for the dApp APIs:
+
+1. **Human-friendly MDX pages (this section)**  
+   - One page per major route: Token Status, Nonce Generation, Gate Access, Form Submission Gate, Logger.  
+   - Focused on concepts, when-to-use guidance, gotchas, and examples.
+
+2. **Machine-readable OpenAPI + Swagger UI**  
+   - Generated spec at `/api/openapi` (served by `dapp/app/api/openapi/route.ts`).  
+   - Full-page Swagger console at `/api-docs` (dapp workspace).  
+  - Embedded Swagger blocks in the docs site via ``<SwaggerDocs />`` or ``<SwaggerDocs tag="..." />``.
+
+The embedded component lives at:
+
+```tsx
+// docs/app/components/utilities/swaggerdocs/SwaggerDocs.tsx
+<SwaggerUI
+  url={`${apiBaseUrl}/api/openapi`}
+  tryItOutEnabled
+  docExpansion="none"
+  defaultModelsExpandDepth={-1}
+  filter={tag || undefined}
+/>
+````
+
+On this docs site, endpoint pages use the `tag` filter (for example, `"Token Status"` or `"Gate Access"`) to show only the relevant slice of the spec.
+
+
+## Testing strategy
+
+The dApp APIs are covered at multiple levels, from pure schema tests to live HTTP calls.
+
+### Unit & integration — Vitest
+
+Key packages:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Package</th>
+      <th>Version</th>
+      <th>Role</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`vitest`</td>
+      <td>`^3.2.4`</td>
+      <td>Unit and integration test runner</td>
+    </tr>
+    <tr>
+      <td>`@vitest/coverage-v8`</td>
+      <td>`^3.2.4`</td>
+      <td>Coverage reporting</td>
+    </tr>
+    <tr>
+      <td>`@testing-library/react`</td>
+      <td>`^16.3.0`</td>
+      <td>React component testing (where UI interacts with API)</td>
+    </tr>
+  </tbody>
+</Table>
+
+Vitest is used to:
+
+* Assert that domain/DTO schemas accept valid payloads and reject invalid ones.
+* Exercise helper libraries (logging, signing, rate-limiting, etc.).
+* Validate that OpenAPI generation doesn’t drift from the Zod schemas.
+
+### End-to-end API tests — Supertest
+
+For live HTTP behavior, the project uses **Supertest**:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Package</th>
+      <th>Version</th>
+      <th>Role</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`supertest`</td>
+      <td>`^7.1.4`</td>
+      <td>Black-box HTTP tests hitting the Next.js handlers</td>
+    </tr>
+  </tbody>
+</Table>
+
+These tests:
+
+* Spin up the API routes and **hit them over HTTP** (or equivalent handler adapters).
+* Validate end-to-end behavior including status codes, headers, and RFC 7807 error shapes.
+* Are especially important for routes like `/api/gate-access` and `/api/form-submission-gate`, which combine auth, chain reads, database access, and side effects.
+
+See the **Testing & QA → Supertest** docs for concrete test locations and scenarios.
+
+## Endpoint index
+
+Use the table below as the high-level map for the API docs in this section.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Doc page</th>
+      <th>Endpoint</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><a href="/dapp/api/token-status">Token Status</a></td>
+      <td>`GET /api/token-status/[tokenId]`</td>
+      <td>Lightweight polling API for checking token existence and usage.</td>
+    </tr>
+    <tr>
+      <td><a href="/dapp/api/nonce">Nonce Generation</a></td>
+      <td>`GET /api/nonce`</td>
+      <td>Issues SIWE nonces for login flows, with rate limiting and expiry.</td>
+    </tr>
+    <tr>
+      <td><a href="/dapp/api/gate-access">Gate Access</a></td>
+      <td>`POST /api/gate-access`</td>
+      <td>Delivers gated content to token holders using JWT, SIWE, or legacy signatures.</td>
+    </tr>
+    <tr>
+      <td><a href="/dapp/api/form-submission-gate">Form Submission Gate</a></td>
+      <td>`POST /api/form-submission-gate`</td>
+      <td>One-time message submission for key holders, with email delivery and optional backdoor resets.</td>
+    </tr>
+    <tr>
+      <td><a href="/dapp/api/logger">Logger</a></td>
+      <td>N/A (library)</td>
+      <td>API-focused logger used across serverless handlers (Winston wrapper).</td>
+    </tr>
+  </tbody>
+</Table>
+
+## How to extend the API surface
+
+When adding a new endpoint:
+
+<Steps>
+  {<h3>1. Define domain & DTO schemas</h3>}
+  Add or extend a domain schema in `dapp/app/schemas/domain`.
+  Define the request/response DTOs in `dapp/app/schemas/dto` using Zod, with OpenAPI metadata attached.
+
+{<h3>2. Wire into OpenAPI</h3>}
+Register the new schemas and route under `dapp/app/schemas/openapi`.
+Ensure the endpoint is tagged so it can be filtered by ``<SwaggerDocs tag="..." />``.
+
+{<h3>3. Implement the handler</h3>}
+Create `dapp/app/api/[route-name]/route.ts`.
+Use the shared logger, rate-limiting, and security helpers where appropriate.
+
+{<h3>4. Add tests</h3>}
+Add schema/logic tests under Vitest.
+Add or extend Supertest suites to cover happy paths and failure modes.
+
+{<h3>5. Document the endpoint</h3>}
+Create a new MDX page under `docs/content/dapp/api`.
+Link to the OpenAPI spec using ``<SwaggerDocs tag="Your Tag" />``.
+Add the page to `_meta.js` so it appears in navigation. 
+</Steps>
+
+This keeps **schemas, handlers, docs, and tests aligned** while letting the OpenAPI spec remain the canonical contract for clients.
+
+````
+
+```js
+// docs/content/dapp/api/_meta.js
+
+const meta = {
+  index: 'Overview',
+  'token-status': 'Token Status',
+  nonce: 'Nonce Generation',
+  'gate-access': 'Gate Access',
+  'form-submission-gate': 'Form Submission Gate',
+  logger: 'Logger',
+};
+
+export default meta;
+````

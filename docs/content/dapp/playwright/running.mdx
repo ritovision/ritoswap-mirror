@@ -1,0 +1,92 @@
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Running the Suite
+
+These are the day-to-day commands for Playwright inside the `dapp/e2e/playwright` workspace, plus pointers to trace viewing and CI behaviour.
+
+## Local commands
+
+<Tabs items={['Common runs', 'Filtering', 'Debugging']} storageKey="playwright-running-tabs" defaultIndex={0}>
+  <Tabs.Tab>
+    ```bash
+    # Full headless run using Playwright config defaults
+    pnpm test:e2e
+
+    # Headed mode (opens the browser UI)
+    pnpm test:e2e -- --headed
+
+    # Single project (Chromium only, for example)
+    pnpm test:e2e -- --project=chromium
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```bash
+    # Run only specs matching a title regex (Playwright's --grep)
+    pnpm test:e2e -- --grep "Wallet Connection"
+
+    # Focus on one file
+    pnpm test:e2e -- dapp/e2e/playwright/hp-tokengate.spec.ts
+    ```
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ```bash
+    # Generate the HTML reporter and open it after the run
+    pnpm test:e2e -- --reporter=html && npx playwright show-report
+
+    # Record traces for every run (config already captures traces/videos on the first retry,
+    # so this flag is only needed when you want them for successful runs too)
+    pnpm test:e2e -- --trace=on
+    ```
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="warning" emoji="🧪">
+Set up <code>.env.playwright</code> before running anything that touches the wallet or MCP mocks; otherwise specs will fail during <code>env.ts</code> validation.
+</Callout>
+
+## Viewing traces & videos
+
+When the config records traces (`trace.zip`), open them with:
+
+```bash
+npx playwright show-trace path/to/trace.zip
+```
+
+Videos and screenshots live under `dapp/e2e/playwright/test-results/`. Delete the folder between runs if you want a clean slate.
+
+## Continuous Integration
+
+<Steps>
+  {<h3>1. Install & build</h3>}
+  CI installs dependencies (`pnpm install`), builds the dapp, and ensures the Playwright browsers are available (`pnpm exec playwright install --with-deps`).
+
+  {<h3>2. Run <code>pnpm test:e2e</code></h3>}
+  The same command used locally runs headless specs on CI. Real-mode tests rely on repository secrets for <code>.env.playwright</code>.
+
+  {<h3>3. Collect artifacts</h3>}
+  Failures upload the Playwright HTML report, traces, and screenshots. Download the artifacts to reproduce locally with <code>npx playwright show-trace</code>.
+</Steps>
+
+Need to tweak browsers or shard tests? Extend `package.json` scripts or Playwright config, then mention the change here so other devs know how to invoke it.
+
+### GitHub workflow specifics
+
+The job defined in `.github/workflows/playwright-e2e.yml`:
+
+- Triggers automatically after the “Deploy Testnet to Vercel” workflow succeeds, or via manual <code>workflow_dispatch</code>.
+- Runs on `ubuntu-latest`, scoped to the `dapp/` directory.
+- Installs dependencies, then executes `pnpm playwright test hp-tokengate --project=chrome --workers=1`.
+- Feeds secrets/variables into the run: `PRIVATE_KEY` from `secrets.PRIVATE_KEY_PLAYWRIGHT`, `TEST_BASE_URL`/`BASE_URL` from environment variables so the suite points at the freshly deployed preview.
+- Restricts browsers to Chrome (`pnpm playwright install chrome`) to keep runtime short; extend the workflow if you need additional projects.
+
+## Config defaults at a glance
+
+- **Test directory**: `dapp/e2e`.
+- **Parallelism**: fully parallel locally; CI forces `workers=1` with 2 retries.
+- **Base URL**: `process.env.BASE_URL` if provided; otherwise the config launches `pnpm run start` (Next.js) on port 3000 and points tests at `http://localhost:3000`.
+- **Artifacts**: screenshots/videos/traces live in `dapp/test-results/`. Traces & videos are captured on the first retry automatically.
+- **Projects**: Desktop Chrome (stable channel) plus a Pixel 5 mobile profile ship by default.
+- **Timeouts**: 60 s per test, 30 s per `expect`.
+- **Reporters**: list + HTML locally (HTML opens on failure); list + HTML + GitHub reporter on CI.
+
+Override these via CLI flags (`--project`, `--reporter`, etc.) when necessary, but understanding the defaults keeps local vs. CI runs predictable.

@@ -1,0 +1,17 @@
+/* app/portfolio/components/organize/ChainWrapper.module.css */
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 5rem;
+  /* Ensure smooth animations by preventing layout shifts */
+  position: relative;
+  min-height: 200px; /* Adjust based on your needs */
+}
+
+/* Optional: Add container query or responsive sizing if needed */
+@media (max-width: 730px) {
+  .wrapper {
+    gap: 0.75rem;
+  }
+}

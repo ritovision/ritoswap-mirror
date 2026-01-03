@@ -1,0 +1,24 @@
+name: manual-vitest-tests-codecov
+
+on:
+  workflow_dispatch:
+
+jobs:
+  vitest-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run Vitest tests (with Codecov)
+        uses: ./.github/actions/run-vitest-tests
+        with:
+          upload-coverage: 'true'
+          codecov-token: ${{ secrets.CODECOV_TOKEN }}

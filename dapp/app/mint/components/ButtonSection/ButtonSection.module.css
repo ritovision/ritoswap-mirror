@@ -1,0 +1,177 @@
+/* app/mint/components/ButtonSection/ButtonSection.module.css */
+.container {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  align-items: center;
+  margin-top: 2rem;
+  width: 100%;
+  max-width: 500px;
+  min-height: 60px; /* Reserve space to prevent layout shift */
+  opacity: 1;
+  transition: opacity 0.3s ease-in-out;
+  animation: initialFadeIn 1s ease-in-out;
+}
+
+.container.transitioning {
+  opacity: 0;
+}
+
+.mintButton,
+.gateButton,
+.burnButton,
+.loadingButton {
+  padding: 1rem 2rem;
+  font-family: var(--font-primary);
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: transparent;
+  border: var(--default-border);
+  border-radius: 200px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.loadingButton {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mintButton:hover:not(:disabled),
+.gateButton:hover {
+  background: var(--secondary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
+}
+
+.burnButton {
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.burnButton:hover:not(:disabled) {
+  background: var(--accent-color);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(255, 0, 0, 0.3);
+}
+
+.mintButton:disabled,
+.burnButton:disabled {
+  cursor: not-allowed;
+}
+
+.mintButton:disabled:not(.processing),
+.burnButton:disabled:not(.processing) {
+  opacity: 0.5;
+}
+
+/* Processing animations */
+.mintButton.processing,
+.burnButton.processing {
+  position: relative;
+  z-index: 1;
+}
+
+.mintButton.processing::before,
+.burnButton.processing::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -110%;
+  width: 110%;
+  height: 100%;
+  border-radius: 200px;
+  animation: waveSlide 2s ease-in-out infinite;
+  z-index: -1;
+}
+
+.mintButton.processing::before {
+  background: var(--secondary-color);
+}
+
+.burnButton.processing::before {
+  background: var(--accent-color);
+}
+
+@keyframes waveSlide {
+  0% {
+    left: -110%;
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  50% {
+    left: 0;
+    opacity: 1;
+  }
+  80% {
+    left: 0;
+    opacity: 0;
+  }
+  100% {
+    left: 0;
+    opacity: 0;
+  }
+}
+
+/* Smooth initial fade in */
+@keyframes initialFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Desktop-only: wider Mint & Burn */
+@media (min-width: 769px) {
+  .burnButton {
+    min-width: 200px;
+  }
+  .mintButton {
+    min-width: 400px;
+  }
+}
+
+/* Mobile override */
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    gap: 0.8rem;
+    min-height: 140px; /* Taller for vertical layout */
+    margin-top: 0rem;
+  }
+
+  .mintButton,
+  .gateButton,
+  .burnButton,
+  .loadingButton {
+    width: 100%;
+    max-width: 300px;
+  }
+}
+
+.faucetText {
+  text-align: center;
+  margin-top: 3rem;
+  font-size: 1rem;
+  text-decoration: none;
+  display: block;
+  color: inherit;
+}
+
+@media (max-width: 768px) {
+  .faucetText {
+    margin-top: 2rem;
+  }
+}

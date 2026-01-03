@@ -1,0 +1,53 @@
+.container {
+  position: relative;
+  width: 100%;
+  max-width: 800px;
+  height: 80vh;
+  border-radius: 100px 100px 20px 20px;
+  border: var(--default-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: transparent;
+  animation: containerGlowPulse 8s ease-in-out infinite;
+}
+
+@keyframes containerGlowPulse {
+  0%, 25% {
+    box-shadow: none;
+  }
+  50%, 75% {
+    box-shadow: 6px 6px 25px rgba(3, 62, 101, 0.25);
+  }
+  100% {
+    box-shadow: none;
+  }
+}
+
+.imageOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: url('/images/rito/rito-thinker.jpg');
+  background-size: cover;
+  background-position: center;
+  opacity: 0.1;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Make sure only children EXCEPT the overlay AND the modal overlay get the z-index tweak */
+.container > *:not(.imageOverlay):not([data-modal-overlay]) {
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 729px) {
+  .container {
+    width: 90%;
+    height: 95vh;
+    max-height: 80vh;
+  }
+}

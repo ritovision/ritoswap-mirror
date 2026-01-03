@@ -1,0 +1,180 @@
+# Logger
+
+This page documents the logger used by the dApp workspace's API code. It's tailored for serverful/serverless Node runtimes (e.g., Vercel functions) and differs slightly from the colored-keys logger.
+
+For deeper library details, see the upstream Winston docs.
+
+## File Location
+
+```
+dapp/
+└── app/
+    └── lib/
+        └── logger/
+            └── logger.ts
+```
+
+## What It Is
+
+### Exports
+
+- **default**: Preconfigured winston.Logger
+- **createLogger(module: string)**: Returns a child logger tagging all messages with module
+
+### Default Meta on Every Record
+
+- `service`: `process.env.SERVICE_NAME` || 'ritoswap-dapp'
+- `environment`: `process.env.NODE_ENV` || 'development'
+
+These default fields are also included in console output (the formatter spreads ...meta). Examples below omit them for brevity.
+
+## TL;DR Usage (API Route)
+
+```typescript
+// app/api/mint/route.ts (Next.js App Router)
+import { createLogger } from '@/app/lib/logger/logger';
+
+const log = createLogger('api/mint');
+
+export async function POST(req: Request) {
+  log.info('Mint request received');
+
+  try {
+    const body = await req.json();
+    log.debug('Parsed body', { hasWallet: !!body?.wallet });
+
+    // … do mint work …
+
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  } catch (err) {
+    // ✅ Pattern A (preferred): pass the Error as the top-level arg
+    log.error(err as Error);
+
+    // ✅ Pattern B (custom message + full stack): serialize manually
+    // log.error('Mint failed', normalizeError(err));
+
+    return new Response('Internal Error', { status: 500 });
+  }
+}
+
+function normalizeError(e: unknown) {
+  if (e instanceof Error) {
+    return { name: e.name, message: e.message, stack: e.stack };
+  }
+  return { error: e };
+}
+```
+
+> **Warning**: Pattern A shows a stack in console & files because `format.errors({ stack: true })` promotes `stack`/`name`/`message` only when the top-level log arg is an `Error`. This happens in the logger's format pipeline before the Console/File transport formats run.
+
+## Where Logs Go
+
+### Console (Always Added; Respects Global Level)
+
+- Colorized level, timestamp, optional [module], message
+- Not strictly single-line: message is one line; metadata is pretty-printed
+- Effective console timestamp: HH:mm:ss
+- Respects the global logger level
+
+### Files (Optional)
+
+File transports are added only when `ENABLE_FILE_LOGS=true` **and** the process is not running in test mode. This is mostly useful for local development or containerized environments where you control disk access.
+
+Logs include:
+- `logs/combined.log`: Records entries at or above the configured global level
+- `logs/error.log`: Only error level
+- `logs/exceptions.log`: Unhandled exceptions
+- `logs/rejections.log`: Unhandled promise rejections
+
+Rotation: 5 MB per file, 5 files kept (≈ 25 MB per stream)
+
+> **Warning**: This logger does **not** create `./logs`. Ensure the directory exists or disable file logs in ephemeral filesystems.
+
+## Console Format
+
+`{timestamp} [optional-module] [level]: message {stringifiedMeta}`
+
+### Examples
+
+#### Pattern A (Error as top-level)
+```bash
+12:04:31 [api/mint] [info]: Mint request received
+12:04:32 [api/mint] [error]: nonce too low {
+  "stack": "Error: nonce too low\n  at ...",
+  "name": "Error"
+}
+```
+
+#### Pattern B (custom message + serialized error)
+```bash
+12:04:32 [api/mint] [error]: Mint failed {
+  "name": "Error",
+  "message": "nonce too low",
+  "stack": "Error: nonce too low\n  at ..."
+}
+```
+
+### File JSON (Pattern A, trimmed)
+```json
+{
+  "level": "error",
+  "message": "nonce too low",
+  "service": "ritoswap-dapp",
+  "environment": "production",
+  "module": "api/mint",
+  "timestamp": "2025-08-09 12:04:32",
+  "stack": "Error: nonce too low\n  at ...",
+  "name": "Error"
+}
+```
+
+## Environment Variables
+
+| Variable | Values | Effect |
+|----------|--------|--------|
+| `NODE_ENV` | production / other | Default level: info (prod) / debug (other). Controls isDevelopment and isTest. |
+| `LOG_LEVEL` | `debug` \| `info` \| `warn` \| `error` | Overrides the auto-selected level (dev → debug, prod/test → info). |
+| `SERVICE_NAME` | any string | Overrides `service` in the default metadata. |
+| `ENABLE_FILE_LOGS` | `true`/`false` | Enables the file transports (defaults to `false`). |
+| `SHOW_TEST_LOGS` | `true`/`false` | When true, prevents the logger from silencing itself under `NODE_ENV=test`. |
+
+### Test Mode
+
+When `NODE_ENV === 'test'`, the entire logger is silent (no console, no files).
+
+## API/Deployment Notes
+
+> **Warning**: This logger relies on Node APIs. **Do not** import it in Edge runtime code.
+
+Serverless filesystems (e.g., Vercel):
+- Prefer console logs in production
+- Disable file logs via `DISABLE_FILE_LOGS=true`
+- Ensure `./logs` exists if enabling files locally/containers
+
+Recommendations:
+- Keep `LOG_LEVEL=info` in production
+- Avoid logging secrets or full request bodies
+- Use module tags by feature (api/mint, api/portfolio, jobs/sync)
+
+## Extending (Optional)
+
+Add transports once at app startup:
+
+```typescript
+import winston from 'winston';
+import base from '@/app/lib/logger/logger';
+
+base.add(new winston.transports.Http({
+  host: 'log-collector.internal',
+  path: '/ingest',
+  ssl: true,
+  level: 'info',
+}));
+```
+
+## Troubleshooting
+
+- No logs in tests? `NODE_ENV=test` silences the logger.
+- No file output in dev? Set `ENABLE_FILE_LOGS=true` and create a `logs/` directory.
+- Missing stack traces? Use Pattern A or serialize the error.
+- Seeing service/environment on every console line? That's expected (they're part of defaultMeta).

@@ -1,0 +1,53 @@
+.footerSocialsContainer {
+    border: var(--default-border);
+    border-radius: 10px;
+    background-color: transparent;
+    padding: 5px 18px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    max-width: 300px;
+    margin-top: 7%;
+  }
+
+  @media (min-width: 730px) {
+.footerSocialsContainer {
+        padding: 5px 60px;
+       max-width: 400px;
+      }
+  }
+  
+  /* Flex container to center the social icon links */
+  .socialsGrid {
+    margin-top: 1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    gap: 1rem; 
+  }
+  
+  /* Ensure each link is centered */
+  .socialLink {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  /* Wrapper for the Image to control sizing */
+  .socialIconWrapper {
+    position: relative;
+    height: 30px;
+    width: 40px;
+  }
+  
+  .socialsText {
+    font-family: var(--font-primary);
+    font-size: 1.5rem;
+    color: white;
+    text-align: center;
+    margin-top: 12px;
+  }
+  
+  

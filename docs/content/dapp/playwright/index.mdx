@@ -1,0 +1,110 @@
+import { Callout, FileTree, Steps, Tabs } from 'nextra/components'
+
+# Playwright E2E Test Suite
+
+The `/dapp/e2e/playwright` workspace owns every end-to-end test that runs inside the hosted dapp and docs sites. It is designed to do three things well:
+
+1. **Exercise real user journeys** — minting, token-gated flows, AI chat, portfolio views, swap widget syncing, and the core marketing pages.
+2. **Mock only what we control** — private keys, AI backends, and on-chain portfolio data can be stubbed or forwarded deterministically.
+3. **Document every assumption** — the helpers read environment variables, inject a custom wallet provider, and expose low-level diagnostics so failures are debuggable.
+
+<Callout type="info" emoji="🧭">
+This section covers the Playwright-specific tooling only. Broader QA guidance still lives under <code>dapp/testing</code>.
+</Callout>
+
+## Directory Tour
+
+<FileTree>
+  <FileTree.Folder name="dapp/e2e/playwright" defaultOpen>
+    <FileTree.File name="env.ts" />
+    <FileTree.File name="debug-key.ts" />
+    <FileTree.Folder name="mocks" defaultOpen>
+      <FileTree.File name="index.ts" />
+      <FileTree.Folder name="ai-provider">
+        <FileTree.File name="ai-provider.mock.ts" />
+        <FileTree.File name="response-handlers.ts" />
+        <FileTree.File name="mcp-caller.ts" />
+      </FileTree.Folder>
+      <FileTree.Folder name="chain-portfolio">
+        <FileTree.File name="chain-portfolio.mock.ts" />
+        <FileTree.File name="alchemy-portfolio.mock.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="flows">
+      <FileTree.File name="nft.flow.ts" />
+      <FileTree.File name="gate-access.flow.ts" />
+      <FileTree.File name="chatbot.flow.ts" />
+      <FileTree.File name="music-player.flow.ts" />
+      <FileTree.File name="wallet.flow.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="utils">
+      <FileTree.File name="wallet.utils.ts" />
+      <FileTree.File name="chat.utils.ts" />
+      <FileTree.File name="nft.utils.ts" />
+      <FileTree.File name="signing.utils.ts" />
+      <FileTree.File name="index.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="wallet">
+      <FileTree.File name="test-setup.ts" />
+      <FileTree.File name="provider.ts" />
+      <FileTree.File name="injected/provider.ts" />
+      <FileTree.File name="defaults.ts" />
+      <FileTree.File name="build-helper.ts" />
+    </FileTree.Folder>
+    <FileTree.File name="wallet.spec.ts" />
+    <FileTree.File name="hp-tokengate.spec.ts" />
+    <FileTree.File name="hp-mint-burn.spec.ts" />
+    <FileTree.File name="portfolio-assets.spec.ts" />
+    <FileTree.File name="swap-widget.spec.ts" />
+    <FileTree.File name="smoke.spec.ts" />
+  </FileTree.Folder>
+</FileTree>
+
+> The `docs/content/dapp/playwright` directory mirrors this hierarchy and explains each layer in depth. Jump to the page that matches what you are editing: environment, wallet harness, mocks, flows, or spec playbooks.
+
+## Test Lifecycle
+
+Every spec follows the same lifecycle, regardless of what it validates:
+
+<Steps>
+  {<h3>1. Load environment + wallet config</h3>}
+  <p>
+    <code>env.ts</code> loads <code>.env.playwright</code>, normalises the private key, derives the account,
+    and hands the wallet config to <code>wallet/test-setup.ts</code>.
+  </p>
+
+  {<h3>2. Bootstrap the page</h3>}
+  <p>
+    <code>setupTest()</code> clears storage (or preserves it if <code>persistConnection</code> is true),
+    injects the mocked/real provider bundle, exposes Node-side signing bridges, and listens for console errors.
+  </p>
+
+  {<h3>3. Attach mocks & flows</h3>}
+  <p>
+    Specs optionally install AI or portfolio mocks, then re-use flows/helpers (wallet, NFT, chat, gate, music)
+    so selectors and retries stay consistent across scenarios.
+  </p>
+
+  {<h3>4. Assert the user journey</h3>}
+  <p>
+    Each spec focuses on user-observable outcomes: buttons that flip states, rendered chat bubbles,
+    music bars, gate unlocks, or on-chain balance changes. Logs from utils/mocks surface context on failure.
+  </p>
+</Steps>
+
+## Picking a Mode
+
+<Tabs items={['Mock mode', 'Real mode']} storageKey="playwright-modes" defaultIndex={0}>
+  <Tabs.Tab>
+    **Mock mode** is used when you omit a private key. The injected provider returns deterministic signatures,
+    crafts synthetic receipts for `mint`/`burn`, and the AI + portfolio mocks intercept data calls. This is ideal
+    for local dev or CI runs that should not touch Sepolia.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    **Real mode** flips on automatically when `walletConfig.privateKey` is present. The Node bridge (via `viem`)
+    signs and broadcasts through a public Sepolia RPC, so `hp-mint-burn.spec.ts` and `hp-tokengate.spec.ts`
+    execute true on-chain transactions. Use a funded throwaway key and keep `.env.playwright` out of git.
+  </Tabs.Tab>
+</Tabs>
+
+The remaining pages drill into the pieces referenced here. Start with **Environment & Secrets** if you need to wire up `.env.playwright`, then continue through the wallet harness, mocks, reusable flows, spec guides, and troubleshooting tips.

@@ -1,0 +1,274 @@
+name: DApp Pipeline
+run-name: >-
+  DApp Pipeline${{ github.event_name == 'workflow_dispatch' && github.event.inputs.trigger_id && format(' (mirror {0})', github.event.inputs.trigger_id) || '' }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dapp/**'
+      - 'colored-keys/**'
+      - '.github/workflows/pipeline-dapp.yml'
+      - '.github/actions/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dapp/**'
+      - 'colored-keys/**'
+      - '.github/workflows/pipeline-dapp.yml'
+      - '.github/actions/**'
+  workflow_dispatch:
+    inputs:
+      trigger_id:
+        description: 'Mirror run id'
+        required: false
+        type: string
+
+jobs:
+  # Detect which paths changed for conditional job execution
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      dapp: ${{ steps.filter.outputs.dapp }}
+      contracts: ${{ steps.filter.outputs.contracts }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            dapp:
+              - 'dapp/**'
+            contracts:
+              - 'colored-keys/**'
+
+  # Step 1: ESLint
+  eslint:
+    needs: changes
+    if: needs.changes.outputs.dapp == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run ESLint
+        uses: ./.github/actions/run-eslint
+
+  # Step 2a: Unit & Integration Tests (with Codecov)
+  unit-tests:
+    needs: eslint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run Vitest tests
+        uses: ./.github/actions/run-vitest-tests
+        with:
+          upload-coverage: 'true'
+
+  # Step 2b: Hardhat Tests (only if colored-keys changed)
+  hardhat-tests:
+    needs: [changes]
+    if: needs.changes.outputs.contracts == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./colored-keys
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+        with:
+          filter: 'colored-keys...'
+
+      - name: Run Hardhat tests
+        uses: ./.github/actions/run-hardhat-tests
+
+  # Step 3: Pre-deploy E2E (build + smoke test locally)
+  predeploy-e2e:
+    needs: [unit-tests, hardhat-tests]
+    # Run if unit-tests passed AND (hardhat passed OR was skipped)
+    if: |
+      always() &&
+      needs.unit-tests.result == 'success' &&
+      (needs.hardhat-tests.result == 'success' || needs.hardhat-tests.result == 'skipped')
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_DB: testdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run pre-deploy E2E
+        uses: ./.github/actions/run-predeploy-e2e
+
+  # Step 4: Deploy to Testnet
+  deploy-testnet:
+    needs: predeploy-e2e
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: testnet
+    outputs:
+      previous-url: ${{ steps.deploy.outputs.previous-url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          pnpm-version: '10.13.1'
+          working-directory: .
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Deploy to Vercel (testnet)
+        id: deploy
+        uses: ./.github/actions/vercel-deploy
+        with:
+          mode: 'prebuilt'
+          production: 'true'
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: .
+
+  # Step 5: Post-deploy Smoke Tests (E2E + API in parallel)
+  smoke-e2e:
+    needs: deploy-testnet
+    runs-on: ubuntu-latest
+    environment: testnet
+    defaults:
+      run:
+        working-directory: ./dapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run smoke E2E tests
+        uses: ./.github/actions/run-smoke-e2e
+        with:
+          base-url: ${{ vars.TEST_BASE_URL }}
+          private-key: ${{ secrets.PRIVATE_KEY_PLAYWRIGHT }}
+
+  smoke-api:
+    needs: deploy-testnet
+    runs-on: ubuntu-latest
+    environment: testnet
+    defaults:
+      run:
+        working-directory: ./dapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run smoke API tests
+        uses: ./.github/actions/run-smoke-api
+        with:
+          base-url: ${{ vars.TEST_BASE_URL }}
+          private-key: ${{ secrets.PRIVATE_KEY_API }}
+          token-id: ${{ secrets.TOKEN_ID }}
+          chain-id: ${{ vars.CHAIN_ID }}
+          enable-state-worker: ${{ vars.NEXT_PUBLIC_ENABLE_STATE_WORKER }}
+          ai-chat-requires-jwt: ${{ vars.NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT }}
+
+  # Rollback testnet if smoke tests fail
+  rollback-testnet:
+    needs: [deploy-testnet, smoke-e2e, smoke-api]
+    # Run only if smoke tests failed AND testnet deployment succeeded
+    if: |
+      always() &&
+      needs.deploy-testnet.result == 'success' &&
+      needs.deploy-testnet.outputs.previous-url != '' &&
+      (needs.smoke-e2e.result == 'failure' || needs.smoke-api.result == 'failure')
+    runs-on: ubuntu-latest
+    environment: testnet
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rollback to previous deployment
+        uses: ./.github/actions/vercel-rollback
+        with:
+          deployment-url: ${{ needs.deploy-testnet.outputs.previous-url }}
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # Step 6: Deploy to Mainnet
+  deploy-mainnet:
+    needs: [smoke-e2e, smoke-api]
+    runs-on: ubuntu-latest
+    environment: mainnet
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup-node-pnpm
+        with:
+          pnpm-version: '10.13.1'
+          working-directory: .
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Deploy to Vercel (mainnet)
+        uses: ./.github/actions/vercel-deploy
+        with:
+          mode: 'prebuilt'
+          production: 'true'
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: .

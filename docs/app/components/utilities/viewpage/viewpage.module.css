@@ -1,0 +1,53 @@
+/* docs/app/components/utilities/viewpage/viewpage.module.css */
+
+.wrapper {
+  max-width: 400px;
+  margin: 0 auto;
+  margin-top: 2rem;
+}
+
+.title {
+  font-family: 'AgencyB';
+  font-size: 20px;
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.container {
+  display: flex;
+  justify-content: center;
+  border: var(--default-border);
+  overflow: hidden;
+  width: 100%;
+}
+
+/* when only one link, shrink & center it */
+.container.single {
+  width: 200px;
+  margin: 0 auto;
+}
+
+.section {
+  flex: 1;
+  max-width: 200px;
+  text-align: center;
+  padding: 0.75rem 1.5rem;
+  text-decoration: none;
+  color: inherit;
+  transition: background-color 1s;
+}
+
+/* fill the 200px on single */
+.container.single .section {
+  flex: none;
+  width: 100%;
+}
+
+.section:hover {
+  background-color: var(--secondary-color);
+}
+
+/* 2px divider only between two */
+.section:not(:last-child) {
+  border-right: 2px solid var(--secondary-color);
+}

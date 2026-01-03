@@ -1,0 +1,128 @@
+---
+title: Chat UI Sub-Modals
+description: Documentation for auxiliary chat modals including BaseModal, ConfirmResetModal, ErrorModal, ModeSelectModal, and BattleFormModal.
+---
+
+import { Cards } from 'nextra/components'
+import { StorybookEmbed } from '@components/StorybookEmbed'
+
+# Chat UI Sub-Modals
+
+The Chat UI utilizes a set of specialized modals to handle user interactions, error states, and configuration choices. These modals are built upon a shared `BaseModal` component to ensure consistency and accessibility.
+
+## Component Architecture
+
+The modals are located in `dapp/components/chatBot/modals/` and share a common styling module.
+
+| Component | Description |
+| :--- | :--- |
+| `BaseModal` | The foundational component providing layout, overlay, and accessibility features. |
+| `ConfirmResetModal` | Prompts the user for confirmation before clearing the conversation context. |
+| `ErrorModal` | Displays error messages and handles specific error scenarios like authentication failures. |
+| `ModeSelectModal` | Allows the user to switch between different chat agent personalities and configurations. |
+| `BattleFormModal` | Collects user context and preferences to initialize battle modes (Rap Battle, Agent Battle). |
+
+---
+
+## BaseModal
+
+`dapp/components/chatBot/modals/BaseModal.tsx`
+
+The `BaseModal` serves as the wrapper for all other modals. It handles:
+- **Overlay Management**: Renders a backdrop that can close the modal when clicked (unless disabled).
+- **Focus Management**: Traps focus within the modal when open and restores focus to the previously active element when closed.
+- **Keyboard Navigation**: Supports `Escape` key to close and `Tab` key to cycle through focusable elements.
+- **Accessibility**: Implements ARIA roles (`dialog`) and attributes (`aria-modal`, `aria-labelledby`).
+
+### Props
+- **`labelledById` / `describedById`**: Pass IDs for heading/description nodes so assistive tech announces the correct modal context.
+- **`onClose`**: Optional callback used for overlay clicks and the Escape key.
+- **`disableOverlayClose`**: When `true`, clicks on the backdrop are ignored (used by `BattleFormModal` to keep partially entered context from being lost).
+
+## ConfirmResetModal
+
+`dapp/components/chatBot/modals/ConfirmResetModal.tsx`
+
+This modal acts as a safeguard for the "Reset Chat" action.
+
+### Demo
+
+<StorybookEmbed title="ChatBot/Modals" story="ConfirmReset" height="640px" />
+
+### Logic
+- **Context Deletion**: It serves as the final confirmation step before wiping the current conversation history and context.
+- **State Integration**: Connects to the `useModalStore` to manage its open/closed state.
+- **Action Execution**: Triggers the provided `onConfirm` callback only when the user explicitly clicks "Delete".
+
+> [!NOTE]
+> This modal is critical for preventing accidental data loss, as resetting the chat is an irreversible action that clears the LLM's short-term memory.
+
+<Cards num={1}>
+  <Cards.Card
+    title="Context Management"
+    href="/ai-systems/context-management"
+    arrow
+  >
+    Learn more about how conversation context and history are managed in the application.
+  </Cards.Card>
+</Cards>
+
+## ErrorModal
+
+`dapp/components/chatBot/modals/ErrorModal.tsx`
+
+The `ErrorModal` provides a user-friendly interface for displaying application errors.
+
+### Demo
+
+Standard error state.
+
+<StorybookEmbed title="ChatBot/Modals" story="ErrorModal" height="640px" />
+
+JWT auth error state.
+
+<StorybookEmbed title="ChatBot/Modals" story="ErrorModalJwt" height="640px" />
+
+### Key Features
+- **Dynamic Content**: Renders error messages and optional detailed stack traces or debug info.
+- **JWT/Auth Handling**: Specifically detects authentication errors (401, JWT issues). If detected, it prompts the user to refresh the page to re-authenticate, rather than just showing a generic error.
+- **Retry Logic**: If the error object includes a `retry` function, a "Retry" button is displayed to allow the user to attempt the failed action again.
+
+## ModeSelectModal
+
+`dapp/components/chatBot/modals/ModeSelectModal.tsx`
+
+This modal allows users to select the "personality" and capability set of the AI agent.
+
+### Demo
+
+<StorybookEmbed title="ChatBot/Modals" story="ModeSelect" height="640px" />
+
+### Configuration & Logic
+The modal dynamically renders options based on `modeConfigs` defined in `dapp/app/lib/llm/modes/configs/`. Each mode configuration determines:
+- **System Prompts**: The base personality and instructions for the LLM (e.g., "You are RapBotRito...").
+
+## BattleFormModal
+
+`dapp/components/chatBot/modals/BattleFormModal.tsx`
+
+The `BattleFormModal` is a specialized form that collects context from the user before starting a "Battle" mode session (e.g., Rap Battle).
+
+### Demo
+
+<StorybookEmbed title="ChatBot/Modals" story="BattleForm" height="720px" />
+
+### Purpose
+Unlike standard chat modes, battle modes require initial context to generate high-quality, personalized content. This modal bridges the gap between selecting a mode and starting the interaction.
+
+### Key Features
+- **Dynamic Fields**: Renders input fields based on a configuration array (`FIELD_CONFIGS`), allowing for easy updates to the requested information (e.g., "Favorite blockchain", "Things to brag about").
+- **Dual Input**: Collects data for both the "User" and the "Chatbot" (RapBotRito), enabling the user to define the persona of their opponent as well.
+- **Identity Integration**: Uses `wagmi` hooks (`useEnsName`, `useEnsAvatar`) to display the user's Web3 identity (ENS name and avatar) within the form UI.
+- **Clear Safeguard**: Keeps the trash icon disabled until at least one field has content (`hasContent()` check) so users don’t accidentally wipe an empty form; submission is always available.
+
+### Data Flow
+1.  **Trigger**: Opened by `ModeSelectModal` when a user selects a battle mode.
+2.  **Collection**: User fills out fields; data is stored in `chatModeStore`.
+3.  **Submission**: On "Done", the selected mode is finally activated via `setMode`, and the modal closes.
+

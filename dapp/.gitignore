@@ -1,0 +1,70 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+GPT prompts
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env
+.env.supertest
+.env.playwright
+.env.postman
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+.vercel
+# prisma
+/app/generated/prisma
+
+# service worker and source map
+/public/sw.js
+/public/sw.js.map
+
+# workbox runtime (hashed)
+!/public/workbox-*.js
+/public/workbox-*.js.map
+
+# logger
+/app/lib/logger/logs
+
+# postman
+
+postman/report.html
+postman/openapi.*.json
+postman/collection.json
+postman/local.postman_environment.json
+
+# Sentry Config File
+.env.sentry-build-plugin

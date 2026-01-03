@@ -1,0 +1,407 @@
+---
+title: Footer System Guide
+description: Complete documentation for the RitoSwap footer system
+author: Rito
+---
+
+import { Cards, FileTree } from 'nextra/components'
+
+# Footer System Guide
+<FileTree>
+  <FileTree.Folder name="components" defaultOpen>
+    <FileTree.Folder name="footer" defaultOpen>
+      
+      <FileTree.File name="FooterWrapper.tsx" />
+
+      <FileTree.Folder name="footerMobile">
+        <FileTree.File name="FooterMobileServer.tsx" />
+        <FileTree.File name="FooterMobileClient.tsx" />
+        <FileTree.File name="FooterMobile.module.css" />
+      </FileTree.Folder>
+
+      <FileTree.Folder name="footerDesktop">
+        <FileTree.File name="FooterDesktopServer.tsx" />
+        <FileTree.File name="FooterDesktopClient.tsx" />
+        <FileTree.File name="FooterDesktop.module.css" />
+      </FileTree.Folder>
+
+      <FileTree.Folder name="utilities" defaultOpen>
+        <FileTree.Folder name="imageQuote">
+          <FileTree.File name="imageTextPairs.json" />
+          <FileTree.File name="ImageQuoteServer.tsx" />
+          <FileTree.File name="ImageQuoteClient.tsx" />
+          <FileTree.File name="ImageQuote.module.css" />
+        </FileTree.Folder>
+        <FileTree.Folder name="footerSocials">
+          <FileTree.File name="FooterSocialsServer.tsx" />
+          <FileTree.File name="FooterSocialsClient.tsx" />
+          <FileTree.File name="FooterSocials.module.css" />
+        </FileTree.Folder>
+        <FileTree.Folder name="footerMenu">
+          <FileTree.File name="FooterMenuServer.tsx" />
+          <FileTree.File name="FooterMenuClient.tsx" />
+          <FileTree.File name="FooterMenu.module.css" />
+        </FileTree.Folder>
+        <FileTree.Folder name="footerLegal">
+          <FileTree.File name="FooterLegalServer.tsx" />
+          <FileTree.File name="FooterLegalClient.tsx" />
+          <FileTree.File name="FooterLegal.module.css" />
+        </FileTree.Folder>
+        <FileTree.Folder name="LogoArray">
+          <FileTree.File name="LogoArrayServer.tsx" />
+          <FileTree.File name="LogoArrayClient.tsx" />
+          <FileTree.File name="LogoArray.module.css" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Overview
+
+The RitoSwap footer system implements a sophisticated responsive architecture that dynamically renders different layouts based on viewport width while maintaining code efficiency through Next.js dynamic imports and code splitting. This approach ensures optimal performance by loading only the necessary components for each device type.
+
+### What’s inside
+
+- [Social Bar](./socialbar): curated external social links with accessible icon treatment
+- [Menu](./menu): footer-specific two-column navigation using local link config
+- [Logo Array](./logo-array): responsive co-brand/partner logo showcase with individualized scaling
+- [Legal](./legal): privacy/terms links, versioned copyright, and builder credit
+- [Image & Quote](./imageQuote): client-side randomized image/quote pairs for dynamic footer content
+
+<Cards>
+  <Cards.Card title="Social Bar" href="./socialbar" icon="🔗">
+    Icon-based social links with curated destinations.
+  </Cards.Card>
+  <Cards.Card title="Menu" href="./menu" icon="📑">
+    Two-column footer nav with manual link config.
+  </Cards.Card>
+  <Cards.Card title="Logo Array" href="./logo-array" icon="🖼️">
+    Responsive co-brand grid with per-logo scaling.
+  </Cards.Card>
+  <Cards.Card title="Legal" href="./legal" icon="⚖️">
+    Privacy/terms links plus versioned copyright/credit.
+  </Cards.Card>
+  <Cards.Card title="Image & Quote" href="./imageQuote" icon="✨">
+    Client-side randomized image and quote pairs.
+  </Cards.Card>
+</Cards>
+
+## Core Architecture
+
+### FooterWrapper Component
+
+The `FooterWrapper` serves as the intelligent orchestrator of the footer system, handling viewport detection and component selection. This component implements several key architectural decisions:
+
+```tsx
+// components/footer/FooterWrapper.tsx
+"use client";
+
+import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
+import ImageQuoteClient from "./utilities/imageQuote/ImageQuoteClient";
+import imageTextPairs from "./utilities/imageQuote/imageTextPairs.json";
+
+const FooterDesktopClient = dynamic(
+  () => import("./footerDesktop/FooterDesktopClient"),
+  { ssr: false }
+);
+const FooterMobileClient = dynamic(
+  () => import("./footerMobile/FooterMobileClient"),
+  { ssr: false }
+);
+```
+
+The wrapper employs Next.js's `dynamic` function with `ssr: false` to achieve several benefits:
+
+1. **Code Splitting**: Each footer variant (desktop/mobile) loads only when needed, reducing initial bundle size
+2. **Client-Side Only**: Prevents hydration mismatches by ensuring components render only on the client
+3. **Performance Optimization**: Users on mobile devices never download desktop footer code and vice versa
+
+### Responsive Detection Logic
+
+The component uses a React Hook pattern to detect and respond to viewport changes:
+
+```tsx
+export default function FooterWrapper() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth <= 730);
+    onResize();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+```
+
+Key characteristics of this implementation:
+
+- **Breakpoint**: 730px serves as the threshold between mobile and desktop layouts
+- **Real-time Updates**: The resize listener ensures immediate layout switches without page reload
+- **Cleanup**: Proper event listener removal prevents memory leaks
+
+### Conditional Rendering Strategy
+
+The wrapper implements a ternary operator for clean conditional rendering:
+
+```tsx
+return isMobile ? (
+  <FooterMobileClient>
+    <ImageQuoteClient imageTextPairs={imageTextPairs} />
+  </FooterMobileClient>
+) : (
+  <FooterDesktopClient
+    rightMenuContent={<ImageQuoteClient imageTextPairs={imageTextPairs} />}
+  />
+);
+```
+
+This approach demonstrates how the same utility component (`ImageQuoteClient`) adapts to different layout contexts through strategic prop placement.
+
+## Desktop Footer Implementation
+
+The desktop footer employs a grid-based layout optimized for wider viewports with distinct content zones:
+
+### Component Structure
+
+```tsx
+// components/footer/footerDesktop/FooterDesktopClient.tsx
+export default function FooterDesktopClient({ rightMenuContent }: FooterDesktopClientProps) {
+  return (
+    <footer className={styles.footer} data-testid="footer">
+      {/* Top section: logo + socials */}
+      <div className={styles.topRow}>
+        <Link href="/" className={styles.logoContainer}>
+          <Image
+            src="/images/brand/ritoswap.png"
+            alt="RitoVision Wordmark"
+            width={350}
+            height={100}
+            className={styles.wordmark}
+            priority
+          />
+        </Link>
+        <div className={styles.footerSocialsInline}>
+          <FooterSocialsClient />
+        </div>
+      </div>
+
+      {/* Menu Row */}
+      <div className={styles.footerMenuRow}>
+        <div className={styles.footerMenuLeft}>
+          <FooterMenuClient />
+        </div>
+        <div className={styles.footerMenuRight}>
+          {rightMenuContent || <FooterMenuClient />}
+        </div>
+      </div>
+
+      {/* Co-brands */}
+      <div className={styles.logoArray}>
+        <LogoArrayClient />
+      </div>
+
+      {/* Legal */}
+      <div className={styles.footerLegal}>
+        <FooterLegalClient />
+      </div>
+    </footer>
+  );
+}
+```
+
+### Desktop Layout Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| rightMenuContent | React.ReactNode (optional) | Custom content for the right menu section, defaults to FooterMenuClient if not provided |
+
+The desktop layout uses CSS Grid for structured content organization:
+
+```css
+.footer {
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  gap: 20px;
+}
+
+.footerMenuRow {
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+}
+```
+
+This grid structure provides:
+- **Vertical Hierarchy**: Clear visual separation between logo, menus, co-brands, and legal sections
+- **Horizontal Balance**: Split menu sections create visual equilibrium
+- **Flexible Content Areas**: The `rightMenuContent` prop enables custom utility integration
+
+## Mobile Footer Implementation
+
+The mobile footer prioritizes vertical stacking and touch-friendly layouts:
+
+### Component Structure
+
+```tsx
+// components/footer/footerMobile/FooterMobileClient.tsx
+export default function FooterMobileClient({ children }: { children?: React.ReactNode }) {
+  return (
+    <footer className={styles.footer} data-testid="footer">
+      <Link href="/" className={styles.logoContainer}>
+        <Image
+          src="/images/brand/ritoswap.png"
+          alt="RitoSwap Logo"
+          width={400}
+          height={100}
+          className={styles.logo}
+          priority
+        />
+      </Link>
+
+      {children}
+
+      <FooterMenuClient />
+      <FooterSocialsClient />
+      <LogoArrayClient />
+      <FooterLegalClient />
+    </footer>
+  );
+}
+```
+
+### Mobile Layout Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| children | React.ReactNode (optional) | Flexible content slot positioned between logo and menu components |
+
+The mobile implementation uses Flexbox for optimal small-screen rendering:
+
+```css
+.footer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  padding-top: 2rem;
+}
+
+.logo {
+  width: 80%;
+  max-width: 400px;
+  margin-bottom: 5vw;
+}
+```
+
+Key mobile optimizations include:
+- **Vertical Flow**: All elements stack naturally for easy scrolling
+- **Responsive Sizing**: Logo scales with viewport width while maintaining maximum bounds
+- **Touch-Friendly Spacing**: Generous margins prevent accidental taps
+
+## Architectural Benefits
+
+### 1. Performance Through Code Splitting
+
+The dynamic import strategy ensures users download only the code they need:
+
+```tsx
+// Desktop users never download this
+const FooterMobileClient = dynamic(
+  () => import("./footerMobile/FooterMobileClient"),
+  { ssr: false }
+);
+```
+
+This results in:
+- **Reduced Initial Bundle**: Each device only downloads its matching footer variant
+- **Faster Time to Interactive**: Less JavaScript to parse and execute
+- **Bandwidth Efficiency**: Critical for mobile users on limited data plans
+
+### 2. Maintainability Through Separation
+
+Rather than managing complex CSS media queries within a single component, the architecture provides:
+
+- **Clear Boundaries**: Desktop and mobile logic remain isolated
+- **Easier Testing**: Each layout can be tested independently
+- **Simplified Debugging**: Issues are confined to specific implementations
+
+### 3. Flexibility for Utilities
+
+The structure accommodates utility components through strategic prop patterns:
+
+```tsx
+// Desktop: Utility as prop
+<FooterDesktopClient
+  rightMenuContent={<ImageQuoteClient imageTextPairs={imageTextPairs} />}
+/>
+
+// Mobile: Utility as children
+<FooterMobileClient>
+  <ImageQuoteClient imageTextPairs={imageTextPairs} />
+</FooterMobileClient>
+```
+
+This design allows utilities to:
+- **Adapt to Context**: Same component renders differently based on container
+- **Maintain Independence**: Utilities remain unaware of their footer context
+- **Enable Reusability**: Components work seamlessly in both layouts
+
+## Optional Server Component Pattern
+
+When a footer utility needs server-provided data (for example, sourcing image/quote pairs from the filesystem), you can wrap the mobile layout in a small server entrypoint. Otherwise, render the client footer components directly:
+
+```tsx
+// Server component for mobile
+export default function FooterMobileServer() {
+  return (
+    <FooterMobileClient>
+      <ImageQuoteServer />
+    </FooterMobileClient>
+  );
+}
+```
+
+When used, this pattern enables:
+- **Server-Side Data Fetching**: Utilities can load data before client hydration
+- **SEO Optimization**: Footer content renders in initial HTML
+- **Progressive Enhancement**: Client features layer on top of server-rendered content
+
+If your utilities already operate fully on the client (as in the component-specific docs), you can skip the server wrapper and render the client footers directly.
+
+## Testing Considerations
+
+The architecture facilitates comprehensive testing through:
+
+1. **Consistent Test IDs**: Both layouts use `data-testid="footer"`
+2. **Isolated Component Tests**: Each layout variant can be tested separately
+3. **Resize Behavior Tests**: The wrapper's responsive logic is easily testable
+
+```tsx
+// Example test structure
+describe('FooterWrapper', () => {
+  it('renders mobile footer when viewport <= 730px', () => {
+    // Test mobile rendering
+  });
+
+  it('renders desktop footer when viewport > 730px', () => {
+    // Test desktop rendering
+  });
+
+  it('switches layouts on resize', () => {
+    // Test dynamic switching
+  });
+});
+```
+
+## Summary
+
+The RitoSwap footer architecture exemplifies modern React patterns by combining:
+
+- **Performance optimization** through code splitting and dynamic imports
+- **Responsive design** through intelligent component selection
+- **Maintainability** through clear separation of concerns
+- **Flexibility** through thoughtful prop interfaces
+
+This structure ensures the footer system scales efficiently across devices while maintaining a clean, testable codebase that supports complex utility integrations without compromising performance or developer experience.

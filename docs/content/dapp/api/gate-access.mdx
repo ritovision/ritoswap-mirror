@@ -1,0 +1,193 @@
+---
+title: "Gate Access"
+description: "Secure content delivery for token holders with tiered JWT/SIWE/legacy authentication"
+---
+
+import { Callout, Table } from 'nextra/components'
+import SwaggerDocs from '@components/utilities/swaggerdocs/SwaggerDocs'
+
+# Gate Access API
+
+The Gate Access API provides authenticated access to exclusive content for Colored Key NFT holders.
+Where the Token Gate Verification API handles the *unlock* moment, this route is about *delivering the experience* — streaming the actual gated content (HTML, audio, styles, and scripts) to verified key holders.
+
+Domain enforcement is handled inside the route by comparing `NEXT_PUBLIC_DOMAIN` entries against both the request host and (for SIWE) the domain parsed from the message, so no external middleware is required.
+
+## When to use this endpoint
+
+Use `POST /api/gate-access` when:
+
+- You need to deliver gated content to a user who owns a Colored Key NFT.
+- You want to reuse a JWT `accessToken` for subsequent gate-access calls without re-signing.
+- Your dapp or front-end needs to embed HTML/audio/styles returned from the server specifically for token holders.
+
+If you only need to **verify** ownership and trigger one-time flows (emails, webhooks, etc.), use the Token Gate Verification API instead.
+
+## Auth flows at a glance
+
+Gate Access uses a three-tier authentication strategy with shared downstream checks (rate limiting, on-chain ownership, database usage):
+
+1. **Bearer JWT (preferred)**  
+   - Client sends `Authorization: Bearer <accessToken>`.  
+   - The token is validated and its embedded `tokenId` reused.  
+   - Request body is optional. If `tokenId` is provided, it must match the JWT payload to prevent override/replay attacks.
+
+2. **SIWE (Sign-In with Ethereum)**  
+   - Client first calls `/api/nonce` to get a fresh nonce.  
+   - Signs an EIP-4361 SIWE message (bound to the correct domain) including that nonce.  
+   - Sends `address`, `signature`, `tokenId`, `message`, and `nonce` to `/api/gate-access`.  
+   - On success, the route issues a fresh JWT (`accessToken`) for reuse.
+
+3. **Legacy timestamped signature**  
+   - Fallback path for older clients or when SIWE is disabled.  
+   - Client signs a legacy envelope that includes domain, path, method, chainId, and a 5-minute timestamp.  
+   - The server reconstructs the envelope from the incoming request and rejects mismatches or expired timestamps.
+
+Regardless of which tier succeeds, the route still enforces:
+
+- Per-identifier **rate limits**
+- **On-chain ownership** of the specified `tokenId`
+- **Database checks** to ensure the token hasn’t already been used
+- Content generation with graceful fallbacks (partial content instead of hard 500s where possible)
+
+## Request & response (at a glance)
+
+- **URL:** `POST /api/gate-access`  
+- **Content-Type:** `application/json`  
+- **Auth:** Bearer JWT **or** SIWE body **or** legacy body.
+
+### Example SIWE request body
+
+```json
+{
+  "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+  "signature": "0x...",
+  "tokenId": 42,
+  "message": "ritoswap.com wants you to sign in with your Ethereum account...",
+  "nonce": "k8Jd93kdo0Sdk39dkD9dk3mdk93kd9Dk"
+}
+```
+
+### Example success response
+
+```json
+{
+  "success": true,
+  "access": "granted",
+  "accessToken": "eyJhbGciOiJFZERTQSIsLi4u",
+  "content": {
+    "welcomeText": "Welcome, esteemed key holder!",
+    "textSubmissionAreaHtml": "<div class='submission-area'>...</div>",
+    "audioData": {
+      "headline": "Exclusive Audio",
+      "imageSrc": "/audio-cover.jpg",
+      "imageAlt": "Audio cover",
+      "description": "Exclusive content for token holders",
+      "title": "Token Holder Music",
+      "audioSrc": "/audio/exclusive.mp3",
+      "error": false
+    },
+    "styles": ".submission-area { padding: 20px; }",
+    "script": "console.log('Gated content loaded');"
+  }
+}
+```
+
+The `accessToken` field only appears when the call has just completed SIWE or legacy authentication. Subsequent Bearer-authenticated calls reuse that token and usually omit a new one.
+
+### Example error response (Problem Details)
+
+```json
+{
+  "type": "https://ritoswap.com/errors/too-many-requests",
+  "title": "Too many requests",
+  "status": 429,
+  "detail": "Rate limit exceeded for gate access",
+  "limit": 60,
+  "remaining": 0,
+  "retryAfter": 45
+}
+```
+
+All failures follow the RFC 7807 Problem Details shape. See the OpenAPI reference below for the complete matrix of status codes and error types.
+
+## OpenAPI reference & try-it console
+
+The OpenAPI spec is the **canonical source of truth** for this route’s request/response schemas, parameters, and example payloads.
+
+Use the interactive console below to:
+
+- Inspect the `Gate Access` endpoint schema and examples.
+- Try requests directly against `https://ritoswap.com/api/gate-access`.
+- Explore all documented success and error responses.
+
+<SwaggerDocs tag="Token Gate" />
+
+## Related endpoints
+
+Gate Access is usually used together with the nonce endpoint when SIWE is enabled:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Endpoint</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>GET /api/nonce</code></td>
+      <td>Returns a cryptographically secure nonce for SIWE authentication (5-minute TTL, rate limited).</td>
+    </tr>
+  </tbody>
+</Table>
+
+For full details on nonce lifecycle and SIWE configuration, see **Environment Configuration → Security & SIWE** and **Authentication → Nonce Endpoint** in the docs.
+
+## Gotchas & best practices
+
+### Domain consistency
+
+- Ensure SIWE messages use the same domain users see in their browser.
+- Keep `NEXT_PUBLIC_DOMAIN` synchronized across all deployed hosts (comma-separated allowlist).
+- If you change domains or add subdomains, update both env vars and any stored SIWE templates.
+
+### HTML & script safety
+
+The API may return HTML, styles, and scripts as part of the gated content payload.
+
+- Sanitize HTML (e.g., DOMPurify) before injecting into the DOM.
+- Consider sandboxing scripts or restricting what is allowed to run.
+- Use a Content Security Policy (CSP) that limits script origins and inline execution.
+
+### Rate limiting
+
+- Default behavior: ~60 requests per 60 seconds per identifier (IP or logical ID).
+- 429 responses include both JSON fields (`limit`, `remaining`, `retryAfter`) and HTTP headers (`X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After`).
+- Implement client-side throttling/backoff based on these hints.
+
+### JWT reuse
+
+- Prefer Bearer JWT auth for follow-up calls instead of re-running SIWE or legacy signatures.
+- Treat the `accessToken` as short-lived and bound to the original `tokenId`.
+- If you include `tokenId` in the body alongside a JWT, keep them in sync to avoid validation failures.
+
+## Automated coverage
+
+<Callout type="info">
+This route is covered by automated end-to-end tests documented in **Testing & QA → Supertest**.
+</Callout>
+
+The Supertest suites:
+
+- Exercise SIWE, legacy, and Bearer JWT flows.
+- Assert the documented 200/403/429 behaviors for valid and invalid token IDs.
+- Verify Problem Details error shapes and rate-limit headers.
+
+Refer to the testing docs if you need the full set of test cases and code examples.
+
+## Summary
+
+Gate Access is the core content-delivery endpoint for Colored Key NFT holders. It combines tiered authentication (JWT, SIWE, legacy) with on-chain verification, database checks, and careful rate limiting.
+
+Use this page to understand **how** the flow works and when to use it. Use the **OpenAPI reference above** as the single source of truth for the exact request/response contracts when you implement clients or SDKs.

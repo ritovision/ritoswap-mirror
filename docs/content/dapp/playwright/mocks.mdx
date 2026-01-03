@@ -1,0 +1,147 @@
+import { Callout, Steps, Tabs, Table } from 'nextra/components'
+
+# Mocks & Data Providers
+
+Playwright tests only mock the services we own. Everything else (Next.js pages, wagmi, on-chain contracts) behaves as in production. The mock entry point is `dapp/e2e/playwright/mocks/index.ts`, which re-exports the AI provider utilities and the chain-portfolio shims.
+
+## AI chat + MCP tooling
+
+`mocks/ai-provider/ai-provider.mock.ts` installs a single route handler that only intercepts `POST /api/chat`. Everything else (`/api/gate-access`, `/api/token-status`, `/api/mcp`, etc.) falls back to the real backend even in tests.
+
+<Tabs items={['Request flow', 'Handlers', 'MCP caller']} storageKey="ai-mock" defaultIndex={0}>
+  <Tabs.Tab>
+    <Steps>
+      <h3>1. Allowlist check</h3>
+      <p>
+        When the route sees <code>/api/chat</code>, it makes sure the pathname is not part of the allowlist
+        defined in <code>e2eEnv.mcpEndpoint</code> or other critical endpoints. Everything else is ignored.
+      </p>
+
+      <h3>2. Payload inspection</h3>
+      <p>
+        The mock parses <code>request.postData()</code>. If JSON parsing fails, it returns a <code>400</code> with a helpful error.
+      </p>
+
+      <h3>3. Handler execution</h3>
+      <p>
+        The request is turned into a <code>ResponseContext</code> (user message, body, URL, MCP caller). The active handler (default or custom) decides what text to stream back.
+      </p>
+
+      <h3>4. SSE streaming</h3>
+      <p>
+        The reply is streamed as Server-Sent Events that mirror the Vercel AI message protocol
+        (<code>start</code>, <code>text-delta</code>, <code>finish</code>, <code>[DONE]</code>).
+      </p>
+    </Steps>
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    <p>
+      <code>response-handlers.ts</code> bundles several handlers and a <code>composeHandlers()</code> helper:
+    </p>
+    <Table>
+      <thead>
+        <tr>
+          <th>Handler</th>
+          <th>Trigger</th>
+          <th>Behaviour</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>helloHandler</code></td>
+          <td>User message contains “hello”.</td>
+          <td>Responds with <q>Hello back!</q></td>
+        </tr>
+        <tr>
+          <td><code>nftCountHandler</code></td>
+          <td>
+            <code>how many nft</code>, <code>nft count</code>, <code>total supply</code>.
+          </td>
+          <td>
+            Calls the MCP tool <code>key_nft_read</code> (
+            <code>action: get_key_nft_total_supply</code>) and formats the result.
+          </td>
+        </tr>
+        <tr>
+          <td><code>musicCommandHandler</code></td>
+          <td><code>play altcoin love</code> (and aliases).</td>
+          <td>
+            Returns a <code>&lt;music song="Altcoin_Love" /&gt;</code> renderer.
+          </td>
+        </tr>
+        <tr>
+          <td><code>inlineRendererHandler</code></td>
+          <td>
+            <code>show keynft</code>, <code>send a celebratory gif</code>, etc.
+          </td>
+          <td>
+            Sends inline renderer tags (
+            <code>&lt;key-nft /&gt;</code>, <code>&lt;chain-logo /&gt;</code>, <code>&lt;gif /&gt;</code>, <code>&lt;img /&gt;</code>
+            ).
+          </td>
+        </tr>
+        <tr>
+          <td><code>echoHandler</code></td>
+          <td>Fallback.</td>
+          <td>Echoes the user message.</td>
+        </tr>
+      </tbody>
+    </Table>
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    <p>
+      <code>mcp-caller.ts</code> runs inside the browser context via <code>page.evaluate</code>. It forwards tool calls to
+      the real MCP endpoint with the user’s JWT:
+    </p>
+    <ul>
+      <li>JWT is read from cookies (<code>access_token</code> / <code>jwt</code>) or <code>localStorage</code>.</li>
+      <li>
+        The fetch body uses{' '}
+        <code>{`{ method: 'tools/call', params: { name, arguments } }`}</code>.
+      </li>
+      <li>Errors mentioning “Test ended” (e.g. browser closed) are swallowed because they happen during teardown.</li>
+    </ul>
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="info" emoji="🧠">
+If you need custom AI behaviour for a spec, pass <code>handler: composeHandlers(...)</code> to <code>installAIMock()</code>. This keeps the SSE plumbing in one place.
+</Callout>
+
+## Portfolio + Alchemy mocks
+
+Asset-heavy pages (like `/portfolio`) rely on two layers:
+
+1. **Chain-portfolio mock** (`mocks/chain-portfolio/chain-portfolio.mock.ts`) — intercepts internal endpoints (`/api/portfolio/assets`, `/api/assets`, etc.) and returns paginated ERC-20/721/1155 datasets keyed by `chainId`.
+2. **Alchemy mock** (`mocks/chain-portfolio/alchemy-portfolio.mock.ts`) — intercepts real Alchemy RPC / REST calls when the app fetches token balances or NFTs directly from Alchemy URLs.
+
+<Steps>
+  <h3>Define the dataset</h3>
+  Build a <code>PortfolioDataset</code> object mapping <code>chainId → &#123; erc20, erc721, erc1155 &#125;</code>. Each asset type has strongly typed fields (symbol, decimals, tokenId, image, etc.).
+
+  <h3>Install mocks inside the spec</h3>
+  <pre>
+    <code>
+      {`await installPortfolioAlchemyMock(page, { dataset, debug: true });`}
+    </code>
+  </pre>
+  Add <code>installChainPortfolioMock</code> if the page uses first-party endpoints. Both helpers accept <code>debug</code> flags and route patterns.
+
+  <h3>Run the flow</h3>
+  Call the portfolio helpers (<code>selectNetworks</code>, <code>expandTokenSection</code>, <code>expectGridRows</code>, etc.). They wait for the mocked endpoints to settle (grid vs empty state vs loading).
+</Steps>
+
+### Mock response details
+
+- The chain-portfolio mock inspects query params for <code>tokenType</code>, <code>chainId</code>, <code>address</code>, <code>page</code>, and <code>cursor</code>. Missing fields trigger <code>route.fallback()</code> so real API routes stay untouched.
+- Pagination is deterministic: page size defaults to 50 but can be overridden.
+- The Alchemy mock inspects the hostname (<code>eth-mainnet</code>, <code>eth-sepolia</code>, etc.) to infer the chain. For NFT endpoints it handles <code>pageKey</code> pagination.
+- ERC-20 balances are normalised to hex using <code>normalizeErc20Balance</code>, mimicking Alchemy’s <code>tokenBalance</code> shape.
+
+<Callout type="warning" emoji="🚫">
+Never intercept endpoints that mutate user data (e.g. <code>/api/gate-access</code>). The mocks already maintain an allowlist to prevent accidental overrides.
+</Callout>
+
+With mocks in place, the reusable flows tie everything together. Proceed to the next page for a catalogue of those helpers.

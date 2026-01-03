@@ -1,0 +1,65 @@
+---
+title: "Swap"
+description: "Multi-chain token swapping overview"
+---
+
+import { FileTree, Cards, Tabs, Callout } from 'nextra/components'
+import ViewPage from '@components/utilities/viewpage/viewpage'
+
+# Swap Page
+
+The Swap page brings cross-chain token trading right into RitoSwap via the Li.Fi widget. The heart of RitoSwap’s classic dApp vision is seamless token trading—so instead of building and maintaining a DEX from scratch, we embed Li.Fi’s battle-tested aggregator and theme it to match RitoSwap’s branding. Users get true multichain freedom without ever leaving the app, making the experience inclusive and expansive.
+
+**RitoSwap does NOT charge any fees or profit from widget usage, nor does it directly promote or sponsor any tokens or projects for profit.**
+
+<ViewPage
+  mainnetUrl="https://ritoswap.com/swap"
+  testnetUrl="https://testnet.ritoswap.com/swap"
+/>
+
+
+## File Paths
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name="app" defaultOpen>
+      <FileTree.Folder name="swap" defaultOpen>
+        <FileTree.Folder name="components" defaultOpen>
+          <FileTree.File name="Music.tsx" />
+          <FileTree.File name="SwapClient.integration.test.tsx" />
+          <FileTree.File name="SwapClient.tsx" />
+          <FileTree.File name="SwapClient.unit.test.tsx" />
+          <FileTree.File name="useExternalProvider.ts" />
+        </FileTree.Folder>
+        <FileTree.Folder name="jsonld" />
+        <FileTree.File name="metadata.ts" />
+        <FileTree.File name="page.integration.test.tsx" />
+        <FileTree.File name="page.module.css" />
+        <FileTree.File name="page.tsx" />
+        <FileTree.File name="page.unit.test.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+---
+
+## Components of Note
+
+| Component   | Location                                  | Purpose                                                                                              |
+|-------------|-------------------------------------------|------------------------------------------------------------------------------------------------------|
+| **SwapClient** | `app/swap/components/SwapClient.tsx`     | Loads, themes, and mounts the Li.Fi cross-chain swap widget with custom orbs and load-state styling. |
+| **Music**      | `app/swap/components/Music.tsx`          | Embeds the “A Trillie” audio player via `AudioWrapper`.                                              |
+
+## Music
+
+This page features **"A Trillie"**, Rito Rhymes’ parody remix of Lil Wayne’s *A Milli*. It’s a punchline-packed anthem about blockchain culture and crypto get-rich-quick memeing—perfect for trading vibes but not meant to be taken too seriously.
+
+## Widget Behavior
+
+- The widget is sourced from `@lifi/widget` and mounted inside `SwapClient`.
+- `widgetConfig.walletConfig.onConnect` is overridden so that Li.Fi’s “Connect Wallet” button opens the existing ConnectKit modal (via `openWalletConnectModal`).
+- All colors, typography, and border radii are themed through `widgetConfig.theme`, making it straightforward to align with any future rebrand.
+
+For full widget documentation and advanced setup options, see [Li.Fi Widget Docs](https://docs.li.fi/introduction/introduction).
+

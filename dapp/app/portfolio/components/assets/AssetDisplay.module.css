@@ -1,0 +1,228 @@
+/* app/portfolio/components/assets/AssetDisplay.module.css */
+.assetContainer {
+  border: var(--default-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card-bg, #1a1a1a);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  cursor: pointer;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.assetContainer:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Image Container */
+.imageContainer {
+  position: relative;
+  overflow: hidden;
+  background: #0a0a0a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.imageContainer.landscape {
+  aspect-ratio: 16 / 9;
+  max-height: 200px;
+}
+
+.imageContainer.portrait {
+  aspect-ratio: 3 / 4;
+  max-height: 280px;
+}
+
+.assetImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.noImage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0f0f0f;
+  color: white;
+  font-size: 14px;
+  font-weight: 1;
+  min-height: 150px;
+}
+
+/* Info Container */
+.infoContainer {
+  padding: 12px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.infoContainer::-webkit-scrollbar {
+  width: 6px;
+}
+
+.infoContainer::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 3px;
+}
+
+.infoContainer::-webkit-scrollbar-thumb {
+  background: var(--secondary-color);
+  border-radius: 3px;
+}
+
+.assetName {
+  font-size: 16px;
+  font-weight: 1;
+  margin: 0;
+  color: white;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.assetBalance {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.assetDescription {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  margin: 4px 0;
+  line-height: 1.4;
+  overflow-wrap: break-word;
+}
+
+/* Attributes */
+.attributes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.attribute {
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  display: flex;
+  gap: 4px;
+}
+
+.traitType {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.traitValue {
+  color: white;
+  font-weight: 1;
+  font-size: 12px;
+}
+
+.moreAttributes {
+  font-size: 11px;
+  color: var(--secondary-color);
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+}
+
+/* ERC-20 Specific */
+.erc20Header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tokenLogoWrapper {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  position: relative;
+  overflow: hidden;
+}
+
+.tokenLogo {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.tokenLogoPlaceholder {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--secondary-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 1;
+  font-size: 16px;
+  color: white;
+}
+
+.tokenInfo {
+  flex: 0 1 auto;
+  overflow: hidden;
+  text-align: center;
+}
+
+.tokenName {
+  font-size: 16px;
+  font-weight: 1;
+  margin: 0;
+  color: white;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tokenSymbol {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.tokenDetails {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.balance,
+.value {
+    margin-right: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 200px;
+}
+
+.label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.value {
+    margin-left: .5rem;
+  font-size: 14px;
+  color: white;
+  font-weight: 1;
+}

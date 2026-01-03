@@ -1,0 +1,63 @@
+.logoArrayContainer {
+  border: var(--default-border);
+  border-radius: 10px;
+  background-color: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 300px;
+  margin-top: 7%;
+  padding: 5px 18px;
+}
+
+.logoArrayTitle {
+  font-family: var(--font-primary);
+  font-size: 1.5rem;
+  color: white;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+.logoArrayWrapper {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 10px;
+  gap: 7vw;
+}
+
+.logoArrayLink {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+.logoArrayImage {
+  height: auto;
+  max-width: 100%;
+  flex-shrink: 0;
+  transition: transform 1s ease-in-out;
+}
+
+.logoArrayImage:hover {
+  transform: scale(1.1);
+}
+
+/* per-brand width overrides */
+.ritovision   { width: clamp(187px, 26.6vw, 293px); }
+.ritography   { width: clamp(227px, 32vw,   347px); }
+.ritorhymes   { width: clamp(147px, 21.3vw, 227px); }
+
+@media (min-width: 730px) {
+  .logoArrayContainer   { max-width: 1000px; padding: 5px 18px; }
+  .logoArrayWrapper     { flex-direction: row; gap: 7%; }
+  .logoArrayLink        { width: auto; }
+
+  .ritovision   { width: clamp(180px, 20vw, 260px); }
+  .ritography   { width: clamp(210px, 26vw, 300px); }
+  .ritorhymes   { width: clamp(140px, 18vw, 200px); }
+}

@@ -1,0 +1,50 @@
+
+.container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 99.25%;
+  height: 60px;
+  background-color: var(--primary-color);
+  border-bottom: var(--default-border);
+  border-left: var(--default-border);
+  border-right: var(--default-border);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+
+  /* Needs to sit above TopNav logo/hamburger in Storybook + app */
+  z-index: 1102;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;         
+  padding: 0 1rem;
+  overflow-x: auto;
+}
+
+/* custom scrollbar height, thumb, etc. */
+.container::-webkit-scrollbar {
+  height: 6px;
+}
+.container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.container::-webkit-scrollbar-thumb {
+  background-color: var(--secondary-color);
+  border-radius: 3px;
+}
+
+@media (min-width: 1100px) {
+  .container {
+    display: none;
+  }
+}
+
+@media (max-width: 400px) {
+  .container {
+    justify-content: flex-start;
+    
+  }
+  .container > a:last-child {
+  margin-right: 5rem;
+}
+}

@@ -1,0 +1,35 @@
+name: Vercel Rollback
+description: Rollback to a previous Vercel deployment
+
+inputs:
+  deployment-url:
+    description: 'The deployment URL to rollback to'
+    required: true
+  vercel-token:
+    description: 'Vercel API token'
+    required: true
+  vercel-org-id:
+    description: 'Vercel organization ID'
+    required: true
+  vercel-project-id:
+    description: 'Vercel project ID'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Vercel CLI
+      shell: bash
+      run: npm i -g vercel@latest
+
+    - name: Rollback to previous deployment
+      shell: bash
+      env:
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+      run: |
+        echo "Rolling back to: ${{ inputs.deployment-url }}"
+        vercel rollback ${{ inputs.deployment-url }} \
+          --token=${{ inputs.vercel-token }} \
+          --yes
+        echo "Rollback completed successfully"

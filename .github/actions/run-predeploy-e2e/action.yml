@@ -1,0 +1,73 @@
+name: Run Pre-deploy E2E
+description: Builds app locally with test DB and runs Playwright smoke tests (pre-deployment validation)
+
+inputs:
+  working-directory:
+    description: 'Working directory'
+    required: false
+    default: './dapp'
+  database-url:
+    description: 'Database URL for tests'
+    required: false
+    default: 'postgresql://testuser:testpass@localhost:5432/testdb?schema=public'
+
+runs:
+  using: composite
+  steps:
+    - name: Run Prisma migrations
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        DATABASE_URL: ${{ inputs.database-url }}
+      run: pnpm exec prisma migrate deploy
+
+    - name: Seed database (optional)
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        DATABASE_URL: ${{ inputs.database-url }}
+      run: pnpm exec prisma db seed || echo "No seed script found"
+
+    - name: Build Next.js app
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        DATABASE_URL: ${{ inputs.database-url }}
+        JWT_ISS: "https://ritoswap.local"
+        JWT_AUD: "https://api.ritoswap.local"
+        JWT_SECRET: "test-secret-minimum-32-characters-long-for-hs256-algorithm"
+        JWT_ALG: "HS256"
+        NEXT_PUBLIC_ACTIVE_CHAIN: "Sepolia"
+        AI_PROVIDER: "lmstudio"
+        AI_BASE_URL: "http://127.0.0.1:1234"
+        AI_LOCAL_MODEL_1: "llama-3.1-8b-lexi-uncensored-v2"
+        AI_IMAGE_PROVIDER: "openai"
+        OPENAI_API_KEY: "sk-test_dummy_key_for_build_only"
+        OPENAI_IMAGE_MODEL: "gpt-image-1"
+        NEXT_PUBLIC_ACTIVATE_WORKER: "false"
+      run: pnpm run build
+
+    - name: Install Playwright with dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm exec playwright install --with-deps chromium
+
+    - name: Run smoke tests
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        DATABASE_URL: ${{ inputs.database-url }}
+        NODE_ENV: "test"
+        NEXT_PUBLIC_ACTIVE_CHAIN: "Sepolia"
+        JWT_ISS: "https://ritoswap.local"
+        JWT_AUD: "https://api.ritoswap.local"
+        JWT_SECRET: "test-secret-minimum-32-characters-long-for-hs256-algorithm"
+        JWT_ALG: "HS256"
+        AI_PROVIDER: "lmstudio"
+        AI_BASE_URL: "http://127.0.0.1:1234"
+        AI_LOCAL_MODEL_1: "llama-3.1-8b-lexi-uncensored-v2"
+        AI_IMAGE_PROVIDER: "openai"
+        OPENAI_API_KEY: "sk-test_dummy_key_for_build_only"
+        OPENAI_IMAGE_MODEL: "gpt-image-1"
+        NEXT_PUBLIC_ACTIVATE_WORKER: "false"
+      run: pnpm test:e2e:smoke

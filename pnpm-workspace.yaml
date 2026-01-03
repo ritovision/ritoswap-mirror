@@ -1,0 +1,6 @@
+packages:
+  - 'dapp'
+  - 'dapp/cloudflare'
+  - 'docs'
+  - 'colored-keys'
+  - 'local-blockchain'

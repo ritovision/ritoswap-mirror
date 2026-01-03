@@ -1,0 +1,16 @@
+/* styles/wallet-variants.css */
+.topnav {
+  display: none;
+}
+.bottomnav {
+  display: flex;
+}
+.no-nav {
+  display: flex;
+}
+
+@media (min-width: 1100px) {
+  .topnav     { display: flex; }
+  .bottomnav  { display: none; }
+  /* .no-nav stays display: flex across all viewports */
+}

@@ -1,0 +1,111 @@
+---
+title: "Mobile Wallet Deeplinking"
+description: "Current WalletConnect handoff behavior and the lightweight deeplink helpers used in the dapp"
+---
+
+import { FileTree, Callout } from 'nextra/components'
+
+# Mobile Wallet Deeplinking
+
+This page reflects the **current** WalletConnect and mobile deeplink behavior in the dapp. The deeplink system was simplified after refactors: we no longer persist session topics or maintain a dedicated WalletConnect store. Instead, deeplinking is handled in two places: the **Connect Modal** during connection and a **lightweight helper** used by transaction/signing flows to wake the wallet app.
+
+## What exists now
+
+### 1) Connection-time WalletConnect handoff (ConnectModal)
+
+When a user selects the WalletConnect connector, the Connect Modal listens for the `display_uri` event. On **desktop**, it shows a QR view; on **mobile**, it immediately redirects the browser to the WalletConnect URI.
+
+- File: `dapp/components/wallet/connectModal/hooks/useWalletConnection.ts`
+- Key behavior:
+  - `display_uri` sets `qrUri` for the UI.
+  - On mobile, `window.location.href = uri` performs the handoff.
+  - No session topic persistence or URI sanitization is performed.
+
+### 2) Best-effort wallet wake link (openWalletDeeplink)
+
+After writes or signatures, the dapp uses a minimal helper to re-open the wallet app. This helper does **not** rebuild a session topic or guarantee OS chooser behavior; it simply navigates to a WC-style URI to prompt a handoff.
+
+- File: `dapp/app/utils/walletDeeplink.ts`
+- Default behavior:
+  - Uses the fallback URI `wc:ritoswap`.
+  - Appends a timestamp query string to force a fresh navigation on repeat calls.
+
+```ts
+import { openWalletDeeplink } from '@/app/utils/walletDeeplink'
+
+if (isMobileDevice() && connector?.id === 'walletConnect') {
+  openWalletDeeplink()
+}
+```
+
+This helper is called from:
+
+- `dapp/app/hooks/useMintBurn.ts`
+- `dapp/app/gate/components/GateModal/GateModal.tsx`
+- `dapp/app/gate/components/GatePageWrapper.tsx`
+- `dapp/components/wallet/processingModal/ProcessingModal.tsx`
+- `dapp/components/wallet/OpenWalletButton/OpenWalletButton.tsx`
+
+## Global redirect/popup guards
+
+The app installs a lightweight guard to block known WalletConnect-related redirects and popups on mobile Chrome:
+
+- File: `dapp/app/hooks/useWalletConnectGuards.ts`
+- Behavior:
+  - Blocks navigation to a small blacklist of wallet domains.
+  - Blocks HTTP/HTTPS popups on Android Chrome.
+  - Does **not** manage any WalletConnect session state.
+
+This guard is wired from `dapp/components/providers/providers.tsx`.
+
+## File map
+
+<FileTree>
+  <FileTree.Folder name="app" defaultOpen>
+    <FileTree.Folder name="utils" defaultOpen>
+      <FileTree.File name="walletDeeplink.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="hooks" defaultOpen>
+      <FileTree.File name="useWalletConnectGuards.ts" />
+      <FileTree.File name="useMintBurn.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="gate" defaultOpen>
+      <FileTree.Folder name="components" defaultOpen>
+        <FileTree.File name="GateModal.tsx" />
+        <FileTree.File name="GatePageWrapper.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="components" defaultOpen>
+    <FileTree.Folder name="wallet" defaultOpen>
+      <FileTree.Folder name="connectModal" defaultOpen>
+        <FileTree.File name="useWalletConnection.ts" />
+      </FileTree.Folder>
+      <FileTree.Folder name="processingModal" defaultOpen>
+        <FileTree.File name="ProcessingModal.tsx" />
+      </FileTree.Folder>
+      <FileTree.Folder name="OpenWalletButton" defaultOpen>
+        <FileTree.File name="OpenWalletButton.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Constraints and expectations
+
+<Callout type="warning">
+  Deeplinking is best-effort. The current helper does not persist WalletConnect session topics,
+  does not sanitize URIs, and does not guarantee that a wallet chooser will appear. Validate
+  on real devices whenever you change wallet flows.
+</Callout>
+
+## WalletConnect availability
+
+WalletConnect is **optional**. If `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID` is not set, the app runs with injected wallets only (see `dapp/components/providers/providers.tsx`). Injected mobile wallets (e.g., MetaMask in-app browser) still work without any deeplink helper.
+
+## Related docs
+
+- `docs/content/dapp/wallet-ui/connectModal.mdx`
+- `docs/content/dapp/smart-contract-ui/processing-modal.mdx`
+- `docs/content/dapp/smart-contract-data/use-mint-burn.mdx`
+- `docs/content/dapp/tokengate.mdx`

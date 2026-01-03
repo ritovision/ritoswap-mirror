@@ -1,0 +1,190 @@
+/* components/utilities/media/audio/CustomAudioPlayer.module.css */
+/* Container */
+.audioPlayer {
+  background-color: var(--primary-color);
+  border: var(--default-border);
+  border-radius: 10px;
+  padding: 20px;
+  min-height: 150px;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 25px;
+}
+/* Title */
+.title {
+  font-size: 1.5rem;
+  color: white;
+  max-width: 100%;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* Announcement region – always takes up space */
+.announcement {
+  font-size: 0.9rem;
+  line-height: 1.2;
+  color: transparent;
+  min-height: 1.2rem;
+  text-align: center;
+}
+/* Reveal when text exists */
+.announcementVisible {
+  color: white;
+}
+/* Controls */
+.controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.playPauseButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  outline: none;
+  width: 50px;
+  height: 50px;
+  margin: 10px 0;
+  border-radius: 8px;
+  transition: box-shadow 0.2s ease;
+}
+/* Focus styles for play/pause button */
+.playPauseButton:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 4px;
+}
+.iconContainer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+.icon {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+.active {
+  opacity: 1;
+  transform: scale(1);
+}
+/* Timeline */
+.timelineContainer {
+  align-self: stretch;
+  padding: 0 10px;
+  position: relative;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+.timeline {
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.3);
+  height: 4px;
+  border-radius: 2px;
+  width: 100%;
+  margin: 10px 0;
+}
+/* Focus styles for timeline */
+.timeline:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 8px;
+}
+.timelineProgress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background-color: white;
+  border-radius: 2px;
+  z-index: 1;
+}
+.timelineCursor {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 30px;
+  background-color: var(--secondary-color);
+  border-radius: 5px;
+  transition: transform 0.1s ease;
+  z-index: 2;
+}
+.timelineCursor.dragging {
+  transform: translate(-50%, -50%) scale(1.1);
+}
+/* Time Counter */
+.timeCounter {
+  color: white;
+  font-size: 0.9rem;
+}
+/* Volume */
+.volumeContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.volumeButton {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  outline: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  transition: box-shadow 0.2s ease;
+}
+/* Focus styles for volume button */
+.volumeButton:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 4px;
+}
+.volumeIcon {
+  width: 100%;
+  height: 100%;
+}
+.volumeSlider {
+  -webkit-appearance: none;
+  width: 100px;
+  height: 4px;
+  background: white;
+  border-radius: 2px;
+  outline: none;
+  margin-top: 20px;
+  margin-bottom: 20px;
+  cursor: pointer;
+}
+/* Focus styles for volume slider */
+.volumeSlider:focus-visible {
+  outline: 3px solid white;
+  outline-offset: 8px;
+}
+.volumeSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 10px;
+  height: 30px;
+  background: var(--secondary-color);
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+.volumeSlider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  background: var(--secondary-color);
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+}

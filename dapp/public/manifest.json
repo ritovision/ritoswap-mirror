@@ -1,0 +1,23 @@
+{
+  "name": "RitoSwap dApp",
+  "short_name": "RitoSwap",
+  "description": "RitoSwap - NFT Minting and Token Gate",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/images/pwa/small-icon-ritoswap.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/images/pwa/big-icon-ritoswap.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

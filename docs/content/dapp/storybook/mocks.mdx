@@ -1,0 +1,57 @@
+---
+title: Mocks & Fixtures
+description: Wallet, token, portfolio, and Sentry mocks used by Storybook.
+---
+
+import { Callout, FileTree } from 'nextra/components'
+
+# Mocks & Fixtures
+
+Storybook uses explicit mocks to keep UI states deterministic. The core files live in `dapp/.storybook/mocks`.
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name=".storybook" defaultOpen>
+      <FileTree.Folder name="mocks" defaultOpen>
+        <FileTree.File name="mockWagmiConfig.ts" />
+        <FileTree.File name="token.ts" />
+        <FileTree.File name="portfolio.ts" />
+        <FileTree.File name="sentry.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Wallet mocking
+
+`mockWagmiConfig.ts` provides `createMockWagmiConfig` and the default wallet fixtures:
+
+- Default account and chain ID (`MOCK_DEFAULT_ACCOUNTS`, `MOCK_DEFAULT_CHAIN_ID`).
+- Mock WalletConnect URI (`MOCK_WALLETCONNECT_URI`).
+- Optional Trust Wallet connector and WalletConnect connector.
+- Mock RPC handling for common JSON-RPC methods (`eth_chainId`, `eth_accounts`, `wallet_switchEthereumChain`, etc).
+
+<Callout type="warning">
+If a story triggers an unsupported RPC method, the mock throws an error. Add the method to `createMockRpcRequest` if your component needs it.
+</Callout>
+
+## Token fixtures
+
+`token.ts` supplies simple fixtures for mint stories:
+
+- `DEFAULT_TOKEN_ID`
+- `KEY_BG` and `KEY_FG` colors
+- `createMockKeyToken(tokenId)` for consistent backgrounds and key colors
+
+## Portfolio fixtures
+
+`portfolio.ts` provides:
+
+- Supported chain IDs and defaults
+- Mock ERC-20 / ERC-721 / ERC-1155 fixtures
+- `createSvgDataUri` for quick placeholder assets
+- ArgTypes helpers for chain and token toggles
+
+## Sentry mock
+
+`sentry.ts` exports no-op functions (`init`, `captureException`, `withScope`, etc). Storybook aliases `@sentry/nextjs` to this mock so Sentry is **not bundled** into Storybook builds.

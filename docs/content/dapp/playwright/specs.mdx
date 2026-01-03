@@ -1,0 +1,74 @@
+import { Callout, Table } from 'nextra/components'
+
+# Spec Playbooks
+
+Each spec in `dapp/e2e/playwright` focuses on a concrete user journey. This page summarises what they cover, which helpers they rely on, and any prerequisites.
+
+## High-level scenarios
+
+<Table>
+  <thead>
+    <tr>
+      <th>Spec</th>
+      <th>What it verifies</th>
+      <th>Notable helpers & mocks</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>smoke.spec.ts</code></td>
+      <td>Public pages load (/, /mint, /portfolio, /terms, /privacy, /gate, /swap). Checks header, wallet bar, <code>&lt;title&gt;</code>, canonical links, JSON-LD count, and absence of page errors.</td>
+      <td>Native Playwright assertions only.</td>
+      <td>Runs in parallel mode. Use as a quick regression before deeper flows.</td>
+    </tr>
+    <tr>
+      <td><code>wallet.spec.ts</code></td>
+      <td>Wallet connection UX: connect, persist through reload, cancel modal via ESC, disconnect, preview WalletConnect QR, reconnect via preview.</td>
+      <td><code>setupTest</code>, <code>WalletTestUtils</code>, wallet flows (<code>ensureConnected</code>, <code>reconnectAfterReload</code>, etc.).</td>
+      <td>Skips the QR preview on mobile widths. Great reference when debugging connect-modals.</td>
+    </tr>
+    <tr>
+      <td><code>swap-widget.spec.ts</code></td>
+      <td>Ensures the embedded swap widget mirrors the site-wide wallet state (connect/disconnect from either surface, reload persistence).</td>
+      <td><code>waitForWidgetReady</code>, wallet flows, <code>persistConnection: true</code> setup.</td>
+      <td>Confirms the widget uses the shared modal instead of a bespoke flow.</td>
+    </tr>
+    <tr>
+      <td><code>portfolio-assets.spec.ts</code></td>
+      <td>Portfolio page renders ERC-20/721/1155 data for Ethereum and shows empty states on Polygon.</td>
+      <td><code>installPortfolioAlchemyMock</code>, portfolio flows (<code>selectNetworks</code>, <code>expectGridRows</code>, etc.).</td>
+      <td>Dataset lives inline in the spec. Update it when UI expectations change.</td>
+    </tr>
+    <tr>
+      <td><code>hp-mint-burn.spec.ts</code></td>
+      <td>Happy path real mint + burn on Sepolia.</td>
+      <td><code>setupTest</code> (real mode), <code>ensureConnected</code>, <code>burnIfKeyPresent</code>, <code>mintKey</code>, <code>burnKey</code>.</td>
+      <td>Requires funded Sepolia account. Emits wallet bridge logs for post-mortems.</td>
+    </tr>
+    <tr>
+      <td><code>hp-tokengate.spec.ts</code></td>
+      <td>Full experience: mint NFT → gate unlock → play secret song → AI chat (MCP + inline renderers) → submit Msg Rito → burn NFT.</td>
+      <td><code>installAIMock</code> with composed handlers, all flows from NFT/chat/music/gate/form, <code>burnIfKeyPresent</code>.</td>
+      <td>
+        Serialised (
+        <code>test.describe.configure(&#123; mode: 'serial' &#125;)</code>
+        ). Longest runtime; keep it green before merging.
+      </td>
+    </tr>
+  </tbody>
+</Table>
+
+## Writing new specs
+
+1. **Import from the barrel** — `import { setupTest, installAIMock, mintKey, ... } from '../utils';` keeps imports tidy.
+2. **Log the environment once** — `logE2eEnvOnce()` provides immediate visibility into which key/network the spec is using.
+3. **Prefer flows over custom selectors** — if a UI element is missing from the helpers, add it there rather than inside the spec.
+4. **Scope mocks per spec** — attach AI or portfolio mocks inside the test body to avoid cross-test leakage.
+5. **Leave breadcrumbs** — the existing specs log significant milestones (`console.log('[Gate Unlock] success')`). Follow the same pattern to ease debugging.
+
+<Callout type="warning" emoji="🧪">
+Specs that perform real transactions should live under <code>test.describe.configure(&#123; mode: 'serial' &#125;)</code> and clean up after themselves with <code>burnIfKeyPresent</code> to avoid exhausting the wallet balance.
+</Callout>
+
+Once your spec is wired, refer to the troubleshooting page for common failure modes and debugging tips.

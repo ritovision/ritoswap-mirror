@@ -1,0 +1,76 @@
+---
+title: Styling & Branding
+description: RitoVision theme and visual system for the docs site.
+---
+
+import { Callout, FileTree, Table } from 'nextra/components'
+
+# Styling & Branding
+
+The docs site is intentionally branded with the **RitoVision** aesthetic: deep blues, high-contrast accents, and custom typography. The single source of truth today is <code>docs/styles/override.css</code>.
+
+## Source of truth
+
+<FileTree>
+  <FileTree.Folder name="docs" defaultOpen>
+    <FileTree.Folder name="styles" defaultOpen>
+      <FileTree.File name="override.css" />
+      <FileTree.File name="colors.css" />
+      <FileTree.File name="layout.css" />
+      <FileTree.File name="typography.css" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+<Callout type="info">
+  <strong>override.css</strong> is the canonical styling file today. Other style files exist, but they are not the primary source of truth yet.
+</Callout>
+
+## Brand tokens
+
+<Table>
+  <thead>
+    <tr>
+      <th>Token</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>--primary-color</code></td>
+      <td>Deep blue background and base UI surfaces</td>
+    </tr>
+    <tr>
+      <td><code>--secondary-color</code></td>
+      <td>Secondary accents, borders, highlights</td>
+    </tr>
+    <tr>
+      <td><code>--accent-color</code></td>
+      <td>Primary CTA and interactive focus states</td>
+    </tr>
+    <tr>
+      <td><code>--font-primary</code></td>
+      <td>Headings (AgencyB)</td>
+    </tr>
+    <tr>
+      <td><code>--font-body</code></td>
+      <td>Body text (Michroma)</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Nextra overrides
+
+The file also overrides Nextra theme tokens like:
+
+- <code>--nextra-primary-hue</code> and <code>--nextra-primary-saturation</code>
+- <code>--nextra-foreground-default</code> for global text color
+- <code>--nextra-link-text-color</code> for link states
+
+These are used to align Nextra components (cards, tables, callouts, search, and footer) to the RitoVision palette.
+
+## Practical guidance
+
+- Update global colors in <code>override.css</code> first.
+- Keep component-level tweaks small and intentional.
+- Use the shared CSS variables for consistency.

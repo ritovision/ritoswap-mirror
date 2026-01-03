@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  slither:
+    build:
+      context: .
+      dockerfile: Dockerfile.slither
+    volumes:
+      # Mount source code (read-only for safety)
+      - ./contracts:/app/contracts:ro
+      - ./hardhat.config.js:/app/hardhat.config.js:ro
+      - ./hardhat.config.ts:/app/hardhat.config.ts:ro
+      - ./tsconfig.json:/app/tsconfig.json:ro
+      - ./.slither.json:/app/.slither.json:ro
+      # Mount output directory for reports
+      - ./slither-output:/app/slither-output
+    working_dir: /app
+    environment:
+      - NODE_ENV=development

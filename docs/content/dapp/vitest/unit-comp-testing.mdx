@@ -1,0 +1,262 @@
+---
+title: Unit & Component Testing
+description: How RitoSwap uses Vitest and React Testing Library to test Zustand stores and wallet UI components.
+---
+
+import { Callout, Tabs, Steps, FileTree, Table } from 'nextra/components'
+
+# Unit & Component Testing
+
+This page documents how the dapp’s **unit tests** and **component tests** are structured, what they focus on, and how to extend them.
+
+The goal of this layer is to make **business rules, state transitions, and wallet UX behaviour** explicit and stable, without pulling in full backend or blockchain infrastructure.
+
+<Callout>
+  This page assumes you are familiar with basic Vitest and React Testing Library usage.  
+  It focuses on **project-specific patterns** rather than generic testing tutorials.
+</Callout>
+
+<Tabs
+  items={['Overview', 'Zustand stores', 'Wallet components', 'Helpers & utilities']}
+  defaultIndex={0}
+  storageKey="unit-component-testing-tabs"
+>
+  <Tabs.Tab>
+    ## Overview
+
+    Unit and component tests in the dapp primarily live in:
+
+    <FileTree>
+      <FileTree.Folder name="app" defaultOpen>
+        <FileTree.Folder name="store" defaultOpen>
+          <FileTree.Folder name="__tests__" defaultOpen>
+            <FileTree.File name="chatModeStore.test.ts" />
+          </FileTree.Folder>
+        </FileTree.Folder>
+      </FileTree.Folder>
+      <FileTree.Folder name="components">
+        <FileTree.Folder name="utilities">
+          <FileTree.Folder name="wallet">
+            <FileTree.Folder name="__tests__" defaultOpen>
+              <FileTree.File name="AddressDisplay.test.tsx" />
+              <FileTree.File name="AccountModal.test.tsx" />
+            </FileTree.Folder>
+          </FileTree.Folder>
+        </FileTree.Folder>
+      </FileTree.Folder>
+    </FileTree>
+
+    At this layer we:
+
+    - Test **Zustand stores** directly via their public API (no DOM).
+    - Test **React components** via **React Testing Library** and DOM assertions.
+    - Mock external dependencies (wagmi, Next.js primitives, Prisma, network calls) so tests are **fast, deterministic, and side‑effect free**.
+
+    Common tools used here:
+
+    - Vitest (`describe`, `it`, `expect`, `vi`).
+    - React Testing Library (`render`, `fireEvent`, `act`, and queries like `getByText`).
+    - `@testing-library/jest-dom` for expressive DOM matchers.
+    - `happy-dom` as the test environment (set in `vitest.config.ts`).
+
+    ### Other suites that live at this layer
+
+    Beyond the flagship wallet header components, Vitest also owns:
+
+    - **Wallet utilities:** `RateLimitModal`, `ProcessingModal`, `ConnectWrapper`, `DisconnectButton`, `OpenWalletButton`, `NetworkWidget`, and their supporting hooks (`test` files under `components/utilities/wallet/__tests__`) which cover timer-driven transitions, wagmi hook stubs, and mobile fallbacks.
+    - **Mint & swap experiences:** Integration suites for `app/mint` (page wrapper, TokenStatus, NFTScreen, ButtonSection) and `app/swap/components/SwapClient` assert page wiring, JSON-LD injection, wagmi + NFT store interactions, and gate-specific button states.
+    - **Docs/SEO pages:** Lightweight page tests (`app/api-docs/page.test.tsx`, `app/terms/terms.integration.test.tsx`, `app/terms/page.unit.test.ts`, `app/swap/page.integration.test.tsx`, `app/metadata.unit.test.ts`) that ensure JSON-LD helpers, metadata exports, and headline structure stay consistent when content shifts.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ## Zustand stores
+
+    Zustand stores are tested as **pure state containers**. The main example is:
+
+    - <code>app/store/__tests__/chatModeStore.test.ts</code>
+
+    This suite covers:
+
+    - **Initial state**: verifies that `activeMode`, `origin`, `lockedByProp`, and `battleFormData` match expected defaults (`defaultFormData`).
+    - **State transitions**: tests `setMode`, `resetMode`, `updateUserField`, `updateChatbotField`, and `clearBattleForm`.
+    - **Locking semantics**: when a mode is set via `origin: 'prop'`, `lockedByProp` is `true` and `resetMode` no longer clears the mode.
+    - **Immutability expectations**: ensures new state objects are created where needed (e.g. `battleFormData.user` is a new object after updates).
+
+    ### Store testing pattern
+
+    The tests follow a consistent pattern:
+
+    <Steps>
+      {<h3>1. Reset store state</h3>}
+      Use a helper like <code>resetStore()</code> (implemented in the test) to call
+      <code>useChatModeStore.setState</code> with a known initial snapshot.
+
+      {<h3>2. Read state via getState()</h3>}
+      Access the current store value through <code>useChatModeStore.getState()</code> and assert initial invariants.
+
+      {<h3>3. Call public store methods</h3>}
+      Invoke methods like <code>setMode</code>, <code>resetMode</code>,
+      <code>updateUserField</code>, <code>updateChatbotField</code>, and
+      <code>clearBattleForm</code> with realistic arguments.
+
+      {<h3>4. Assert new state and immutability</h3>}
+      Re-read the store and:
+      - Assert changed fields have the expected values.
+      - Assert unrelated subtrees are unchanged.
+      - Where relevant, assert that new object references are created for updated branches.
+    </Steps>
+
+    ### When to add a store test
+
+    Add or update tests in `app/store/__tests__` when you:
+
+    - Introduce a new store or major new store method.
+    - Change the semantics of an existing method (e.g. how modes lock/unlock).
+    - Tighten invariants on shared state (e.g. resetting battle form data).
+
+    Prefer store tests when logic is **stateful but UI-agnostic**. UI concerns should be covered by component tests.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ## Wallet components
+
+    Wallet-related components are tested via **React Testing Library** using a mixture of **wagmi hook mocks** and **fake timers**.
+
+    The main suites are:
+
+    - <code>components/utilities/wallet/__tests__/AddressDisplay.test.tsx</code>
+    - <code>components/utilities/wallet/__tests__/AccountModal.test.tsx</code>
+
+    ### AddressDisplay
+
+    `AddressDisplay` focuses on **connected wallet state**, **ENS name resolution**, and a **modal trigger**.
+
+    Key behaviours covered:
+
+    - **Disconnected state**
+      - When `useAccount` returns `isConnected: false`, the component renders nothing (container is empty) even after timers advance.
+    - **Connected state with address only**
+      - With `useAccount` returning an address and no ENS data, the display shows a truncated address (e.g. `0x1234…7890`).
+    - **ENS name transition**
+      - When `useEnsName` returns a name, the component first shows the truncated address, then swaps to the ENS name after a delay.
+      - Uses Vitest fake timers (`vi.useFakeTimers()` + `vi.advanceTimersByTime`) to step through the transition.
+    - **Long ENS truncation**
+      - Very long ENS names are truncated to a compact form (e.g. `verylongens…eth`).
+    - **Modal trigger**
+      - Clicking the main button toggles an `AccountModal` (stubbed) to `data-open="true"`.
+    - **Variant handling**
+      - Different classnames applied for `variant="topnav"`, `variant="bottomnav"`, and the default `"no-nav"` variant.
+
+    The test suite stubs wagmi hooks at the module level:
+
+    - `useAccount`, `useEnsName`, `useEnsAvatar`, `useChainId` are mocked via `vi.mock('wagmi', () => ({ ... }))`.
+    - Timers are controlled per test to ensure deterministic delays.
+
+    ### AccountModal
+
+    `AccountModal` presents **account details, balances, and network info**, with multiple ways to close the modal.
+
+    Tested behaviours include:
+
+    - **Closed state**
+      - When `isOpen={false}`, the component renders nothing (empty DOM).
+    - **Open state**
+      - Renders:
+        - Current account and secondary account addresses (truncated forms).
+        - Primary balance (derived via `useBalance` + stubbed `formatUnits`).
+        - A network button showing chain name and native currency symbol.
+        - A `NetworkModal` child controlled by local state.
+        - Close and disconnect buttons.
+    - **Interactions**
+      - Clicking the overlay calls `onClose`.
+      - Clicking the close icon also calls `onClose`.
+      - Clicking the network button toggles the `NetworkModal` `data-open` attribute to `"true"`.
+      - Clicking the disconnect button calls the wagmi `disconnect` function and then `onClose`.
+
+    Dependencies are stubbed to keep the test focused on behaviour:
+
+    - `next/image` → simple `<img>` passthrough.
+    - `wagmi` hooks → mocked returns for `useAccount`, `useDisconnect`, `useEnsName`, `useEnsAvatar`, `useBalance`, `useChainId`.
+    - `useChainInfo` from `ChainInfoProvider` → mocked to provide `activeChain`, logo URLs, and display name.
+    - `NetworkModal` → replaced with a lightweight stub `<div data-testid="network-modal" data-open={...} />`.
+
+    ### When to add a component test
+
+    Add or extend component tests when you:
+
+    - Change wallet UX (new flows, new states, new CTA buttons).
+    - Adjust how addresses, ENS names, or balances are displayed.
+    - Introduce new modal behaviour or network selection flows.
+
+    Prefer component tests when you want to guarantee **user-visible behaviour** is correct: what the user sees, clicks, and reads.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ## Helpers & utilities
+
+    Several utilities support unit and component tests without being tied to a single feature.
+
+    ### test/setup.ts
+
+    Registered via `setupFiles` in `vitest.config.ts`, this file:
+
+    - **Mocks Prisma client**
+      - Replaces `@prisma/client` with a lightweight class whose methods (`$connect`, `$disconnect`, `$transaction`, `$extends`) are `vi.fn()` spies.
+      - Prevents accidental real DB connections in tests.
+    - **Sets up MSW**
+      - Uses `setupServer(...alchemyHandlers)` to create an in-memory HTTP server for mocking external calls.
+      - Configures `onUnhandledRequest` so:
+        - Requests to `localhost` / `127.0.0.1` (e.g. Supertest) are ignored by MSW.
+        - Any other unhandled requests cause an error, surfacing missing mocks.
+    - **Stubs Next.js primitives**
+      - `next/navigation` – provides dummy implementations for `useRouter`, `useSearchParams`, `usePathname`.
+      - `next/link` – renders a simple `<a href>` element.
+      - `next/image` – renders a plain `<img>` tag.
+    - **Installs browser-like shims**
+      - `window.matchMedia` – mocked implementation for responsive logic.
+      - `IntersectionObserver` – mocked globally and on `window` for components that observe DOM visibility.
+
+    These globals let component tests focus purely on behaviour, without repeatedly setting up mocks in every file.
+
+    ### test/utils/wagmi.tsx
+
+    This helper file provides a way to render components within a **real wagmi + React Query context** when needed.
+
+    It includes:
+
+    - `createTestConfig(chains)`
+      - Builds a wagmi config using the `mock` connector with a fixed set of test accounts.
+      - Registers transports for each chain via `http()`.
+    - `TestWrapper`
+      - Wraps children in a `WagmiProvider` and `QueryClientProvider` with retries disabled.
+      - Ideal for components that rely on wagmi hooks and React Query behaviour.
+    - `renderWithWagmi(ui, options)`
+      - Convenience helper that:
+        - Creates a test config for specified chains.
+        - Wraps the UI with `TestWrapper`.
+        - Returns both the render result and the underlying config for assertions.
+    - Re-exports `@testing-library/react` APIs
+      - Allows imports from a single place (e.g. `import { render, screen } from 'test/utils/wagmi'`).
+
+    ### test/helpers/env.ts
+
+    Environment helpers are used more heavily by route tests, but they can also support unit and component tests that depend on `process.env`.
+
+    Key capabilities:
+
+    - `resetEnv`, `seedBase`, `seedServerTest`, `seedRitonet`, `seedEmail`, `seedR2`, `seedBackdoor`.
+    - `resetModulesAndSeed` to force modules that read env at import time to be reloaded with new values.
+    - A hoisted mock for `@config/server.env` to make `serverEnv` and `serverConfig` read from test-controlled values.
+
+    When writing unit or component tests that depend on environment configuration, prefer these helpers over manual `process.env` mutation.
+  </Tabs.Tab>
+</Tabs>
+
+
+## Summary
+
+- **Zustand stores** are tested as pure state containers: focus on initial state, transitions, and immutability.
+- **Wallet components** are tested via React Testing Library with wagmi mocks, ensuring UX stays stable across refactors.
+- **Global helpers** in `test/setup.ts`, `test/utils/wagmi.tsx`, and `test/helpers/env.ts` provide a consistent, controlled environment so individual test files can stay focused on behaviour.
+
+Use this page as a reference when adding or updating unit and component tests; for API routes and OpenAPI contracts, see the other testing subpages.

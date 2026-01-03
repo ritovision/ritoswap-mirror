@@ -1,0 +1,8 @@
+{
+  "git": {
+    "productionBranch": "prod"
+  },
+  "installCommand": "echo 'Skip - handled in buildCommand'",
+  "buildCommand": "cd dapp && pnpm install && pnpm prisma generate --no-engine && pnpm next build && pnpm generate:openapi",
+  "outputDirectory": "dapp/.next"
+}

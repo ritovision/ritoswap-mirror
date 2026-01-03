@@ -1,0 +1,6 @@
+{
+  "installCommand": "pnpm install --filter docs --filter ritoswap --frozen-lockfile",
+  "buildCommand": "pnpm build",
+  "outputDirectory": ".next",
+  "framework": "nextjs"
+}

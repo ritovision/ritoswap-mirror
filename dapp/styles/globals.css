@@ -1,0 +1,170 @@
+@import "./wallet-variants.css";
+
+:root {
+  --primary-color: #012035; 
+  --secondary-color: #04426C; 
+  --accent-color: #FC1819;
+  --accent-color-2: #f47838; 
+  --background-white: #e9f9f9; 
+  --secondary-red: #CE161B; 
+  --utility-green: #11C045;
+  --background: var(--primary-color);
+  --foreground: #ffffff;
+
+  --secondary-color-rgb: 4, 66, 108;
+
+  --default-border: 2px solid var(--secondary-color);
+  --error-border: 2px solid var(--accent-color);
+}
+
+html {
+  box-sizing: border-box;
+}
+*, *::before, *::after {
+  box-sizing: inherit;
+}
+
+body {
+  background-color: var(--primary-color);
+  color: var(--foreground);
+  font-family: var(--font-primary);
+  margin: 0;
+  padding: 0;
+}
+
+h1, h2, h3, h4, h5 {
+  font-family: var(--font-primary);
+  font-weight: 1;
+}
+
+h1 {
+  font-size: 2.5rem;
+  font-weight: 1;
+}
+
+h2 {
+  font-size: 2rem;
+  font-weight: 1;
+}
+
+h3 {
+  font-size: 1.75rem;
+  font-weight: 1;
+}
+
+h4 {
+  font-weight: 1;
+  font-size: 1.5rem;
+}
+
+h5 {
+  font-size: 1.25rem;
+  font-weight: 1;
+}
+
+h6 {
+  font-family: var(--font-h6);
+  font-weight: 400;
+  font-size: 1rem;
+}
+
+p {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 0.10em;
+}
+
+::-webkit-scrollbar {
+  width: 15px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(90, 86, 86);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #01182a;
+}
+
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  -webkit-text-fill-color: var(--foreground) !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+:-moz-autofill {
+  background-color: transparent !important;
+  color: var(--foreground) !important;
+}
+
+.defaulttopspace {
+  margin-top: 8%;
+}
+
+@media (max-width: 730px) {
+  .defaulttopspace {
+    margin-top: 20%;
+  }
+}
+
+.defaultbottomspace {
+  margin-bottom: 8%;
+}
+
+@media (max-width: 730px) {
+  .defaultbottomspace {
+    margin-bottom: 20%;
+  }
+
+  .margincenter {
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+.darkglow {
+  box-shadow: 6px 6px 25px rgba(0, 0, 0, 0.25);
+}
+
+.blueglow {
+  box-shadow: 6px 6px 25px rgba(3, 62, 101, 0.25);
+}
+
+.redglow {
+  box-shadow: 0 10px 20px rgba(252, 24, 25, 0.3);
+}
+
+.headingLarge {
+  font-size: 3rem;
+  text-align: center;
+}
+
+@media (max-width: 730px) {
+  .headingLarge {
+    font-size: 2.5rem;
+    text-align: center;
+  }
+}
+
+.redText {
+  color: var(--accent-color);
+}
+
+/** Accessibility: Screen Reader Only */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}

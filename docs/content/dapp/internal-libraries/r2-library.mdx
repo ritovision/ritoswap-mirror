@@ -1,0 +1,304 @@
+---
+title: "R2 Storage"
+description: "Internal library for generating signed URLs to access protected audio content stored in Cloudflare R2"
+---
+
+import { FileTree, Table, Tabs, Callout } from 'nextra/components'
+
+# R2 Storage Library
+
+The R2 Storage Library provides secure access to RitoSwap's exclusive audio content stored in Cloudflare R2. This internal library generates time-limited signed URLs that allow authenticated users to stream protected content without exposing the storage bucket or credentials.
+
+## Overview
+
+RitoSwap's token gate grants access to exclusive crypto-themed music created by Rito Rhymes. Rather than serving these audio files directly (which would expose them to unauthorized access), the R2 library generates temporary signed URLs that expire after a set duration. This approach ensures that only users who have successfully unlocked the token gate can access the content, and even then, only for a limited time.
+
+### Why Cloudflare R2?
+
+R2 provides several advantages for RitoSwap's content delivery:
+- **S3-compatible API** - Works with existing AWS SDK tools
+- **No egress fees** - Cost-effective for streaming audio content
+- **Global distribution** - Fast content delivery worldwide
+- **Signed URL support** - Secure, time-limited access control
+
+<FileTree>
+  <FileTree.Folder name="lib" defaultOpen>
+    <FileTree.Folder name="server" defaultOpen>
+      <FileTree.File name="r2.ts" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Implementation
+
+The R2 library uses the AWS SDK S3 client configured for Cloudflare R2:
+
+```typescript
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+
+const R2 = new S3Client({
+  region: "auto",
+  endpoint: `https://${process.env.R2_API_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.R2_API_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_API_SECRET_ACCESS_KEY!,
+  },
+});
+```
+
+Key configuration points:
+- **Region**: Set to "auto" for R2 compatibility
+- **Endpoint**: Uses Cloudflare's R2 endpoint format
+- **Credentials**: R2 API credentials (not regular Cloudflare API keys)
+
+### Generating Signed URLs
+
+The `generateSignedAudioUrl` function creates temporary access URLs:
+
+```typescript
+export async function generateSignedAudioUrl(
+  expiresIn: number = 3600 // 1 hour default
+): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: process.env.R2_API_BUCKET_NAME!,
+    Key: "HitMeBitcoin.mp3",
+  });
+
+  const signedUrl = await getSignedUrl(R2, command, { expiresIn });
+  return signedUrl;
+}
+```
+
+The function:
+1. Creates a GetObjectCommand for the specific audio file
+2. Generates a signed URL with the specified expiration time
+3. Returns the URL that includes authentication parameters
+
+## API Reference
+
+| Function | Signature | Returns | Notes |
+|----------|-----------|---------|-------|
+| **generateSignedAudioUrl** | `(expiresIn?: number): Promise<string>` | Signed URL string | Generates time-limited access URL for audio content. Default 1-hour expiration |
+
+### Generated URL Structure
+
+A signed R2 URL includes several query parameters:
+```
+https://account-id.r2.cloudflarestorage.com/bucket-name/HitMeBitcoin.mp3
+  ?X-Amz-Algorithm=AWS4-HMAC-SHA256
+  &X-Amz-Credential=...
+  &X-Amz-Date=20240101T120000Z
+  &X-Amz-Expires=3600
+  &X-Amz-SignedHeaders=host
+  &X-Amz-Signature=...
+```
+
+## Integration in RitoSwap
+
+### Used by Gated Content
+
+The R2 library is called by the `getGatedContent` function to provide audio URLs:
+
+```typescript
+// In gatedContent.ts
+let audioUrl: string;
+let audioError = false;
+
+try {
+  audioUrl = await generateSignedAudioUrl();
+} catch (error) {
+  console.error('Failed to generate signed audio URL:', error);
+  audioUrl = '';
+  audioError = true;
+}
+```
+
+### Flow Through the System
+
+1. **User unlocks gate** → GateModal component
+2. **API calls getGatedContent** → Which calls generateSignedAudioUrl
+3. **Content returned to client** → Including the signed audio URL
+4. **AudioWrapper plays audio** → Using the temporary signed URL
+5. **URL expires after 1 hour** → Preventing long-term access
+
+### Error Handling
+
+The integration includes graceful error handling:
+
+```typescript
+audioData: {
+  headline: "Secret Crypto Music",
+  imageSrc: "/images/music/hitmebitcoin-coverart-square.jpg",
+  imageAlt: "Cover art of Britney Spears crying about Bitcoin price crashing",
+  description: "Number go up, number go down, will it ever end?",
+  title: "Hit Me Bitcoin One More Time",
+  audioSrc: audioUrl,
+  error: audioError  // Flags audio unavailability
+}
+```
+
+When R2 access fails:
+- The `audioError` flag is set to true
+- The UI shows "Audio Temporarily Unavailable"
+- Other gated content remains accessible
+
+## Configuration
+
+Required environment variables for R2 access:
+
+| Variable | Purpose | Example |
+|----------|---------|---------|
+| **R2_API_ACCOUNT_ID** | Cloudflare account ID | `a1b2c3d4e5f6...` |
+| **R2_API_ACCESS_KEY_ID** | R2 API access key | `1a2b3c4d5e6f...` |
+| **R2_API_SECRET_ACCESS_KEY** | R2 API secret key | `abcd1234efgh...` |
+| **R2_API_BUCKET_NAME** | R2 bucket name | `ritoswap-audio` |
+
+<Callout type="info">
+**R2 API Keys vs Cloudflare API Keys**
+
+R2 requires specific API credentials created in the Cloudflare dashboard under R2 > Manage R2 API Tokens. Regular Cloudflare API keys will not work.
+</Callout>
+
+## Security Considerations
+
+### URL Expiration Strategy
+
+The 1-hour default expiration balances security with user experience:
+- **Too short**: Users might experience playback interruption
+- **Too long**: Increases risk of URL sharing
+- **1 hour**: Sufficient for typical listening sessions
+
+### Access Control Layers
+
+The R2 library works within multiple security layers:
+
+1. **Token Gate**: User must own an unused NFT
+2. **Signature Verification**: User must sign with their wallet
+3. **Rate Limiting**: Prevents URL generation abuse
+4. **URL Expiration**: Limits temporal access
+5. **Bucket Privacy**: R2 bucket is not publicly accessible
+
+### URL Sharing Prevention
+
+While signed URLs could theoretically be shared, several factors limit this:
+- Short expiration time (1 hour)
+- URLs are generated per-session
+- Token gate tracks usage per NFT
+- Rate limiting prevents mass generation
+
+## Error Scenarios
+
+### Common Errors and Solutions
+
+| Error | Cause | Solution |
+|-------|-------|----------|
+| **CredentialsError** | Invalid R2 API keys | Verify R2_API_ACCESS_KEY_ID and SECRET |
+| **NoSuchBucket** | Incorrect bucket name | Check R2_API_BUCKET_NAME matches R2 dashboard |
+| **NoSuchKey** | Audio file not found | Ensure "HitMeBitcoin.mp3" exists in bucket |
+| **NetworkError** | Connection issues | Check network and Cloudflare status |
+
+### Debugging Signed URLs
+
+To debug URL generation issues:
+
+```typescript
+// Add logging to see generated URL structure
+export async function generateSignedAudioUrl(
+  expiresIn: number = 3600
+): Promise<string> {
+  const command = new GetObjectCommand({
+    Bucket: process.env.R2_API_BUCKET_NAME!,
+    Key: "HitMeBitcoin.mp3",
+  });
+  
+  console.log('Generating signed URL for:', {
+    bucket: process.env.R2_API_BUCKET_NAME,
+    key: "HitMeBitcoin.mp3",
+    expiresIn
+  });
+
+  const signedUrl = await getSignedUrl(R2, command, { expiresIn });
+  
+  // Log URL without sensitive signature
+  const urlObj = new URL(signedUrl);
+  console.log('Generated URL host:', urlObj.hostname);
+  console.log('Expires in:', expiresIn, 'seconds');
+  
+  return signedUrl;
+}
+```
+
+## Best Practices
+
+### Optimal Expiration Times
+
+Consider different expiration times for different use cases:
+
+```typescript
+// For immediate playback (default)
+const audioUrl = await generateSignedAudioUrl(3600); // 1 hour
+
+// For download scenarios (if implemented)
+const downloadUrl = await generateSignedAudioUrl(300); // 5 minutes
+
+// For preview clips (if implemented)
+const previewUrl = await generateSignedAudioUrl(600); // 10 minutes
+```
+
+### Caching Considerations
+
+While signed URLs shouldn't be cached (they expire), consider:
+- Cache the audio file metadata separately
+- Implement client-side audio buffering
+- Use browser's native audio caching
+
+### Monitoring Usage
+
+Track R2 usage patterns:
+- Number of signed URLs generated
+- Average listening duration
+- Failed URL generation attempts
+- Bandwidth consumption
+
+## Future Enhancements
+
+Potential improvements to the R2 library:
+
+### Multiple Audio Files
+```typescript
+export async function generateSignedAudioUrl(
+  fileName: string = "HitMeBitcoin.mp3",
+  expiresIn: number = 3600
+): Promise<string> {
+  // Support multiple exclusive tracks
+}
+```
+
+### Adaptive Bitrates
+```typescript
+export async function generateAudioUrls(quality: 'high' | 'medium' | 'low') {
+  const fileMap = {
+    high: "HitMeBitcoin-320k.mp3",
+    medium: "HitMeBitcoin-128k.mp3", 
+    low: "HitMeBitcoin-64k.mp3"
+  };
+  // Generate URL for requested quality
+}
+```
+
+### Usage Analytics
+```typescript
+export async function generateSignedAudioUrlWithAnalytics(
+  userId: string,
+  tokenId: number
+): Promise<string> {
+  // Log access for analytics
+  await logAudioAccess(userId, tokenId);
+  return generateSignedAudioUrl();
+}
+```
+
+## Summary
+
+The R2 Storage Library provides a secure, scalable solution for delivering exclusive audio content to RitoSwap's token holders. By leveraging Cloudflare R2's S3-compatible API and signed URL functionality, it ensures that premium content remains protected while providing a seamless streaming experience for authenticated users. The library's integration with the broader token gate system demonstrates how modern cloud storage can enhance Web3 applications without compromising on security or user experience.

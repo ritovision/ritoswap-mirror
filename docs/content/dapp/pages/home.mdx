@@ -1,0 +1,51 @@
+---
+title: "Home"
+description: "Entry point into RitoSwap’s multichain dApp showcase—introducing purpose, features, and creative vibe."
+---
+
+import { FileTree } from 'nextra/components'
+import ViewPage from '@components/utilities/viewpage/viewpage'
+
+# Home Page
+
+The Home page functions as the central hub for RitoSwap’s dApp and multi-modal agentic chatbot showcase, clearly laying out each feature, including cross-chain token swapping, NFT minting and burning, and token-gated messaging, music and RapBotRito AI, while framing the project as a technical proof-of-concept rather than a commercial product. It establishes expectations around the project’s multidisciplinary scope (blockchain interactions, UI/UX, embedded music, AI infrastructure) and directs users to both the official documentation and the GitHub repository for deeper examination.
+
+<ViewPage
+  mainnetUrl="https://ritoswap.com"
+  testnetUrl="https://testnet.ritoswap.com"
+/>
+
+## File Paths
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name="components" defaultOpen>
+      <FileTree.Folder name="home" defaultOpen>
+        <FileTree.File name="HomeGrid.tsx" />
+        <FileTree.File name="HomeGrid.test.tsx" />
+        <FileTree.File name="HomeGrid.module.css" />
+        <FileTree.File name="CryptoMusicSection.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="app" defaultOpen>
+      <FileTree.File name="page.tsx" />
+      <FileTree.File name="page.module.css" />
+      <FileTree.File name="page.integration.test.tsx" />
+      <FileTree.File name="metadata.unit.test.ts" />
+      <FileTree.File name="metadata.ts" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+---
+
+## Components of Note
+
+| Component            | Location                                             | Purpose                                                                                   |
+|----------------------|------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| **HomeGrid**           | `/app/home/HomeGrid.tsx`                  | Animates and displays navigation cards for core features (Trade, Mint, Burn, Unlock).      |
+| **CryptoMusicSection** | `/app/home/CryptoMusicSection.tsx`        | Embeds Rito Rhymes’ **Altcoin Love** audio player to set the creative, Blade Runner vibe. |
+
+## Music
+
+This page features **Rito Rhymes'** track **"Altcoin Love"**, a parody remix of *California Love*. It’s an anthem to the spirit of altcoins and celebrity in the crypto universe, delivered with a fun yet infotaining vibe. While RitoSwap is a deep technical showcase, this music reminds users it’s also a creative project meant to be enjoyed, not just examined.

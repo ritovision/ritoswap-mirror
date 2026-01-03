@@ -1,0 +1,144 @@
+---
+title: Bottom Bar
+description: Sophisticated navigation, AI workflows, and scroll utilities built into the docs UI.
+---
+
+import { Callout, FileTree, Steps, Table } from 'nextra/components'
+
+# Bottom Bar
+
+The Bottom Bar is a **custom navigation and AI control plane** integrated into Nextra. It replaces the usual floating TOC UX with a two-panel drawer, custom AI workflows, and scroll controls that feel native to the RitoVision docs.
+
+## Architecture map
+
+<FileTree>
+  <FileTree.Folder name="docs/app/components/navigation/BottomBar" defaultOpen>
+    <FileTree.File name="BottomBar.tsx" />
+    <FileTree.File name="BottomBar.module.css" />
+    <FileTree.Folder name="components" />
+    <FileTree.Folder name="drawers" />
+    <FileTree.Folder name="hooks" />
+    <FileTree.Folder name="modals" />
+    <FileTree.Folder name="utils" />
+  </FileTree.Folder>
+</FileTree>
+
+## Where the TOC comes from (standard)
+
+The docs pages already include a Nextra-generated TOC. The Bottom Bar **injects itself** into that flow and renders the TOC in a custom drawer instead of the default layout.
+
+<Steps>
+### Step 1: Nextra builds the TOC per page
+Each MDX page imported by Nextra returns a <code>toc</code> array.
+
+### Step 2: The TOC is provided to the app
+`docs/app/[[...slug]]/page.tsx` wraps content with `<TOCProvider initialTOC={toc} />`.
+
+### Step 3: Bottom Bar consumes the TOC
+<code>BottomBar.tsx</code> pulls the live <code>toc</code> from <code>useTOC()</code> and wires it into the TOC drawer.
+</Steps>
+
+## Drawer system (shared infrastructure)
+
+The bar uses a **single drawer shell** that hosts two panels: TOC and AI. The panel switch is instant, but the drawer height is **measured, clamped, and animated** for stability.
+
+- <code>useDrawerController</code> manages active tab, open/close state, and height measurement.
+- Drawer height clamps to 60% viewport height (<code>DRAWER_MAX_HEIGHT_RATIO</code>) and enables scroll overflow only when needed.
+- The drawer closes on outside clicks or Escape with modal-priority logic (<code>useDrawerDismiss</code>).
+
+## TOC drawer (custom presentation of a standard feature)
+
+The TOC experience is standard Nextra data with custom presentation and behavior:
+
+- <code>TOCDrawer</code> renders the nested list and anchors.
+- <code>useActiveHeading</code> uses <code>IntersectionObserver</code> to highlight the current section.
+- Clicking a heading uses `scrollIntoView({ behavior: 'smooth' })` and closes the drawer after the jump.
+- Keyboard support: Enter/Space activates a TOC item via <code>onKeyDown</code> handlers.
+
+<Callout type="info">
+  The TOC button disables itself when a page has no headings. This prevents empty drawers and makes the bar context-aware.
+</Callout>
+
+## AI drawer (non-standard, custom workflow)
+
+This is the part that is **not standard** for Nextra: a full prompt system and AI provider launcher that lives inside the docs UI.
+
+### Prompting system (Zustand store + local persistence)
+
+The AI prompt system is stored locally in the browser and persists across sessions.
+
+- Store: <code>docs/app/stores/promptStore.ts</code> using Zustand + <code>persist</code>.
+- Storage key: <code>ai-prompts</code>.
+- Default prompt: "Please explain this webpage to me".
+- Users can create, edit, delete, and select prompts in the UI.
+
+The prompt selection modal sorts the active prompt to the top and uses a short "Prompt Activated!" animation to confirm the change.
+
+### Prompt editing flow
+
+- <code>PromptSelectionModal</code> lists prompts and lets you activate or edit.
+- <code>PromptEditModal</code> is used for create/edit and validates name + content.
+- Deletes are guarded with confirmation modals.
+
+### AI provider deep links
+
+The drawer launches external AI sessions, prefilled with **prompt + current page URL**:
+
+- ChatGPT: <code>https://chat.openai.com/?q=...</code>
+- Claude: <code>https://claude.ai/new?q=...</code>
+- Perplexity: <code>https://www.perplexity.ai/search?q=...</code>
+
+This is done via <code>openAIDeeplink</code> in <code>docs/app/components/navigation/BottomBar/utils/aiDeeplinks.ts</code>.
+
+### Copy page as markdown
+
+The AI drawer also includes a **Copy Page as Markdown** action:
+
+- <code>copyPageAsMarkdown()</code> converts the current DOM into markdown.
+- Script/style/nav/header/footer are stripped before conversion.
+- The result includes the page title + URL for context.
+- A transient status label uses <code>aria-live="polite"</code> to announce success/failure.
+
+## Scroll controls and visibility
+
+The right side of the bar hosts **up/down scroll arrows** with smart visibility:
+
+- <code>useScrollIndicators</code> shows the up arrow only when not near the top and the down arrow only when not near the bottom.
+- Scrolls are smooth and set a short "sticky" active state to keep the button highlighted.
+- Hover/active states fade out automatically after a short timeout.
+
+### Footer-aware fade out
+
+When the page nears the footer, the entire bar fades out so the footer stays readable.
+
+- Computed by <code>FOOTER_NEAR_RATIO</code> inside <code>useScrollIndicators</code>.
+- <code>BottomBar.module.css</code> applies <code>opacity: 0</code> and disables pointer events via <code>.fadeOut</code>.
+- The fade-out is suppressed while the drawer is open to avoid interrupting interactions.
+
+## Sidebar toggle integration
+
+The bar includes a sidebar toggle that **bridges to Nextra** instead of duplicating state.
+
+- <code>useSidebarBridge</code> finds the native Nextra sidebar button via ARIA attributes.
+- A <code>MutationObserver</code> tracks <code>aria-expanded</code> to keep state in sync.
+- When no native button is found, it dispatches <code>nextra:toggleSidebar</code>.
+- The button only appears at the breakpoints defined in <code>BottomBar.module.css</code> (hidden on small screens, visible from 768px up).
+
+## Accessibility details
+
+Accessibility is treated as a first-class behavior:
+
+- <code>aria-expanded</code> on AI and TOC toggles.
+- <code>aria-label</code> on all icon buttons and action controls.
+- <code>aria-live</code> on copy status feedback.
+- Keyboard controls for TOC and prompt list entries.
+- Escape key closes modals first, then the drawer.
+
+## Key files
+
+- <code>docs/app/components/navigation/BottomBar/BottomBar.tsx</code>
+- <code>docs/app/components/navigation/BottomBar/drawers/AIDrawer/AIDrawer.tsx</code>
+- <code>docs/app/components/navigation/BottomBar/drawers/TOCDrawer/TOCDrawer.tsx</code>
+- <code>docs/app/stores/promptStore.ts</code>
+- <code>docs/app/components/navigation/BottomBar/utils/markdownCopy.ts</code>
+- <code>docs/app/components/navigation/BottomBar/utils/aiDeeplinks.ts</code>

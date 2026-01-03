@@ -1,0 +1,484 @@
+/* Base text */
+p {
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+  font-weight: 1 !important; 
+}
+
+/* Schemes container */
+.scheme-container {
+  background-color: var(--primary-color) !important;
+  border: var(--default-border) !important;
+}
+
+/* ---------- Dropdown (Servers) ---------- */
+.servers select,
+.servers option {
+  background-color: var(--primary-color) !important;
+  color: #ffffff !important;
+  border: var(--default-border) !important;
+  font-family: var(--font-body) !important;
+}
+.servers select:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--secondary-color) !important; /* custom focus ring */
+}
+.servers option:hover {
+  background-color: var(--secondary-color) !important;
+  color: #ffffff !important;
+}
+
+/* ---------- Headings ---------- */
+h1, h2, h3, h4, h5, h6 {
+  color: #ffffff !important;
+  font-family: var(--font-primary) !important;
+  font-weight: 1 !important;
+}
+
+h4 {
+  font-size: 1.5rem !important;
+  font-weight: 1 !important;
+}
+
+/* Make these texts white */
+.opblock-summary-description,
+.servers-title,
+.opblock-summary-path,
+.opblock-summary-path a,
+.opblock-summary-path-description-wrapper,
+.opblock-summary-path-description-wrapper .opblock-summary-description,
+.url {
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+}
+
+/* ---------- Method badges (consistent secondary color) ---------- */
+.opblock-summary-method {
+  background-color: var(--secondary-color) !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-family: var(--font-body) !important;
+}
+/* Also catch any per-method variants Swagger might add */
+.opblock.opblock-get .opblock-summary-method,
+.opblock.opblock-post .opblock-summary-method,
+.opblock.opblock-put .opblock-summary-method,
+.opblock.opblock-delete .opblock-summary-method,
+.opblock.opblock-patch .opblock-summary-method,
+.opblock.opblock-head .opblock-summary-method,
+.opblock.opblock-options .opblock-summary-method,
+.opblock.opblock-trace .opblock-summary-method {
+  background-color: var(--secondary-color) !important;
+  color: #ffffff !important;
+}
+
+/* ---------- Borders on blocks & tags ---------- */
+.opblock,
+.opblock-summary,
+.opblock-tag {
+  border: var(--default-border) !important;
+}
+
+/* Extra: ensure the summary button shows a bottom border */
+.opblock-summary-control {
+  border-bottom: 2px solid var(--secondary-color) !important;
+}
+
+/* ---------- Arrows: force white everywhere ---------- */
+.arrow path,
+.opblock-control-arrow svg path,
+.expand-operation svg path {
+  fill: #ffffff !important;
+  stroke: #ffffff !important;
+}
+
+/* ---------- Version stamps ---------- */
+.version-stamp .version {
+  background-color: var(--utility-green) !important; /* OAS 3.0 */
+  color: #ffffff !important;
+  font-family: var(--font-primary) !important;
+}
+small .version {
+  background-color: var(--secondary-color) !important; /* 1.0 */
+  color: #ffffff !important;
+  font-family: var(--font-primary) !important;
+}
+small {
+  background-color: var(--secondary-color) !important;
+}
+small.version-stamp {
+  background-color: var(--utility-green) !important;
+}
+
+/* ---------- Opblock body & sections ---------- */
+.opblock-body,
+.responses-wrapper,
+.responses-inner,
+.parameters-container,
+.headers,
+.responses-table {
+  background-color: var(--primary-color) !important;
+}
+
+/* ---------- Execute button ---------- */
+.btn.execute.opblock-control__btn {
+  background-color: transparent !important;
+  color: #ffffff !important;
+  border: var(--default-border) !important;
+  font-family: var(--font-body) !important;
+}
+.btn.execute.opblock-control__btn:hover {
+  background-color: var(--secondary-color) !important;
+  color: #ffffff !important;
+}
+
+/* Try it out button */
+.btn.try-out__btn {
+  background-color: var(--primary-color) !important;
+  color: #ffffff !important;
+  border: var(--default-border) !important;
+  font-family: var(--font-body) !important; /* Michroma */
+}
+
+/* Clear button */
+.btn.btn-clear.opblock-control__btn {
+  background-color: transparent !important;
+  color: #ffffff !important;
+  border: 2px solid var(--accent-color) !important; /* "primary-accent" -> accent-color */
+  border-radius: 10px !important;
+  font-family: var(--font-body) !important;
+}
+
+/* ---------- Section headers (e.g., Parameters) ---------- */
+.opblock-section-header {
+  background-color: var(--secondary-color) !important;
+  color: #ffffff !important;
+}
+/* Make the little connected ::after bits white */
+.opblock-section-header::after,
+.opblock-section-header *::after,
+.tab-header .tab-item.active::after,
+.opblock-title::after {
+  background: #ffffff !important;
+  border-color: #ffffff !important;
+  color: #ffffff !important;
+}
+
+/* ---------- Tabs ---------- */
+.tab-header .tab-item.active h4,
+.tab-header .tab-item.active h4 span {
+  color: #ffffff !important;
+}
+.tab-header .tab-item h4,
+.tab-header .tab-item h4 span {
+  color: #ffffff !important;
+}
+.tab-header .tab-item.active {
+  background-color: transparent !important;
+}
+
+/* ---------- Code examples ---------- */
+pre.example.microlight,
+pre.example.microlight code,
+.highlight-code pre,
+.highlight-code code {
+  background: #000000 !important;
+  color: #ffffff !important;
+font-weight: 100 !important;
+  font-family: var(--font-body) !important;
+}
+/* CURL and plain microlight blocks: black bg, no border */
+pre.curl.microlight,
+pre.microlight {
+  background: #000000 !important;
+  color: #ffffff !important;
+  border: none !important;
+  font-family: var(--font-body) !important;
+}
+
+/* Kill the unwanted line-underlines/borders inside code blocks */
+.microlight span,
+pre.microlight * ,
+pre.example.microlight * ,
+.highlight-code .microlight * ,
+.highlight-code pre * ,
+.highlight-code code * {
+  border-bottom: none !important;
+  text-decoration: none !important;
+  box-shadow: none !important;
+  background-image: none !important;
+}
+
+/* Syntax highlight tweaks (hljs classes) */
+.hljs-attr {
+  color: #a2fca2 !important; /* matches your green */
+  text-decoration: none !important;
+}
+.hljs-string {
+  color: #a2fca2 !important;
+}
+.hljs-number {
+  color: #d36363 !important; /* red numbers */
+}
+.hljs-literal {
+  color: #f47838 !important; /* accent orange */
+}
+
+/* ---------- Tables (headers + responses) ---------- */
+table,
+thead,
+tbody,
+tr,
+th,
+td,
+.responses-table,
+.responses-table * ,
+.headers,
+.headers * {
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+  background: transparent !important; /* let the container’s primary show through */
+}
+/* Response/status cells too */
+.response-col_status,
+.col_header,
+.header-col {
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+}
+
+/* Adjust padding + center text for Links column header & cells */
+.col.col_header.response-col_links,
+.response-col_links {
+  padding-left: 5px !important;
+  padding-right: 5px !important;
+  text-align: center !important;
+}
+
+
+/* Tab buttons inside examples/schemas */
+.tablinks,
+.tabitem button {
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+}
+
+/* Content-type selectors inside responses */
+.content-type-wrapper select,
+.content-type-wrapper option,
+.content-type {
+  background-color: var(--primary-color) !important;
+  color: #ffffff !important;
+  border: var(--default-border) !important;
+  font-family: var(--font-body) !important;
+  font-weight: 100 !important; /* = "1" */
+}
+.content-type-wrapper select:focus,
+.content-type:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px var(--secondary-color) !important;
+}
+
+/* Keep anchors white in opblock areas */
+.opblock a,
+.opblock a:visited {
+  color: #ffffff !important;
+}
+
+/* Ensure Swagger’s internal shadows don’t overpower our theme */
+.opblock-summary,
+.opblock {
+  box-shadow: none !important;
+}
+
+
+
+/* Execute button: keep 10px radius even after click (grouped state) */
+.btn.execute.opblock-control__btn,
+.btn.execute.opblock-control__btn:focus,
+.btn.execute.opblock-control__btn:active {
+  border-radius: 10px !important;
+}
+.execute-wrapper .btn.execute.opblock-control__btn,
+.execute-wrapper .btn.execute.opblock-control__btn:focus,
+.execute-wrapper .btn.execute.opblock-control__btn:active {
+  border-top-left-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+/* If Swagger groups buttons, force both ends rounded */
+.execute-wrapper .opblock-control__btn:first-child {
+  border-top-left-radius: 10px !important;
+  border-bottom-left-radius: 10px !important;
+}
+.execute-wrapper .opblock-control__btn:last-child {
+  border-top-right-radius: 10px !important;
+  border-bottom-right-radius: 10px !important;
+}
+
+/* Servers <select>: force white arrow + white text */
+.servers select {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+
+  background-color: var(--primary-color) !important;
+  color: #ffffff !important;
+  border: var(--default-border) !important;
+  font-family: var(--font-body) !important;
+
+  padding-right: 2.5rem !important; /* room for arrow */
+  background-image:
+    url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23ffffff'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat !important;
+  background-position: right .75rem center !important;
+  background-size: 20px 20px !important;
+}
+/* Hide native arrow in old IE/Edge */
+.servers select::-ms-expand { display: none !important; }
+
+/* Ensure dropdown menu text stays white too */
+.servers select option,
+.servers select optgroup {
+  color: #ffffff !important;
+  background-color: var(--primary-color) !important;
+}
+
+
+input[type="text"] {
+  background-color: var(--primary-color) !important;
+  border: var(--default-border) !important;
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+}
+
+/* Placeholder text white */
+input[type="text"]::placeholder {
+  color: #ffffff !important;
+  opacity: 1 !important; /* for Firefox */
+}
+
+/* Left padding for description cell */
+.parameters-col_description {
+  padding-left: 0.5rem !important;
+}
+
+/* Center align + white Michroma text for param name column */
+.parameters-col_name {
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+  padding-left: 0.5rem !important;
+}
+.parameters-col_name * {
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+}
+
+/* Asterisk and ::after indicators (e.g., for required fields) to use --accent-color */
+.parameter__name.required span,
+.parameter__name.required::after {
+  color: var(--accent-color) !important;
+}
+
+/* Textarea body param */
+textarea.body-param__text {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+  border: var(--default-border) !important;
+}
+
+/* ::after on request body title */
+h4.opblock-title.parameter__name.required::after {
+  margin-left: 0.5rem !important;
+  color: white !important;
+  border: var(--default-border) !important;
+  font-family: var(--font-body) !important;
+  background-color: var(--primary-color) !important;
+  border-radius: 10px !important;
+}
+/* Examples select styling (first one with bottom margin) */
+select.examples-select-element {
+  background-color: var(--primary-color) !important;
+  color: #ffffff !important;
+  border: var(--default-border) !important;
+  font-family: var(--font-body) !important;
+  margin-bottom: 0.2rem !important;
+
+  appearance: none !important;
+  padding-right: 2.5rem !important;
+  background-image:
+    url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23ffffff'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat !important;
+  background-position: right .75rem center !important;
+  background-size: 20px 20px !important;
+}
+select.examples-select-element option {
+  background-color: var(--primary-color) !important;
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+}
+
+.examples-select__section-label {
+  color: #ffffff !important;
+  font-family: var(--font-body) !important;
+  margin-bottom: 2rem !important;
+}
+
+/* White arrow for content-type <select> */
+select.content-type {
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+
+  background-color: var(--primary-color) !important;
+  color: #ffffff !important;
+  border: var(--default-border) !important;
+
+  padding-right: 2.5rem !important;
+  background-image:
+    url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='%23ffffff'%3E%3Cpath d='M5.5 7.5l4.5 4.5 4.5-4.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat !important;
+  background-position: right .75rem center !important;
+  background-size: 20px 20px !important;
+}
+
+
+/* White focus outline */
+select.examples-select-element:focus {
+  outline: none !important;
+  box-shadow: 0 0 0 2px #ffffff !important;
+}
+
+/* Try to catch highlighted/selected options */
+select.examples-select-element option:checked,
+select.examples-select-element option:focus,
+select.examples-select-element:focus > option {
+  color: #ffffff !important;
+}
+
+/* the text container next to each Name of the API */
+small {
+  border-radius: 10px;
+  margin-left: 1rem;
+  margin-right: 0.5rem;
+}
+
+
+
+/** 
+
+--primary-color: #012035; 
+  --secondary-color: #04426C; 
+  --accent-color: #FC1819;
+  --accent-color-2: #f47838; 
+  --background-white: #e9f9f9; 
+  --secondary-red: #CE161B; 
+  --utility-green: #11C045;
+  --background: var(--primary-color);
+  --foreground: #ffffff;
+
+  --font-primary: "AgencyB", sans-serif;
+  --font-body: "Michroma", sans-serif;
+
+  --default-border: 2px solid var(--secondary-color);
+  **/

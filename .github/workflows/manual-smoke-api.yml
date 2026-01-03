@@ -1,0 +1,32 @@
+name: Manual - Smoke API
+
+on:
+  workflow_dispatch:
+
+jobs:
+  smoke-api:
+    runs-on: ubuntu-latest
+    environment: testnet
+    defaults:
+      run:
+        working-directory: ./dapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run smoke API tests
+        uses: ./.github/actions/run-smoke-api
+        with:
+          base-url: ${{ vars.TEST_BASE_URL }}
+          private-key: ${{ secrets.PRIVATE_KEY_API }}
+          token-id: ${{ secrets.TOKEN_ID }}
+          chain-id: ${{ vars.CHAIN_ID }}
+          enable-state-worker: ${{ vars.NEXT_PUBLIC_ENABLE_STATE_WORKER }}
+          ai-chat-requires-jwt: ${{ vars.NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT }}

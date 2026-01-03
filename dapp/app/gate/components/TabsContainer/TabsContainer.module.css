@@ -1,0 +1,129 @@
+/* app/gate/components/TabsContainer/TabsContainer.module.css */
+.container {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.title {
+  font-family: var(--font-primary);
+  font-size: 3rem;
+  color: white;
+  text-align: center;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+}
+
+.tabsRoot {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.tabsList {
+  display: flex;
+  justify-content: center;
+  gap: 0;
+  border: var(--default-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: transparent;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.tabsTrigger {
+  flex: 1;
+  padding: 1rem 2rem;
+  background: transparent;
+  border: none;
+  border-right: 2px solid var(--secondary-color);
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1.1rem;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 1s ease;
+  position: relative;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tabsTrigger:last-child {
+  border-right: none;
+}
+
+.tabsTrigger:hover {
+  background-color: var(--secondary-color);
+}
+
+.tabsTrigger[data-state="active"] {
+  background-color: var(--secondary-color);
+}
+
+.tabsContent {
+  padding: 3rem 2rem;
+  background: rgba(0, 30, 60, 0.3);
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  animation: fadeIn 0.3s ease;
+}
+
+.tabsContent[data-state="inactive"] {
+  display: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem 0;
+    gap: 1.5rem;
+  }
+  
+  .title {
+    font-size: 2rem;
+    letter-spacing: 2px;
+  }
+  
+  .tabsList {
+    margin: 0 1rem;
+  }
+  
+  .tabsTrigger {
+    padding: 0.75rem 1rem;
+    font-size: 0.9rem;
+    letter-spacing: 0.5px;
+  }
+  
+  .tabsContent {
+    /* Remove horizontal padding and use full width */
+    padding: 2rem 0;
+    min-height: 300px;
+    /* Force full viewport width */
+    width: 100vw;
+    position: relative;
+    left: 50%;
+    right: 50%;
+    margin-left: -50vw;
+    margin-right: -50vw;
+  }
+  
+  /* Add this class to child content that needs padding */
+  .tabsContent > * {
+    width: 100%;
+    padding: -2.5 1rem;
+  }
+}

@@ -1,0 +1,39 @@
+/* docs/styles/code.css */
+li code.nextra-code {
+  border: .5px solid var(--secondary-color) !important;         
+}
+
+/* 1. Give all MDX code blocks (<pre>) a white border only */
+pre.not-prose {
+  border: 1px solid var(--secondary-color) !important;
+  box-shadow: none !important;      /* strip out the default ring shadow */
+}
+
+/* Make the code blocks “Copy code” button’s icon/text gray by default and white on hover */
+button[title="Copy code"] {
+  color: #6b7280 !important;        /* Tailwind’s gray-500 */
+}
+
+button[title="Copy code"]:hover {
+  color: #ffffff !important;
+}
+
+/* Always show the toolbar in the code block (including the copy button) */
+pre.not-prose > div {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Make the permalink icon white instead of gray */
+a.subheading-anchor,
+a.subheading-anchor:hover,
+a.subheading-anchor:focus-visible {
+  color: #fff !important;
+  fill:  #fff !important;
+}
+
+a.subheading-anchor::before,
+a.subheading-anchor::after {
+  color: #fff !important;
+  fill:  #fff !important;
+}

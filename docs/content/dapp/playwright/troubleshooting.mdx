@@ -1,0 +1,72 @@
+import { Callout, Steps, Tabs } from 'nextra/components'
+
+# Troubleshooting & Tips
+
+Even with solid helpers, complex flows can fail for mundane reasons. Use this page as a checklist when debugging CI runs or local flakes.
+
+## Common issues
+
+<Tabs items={['Environment', 'Wallet', 'Mocks & MCP', 'Gate & NFT']} storageKey="troubleshooting-tabs" defaultIndex={0}>
+  <Tabs.Tab>
+    <Steps>
+      {<h3>`.env.playwright` not found</h3>}
+      Ensure the file lives inside `dapp/.env.playwright`. `env.ts` logs `[e2e env] .env.playwright not found` when both search paths fail.
+
+      {<h3>Private key format errors</h3>}
+      Run `npx tsx dapp/e2e/playwright/debug-key.ts` to see where normalization fails (invisible chars, stray quotes, incorrect length).
+
+      {<h3>CHAIN_ID undefined</h3>}
+      If you set `NETWORK=Ritonet`, `CHAIN_ID` becomes mandatory. `env.ts` throws with `[e2e env] CHAIN_ID is required...`.
+    </Steps>
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <Steps>
+      {<h3>Provider missing</h3>}
+      Always await `setup.waitForProvider()` before interacting with the page. If wagmi initialises first, it won’t detect the injected provider.
+
+      {<h3>Address mismatch</h3>}
+      `setupTest` compares the derived address with `walletConfig.address`. When they differ, it throws before navigation. Fix the config instead of stubbing the error away.
+
+      {<h3>State leaks between tests</h3>}
+      Forgetting `clearStorage: true` or reusing the same `page` across tests can keep wagmi’s session alive. Use per-test `setupTest()` calls and call `ensureDisconnected()` in `afterEach` if needed.
+    </Steps>
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <Steps>
+      {<h3>MCP call fails</h3>}
+      The AI mock logs `[AI Mock MCP] Tool call failed`. Verify the JWT cookie exists and the MCP endpoint matches `e2eEnv.mcpEndpoint`. For authenticated tests, log in before sending chat messages.
+
+      {<h3>Mock intercepts the wrong endpoint</h3>}
+      If you see missing API responses elsewhere, ensure you didn’t change the allowlist in `ai-provider.mock.ts`. Never route-match `**/api/**` without the explicit `/api/chat` check.
+
+      {<h3>Portfolio data missing</h3>}
+      The chain-portfolio mock only responds when it finds `tokenType` and `chainId` query params. Confirm the page still sends those (selectors in `portfolio.flow.ts` assume they exist).
+    </Steps>
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <Steps>
+      {<h3>Gate unlock timeout</h3>}
+      Increase `waitForResponseMs`/`waitForUIVisibleMs` or enable `refreshOnFail`. Also make sure no modals are blocking the button—`unlockTokenGateWithRetry` attempts to dismiss them but new UI could require updates.
+
+      {<h3>Mint/Burn stuck</h3>}
+      In real mode, check the Sepolia account balance and the RPC status. In mock mode, ensure `txDelayMs` isn’t set to something huge. Logs from `wallet/injected/provider.ts` show pending tx hashes.
+
+      {<h3>Inline renderer assertions flake</h3>}
+      Call `smartChat(..., skipResponseCheck: true)` when expecting non-text output and then use the dedicated assertion helpers. They already wait for SVG/GIF elements.
+    </Steps>
+  </Tabs.Tab>
+</Tabs>
+
+## Debugging tips
+
+- **Enable debug flags** — Most helpers accept `debug: true` (e.g. `installPortfolioAlchemyMock`). Verbose logs are invaluable on CI.
+- **Capture screenshots** — `ScreenshotUtils.capture('gate-error')` stores before/after screenshots under `test-results/screenshots`.
+- **Console filtering** — `setupTest` pipes wallet-related console logs to the terminal. Add your own `page.on('console')` listeners for component-specific debugging.
+- **Use `test.step`** — Wrapping flows in `test.step('Gate unlock', async () => { ... })` produces readable trace chunks in Playwright HTML reports.
+- **Surface retries in logs** — Helpers already log attempt counts. If you add new retries, follow the `[Component] Attempt x/y` format to stay consistent.
+
+<Callout type="info" emoji="🪪">
+Never mask genuine backend failures with mocks. The existing mocks only bypass unreliable external data (AI + portfolio). Everything else should keep talking to the staging API so we notice regressions.
+</Callout>
+
+Still stuck? Cross-reference the spec playbook for the relevant test or inspect the Playwright trace (`npx playwright show-trace trace.zip`) to see DOM timing issues.

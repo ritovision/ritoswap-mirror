@@ -1,0 +1,24 @@
+name: Manual - ESLint
+
+on:
+  workflow_dispatch:
+
+jobs:
+  eslint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run ESLint
+        uses: ./.github/actions/run-eslint

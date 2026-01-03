@@ -1,0 +1,304 @@
+/* app/swap/page.module.css */
+
+.main {
+  min-height: 100vh;
+  background-color: var(--primary-color);
+  padding: 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Edge gradients for orb fade effect - left, right, and bottom */
+.main::before,
+.main::after {
+  content: '';
+  position: fixed;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.main::before {
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 120px;
+  background: linear-gradient(to right, var(--primary-color) 0%, transparent 100%);
+}
+
+.main::after {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 120px;
+  background: linear-gradient(to left, var(--primary-color) 0%, transparent 100%);
+}
+
+/* Bottom gradient */
+.orbsContainer::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 100px;
+  background: linear-gradient(to top, var(--primary-color) 0%, transparent 100%);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.container {
+  max-width: 600px;
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+.title {
+  color: white;
+  text-align: center;
+  margin-bottom: 2rem;
+  font-family: var(--font-primary);
+}
+
+.widgetSpacer {
+  min-height: 450px;
+  margin-bottom: 2rem;
+}
+
+.widgetWrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Widget container + fade-in */
+.widgetContainer {
+  position: relative;
+  min-height: auto;
+  width: fit-content;
+  max-width: 600px;
+  border: var(--default-border);
+  background: var(--primary-color);
+  border-radius: 10px;
+  overflow: hidden;
+  margin: 0 auto;
+
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 1.5s ease, transform 1.5s ease;
+}
+
+.widgetLoaded { opacity: 1; transform: translateY(0); }
+
+.widgetContent {
+  position: relative;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 1.5s ease, transform 1.5s ease;
+}
+
+.widgetContentVisible { opacity: 1; transform: translateY(0); }
+
+/* Caption fades in over 1.5s */
+.caption {
+  text-align: center;
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 16px;
+  margin-bottom: 2rem;
+  opacity: 0;
+  transition: opacity 1.5s ease;
+}
+
+.captionVisible { opacity: 0.8; }
+
+/* Page-level orbs */
+.orbsContainer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* Crisp core circle; animation reads CSS vars for path/timing */
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--secondary-color);
+  opacity: 0;
+  animation: orbLifecycle var(--lifecycle-duration) ease-in-out infinite;
+  animation-delay: var(--delay);
+
+  /* keep edges sharp; avoid blurry composites on mobile GPUs */
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+
+  /* Fallback halo if color-mix() unsupported (older browsers) */
+  filter: drop-shadow(0 0 20px var(--secondary-color));
+}
+
+/* Sizes (desktop) */
+.orbHuge { width: 400px; height: 400px; }
+.orbMedium { width: 250px; height: 250px; }
+.orbSmall { width: 150px; height: 150px; }
+
+/* ✨ Prefer gradient halo on a separate layer (if supported) */
+@supports (color: color-mix(in srgb, red, transparent)) {
+  .orb { filter: none; }            /* disable fallback for modern browsers */
+  .orb { z-index: 1; }
+  .orb::before {
+    content: "";
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 0;                     /* behind the orb core but above the bg */
+  }
+
+  /* Scale halo by size so medium/large are clearly visible */
+  .orbHuge::before {
+    inset: -84px;                   /* thicker shell for large orb */
+    filter: blur(25px);
+    opacity: 0.98;
+    background:
+      radial-gradient(closest-side,
+        color-mix(in srgb, var(--secondary-color) 82%, transparent) 0 60%,
+        color-mix(in srgb, var(--secondary-color) 60%, transparent) 60% 85%,
+        transparent 85% 100%
+      );
+  }
+
+  .orbMedium::before {
+    inset: -46px;
+    filter: blur(20px);
+    opacity: 0.96;
+    background:
+      radial-gradient(closest-side,
+        color-mix(in srgb, var(--secondary-color) 78%, transparent) 0 60%,
+        color-mix(in srgb, var(--secondary-color) 56%, transparent) 60% 85%,
+        transparent 85% 100%
+      );
+  }
+
+  .orbSmall::before {
+    inset: -38px;
+    filter: blur(16px);
+    opacity: 0.94;
+    background:
+      radial-gradient(closest-side,
+        color-mix(in srgb, var(--secondary-color) 72%, transparent) 0 60%,
+        color-mix(in srgb, var(--secondary-color) 52%, transparent) 60% 85%,
+        transparent 85% 100%
+      );
+  }
+}
+
+/* Paths/timing (desktop defaults) */
+.orb1 { --start-x: -400px; --start-y: 50vh;  --end-x: 110vw; --end-y: 40vh;  --lifecycle-duration: 70s; --delay: 0s; }
+.orb2 { --start-x: 85vw;   --start-y: -200px; --end-x: 75vw;  --end-y: 110vh; --lifecycle-duration: 56s; --delay: 25s; }
+.orb3 { --start-x: 110vw;  --start-y: 92vh;  --end-x: 50vw;  --end-y: -100px; --lifecycle-duration: 44s; --delay: 2s; }
+.orb4 { --start-x: 95vw;   --start-y: 105vh; --end-x: 90vw;  --end-y: -80px;  --lifecycle-duration: 48s; --delay: 35s; }
+.orb5 { --start-x: -100px; --start-y: 85vh;  --end-x: 40vw;  --end-y: -90px;  --lifecycle-duration: 50s; --delay: 12s; }
+
+@keyframes orbLifecycle {
+  0% {
+    opacity: 0;
+    transform: translate(var(--start-x), var(--start-y)) scale(0.9);
+  }
+  15% {
+    opacity: 0.5;
+    transform: translate(
+      calc(var(--start-x) + (var(--end-x) - var(--start-x)) * 0.15),
+      calc(var(--start-y) + (var(--end-y) - var(--start-y)) * 0.15)
+    ) scale(1);
+  }
+  85% {
+    opacity: 0.5;
+    transform: translate(
+      calc(var(--start-x) + (var(--end-x) - var(--start-x)) * 0.85),
+      calc(var(--start-y) + (var(--end-y) - var(--start-y)) * 0.85)
+    ) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--end-x), var(--end-y)) scale(0.9);
+  }
+}
+
+.musicWrapper {
+  margin-top: 5rem;
+  position: relative;
+  z-index: 2;
+}
+
+/* =========================
+   Mobile tweaks (≤ 730px)
+   - size-scaled halo (medium/large clearly visible)
+   - crisp edges (no heavy filters on core)
+   - earlier entry (start positions & delays)
+   ========================= */
+@media (max-width: 730px) {
+  .main { padding: 1rem; }
+  .title { font-size: 2.5rem; }
+
+  .main::before, .main::after { width: 60px; }
+  .orbsContainer::after { height: 60px; }
+
+  /* sizes for mobile */
+  .orbHuge { width: 250px; height: 250px; }
+  .orbMedium { width: 180px; height: 180px; }
+  .orbSmall { width: 120px; height: 120px; }
+
+  /* Fallback halo on old browsers (keeps visibility) */
+  .orb { filter: drop-shadow(0 0 18px var(--secondary-color)); }
+
+  @supports (color: color-mix(in srgb, red, transparent)) {
+    .orb { filter: none; }
+
+    .orbHuge::before {
+      inset: -68px;
+      opacity: 1;
+      background:
+        radial-gradient(closest-side,
+          color-mix(in srgb, var(--secondary-color) 80%, transparent) 0 58%,
+          color-mix(in srgb, var(--secondary-color) 60%, transparent) 58% 82%,
+          transparent 82% 100%
+        );
+    }
+
+    .orbMedium::before {
+      inset: -42px;
+      opacity: 0.98;
+      background:
+        radial-gradient(closest-side,
+          color-mix(in srgb, var(--secondary-color) 76%, transparent) 0 58%,
+          color-mix(in srgb, var(--secondary-color) 56%, transparent) 58% 82%,
+          transparent 82% 100%
+        );
+    }
+
+    .orbSmall::before {
+      inset: -30px;
+      filter: blur(7px);
+      opacity: 0.95;
+      background:
+        radial-gradient(closest-side,
+          color-mix(in srgb, var(--secondary-color) 70%, transparent) 0 58%,
+          color-mix(in srgb, var(--secondary-color) 52%, transparent) 58% 82%,
+          transparent 82% 100%
+        );
+    }
+  }
+
+  /* appear-sooner paths/timing */
+  .orb1 { --start-x: -120px; --start-y: 46vh;  --end-x: 105vw; --end-y: 38vh;  --lifecycle-duration: 60s; --delay: 0s;  }
+  .orb2 { --start-x: 78vw;   --start-y: -80px; --end-x: 72vw;  --end-y: 108vh; --lifecycle-duration: 48s; --delay: 10s; }
+  .orb3 { --start-x: 98vw;   --start-y: 88vh;  --end-x: 50vw;  --end-y: -80px;  --lifecycle-duration: 40s; --delay: 1s;  }
+  .orb4 { --start-x: 90vw;   --start-y: 100vh; --end-x: 86vw;  --end-y: -60px;  --lifecycle-duration: 42s; --delay: 18s; }
+  .orb5 { --start-x: -60px;  --start-y: 82vh;  --end-x: 42vw;  --end-y: -70px;  --lifecycle-duration: 44s; --delay: 6s;  }
+}

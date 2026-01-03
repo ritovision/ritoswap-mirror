@@ -1,0 +1,177 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+  background-color: transparent;
+  border: var(--default-border);
+  border-radius: 12px;
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-size: 2.5rem;
+  font-weight: bold;
+  margin-bottom: 2rem;
+  text-align: center;
+  color: #ffffff;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+}
+
+.addressButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  margin-bottom: 2rem;
+  padding: 1.25rem 1.5rem;
+  background-color: var(--secondary-color);
+  border: var(--default-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: #ffffff;
+  position: relative;
+  overflow: hidden;
+  min-height: 70px;
+}
+
+.addressButton:hover {
+  background-color: var(--primary-color);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.addressButton:active {
+  transform: translateY(0);
+}
+
+.contractLabel {
+  font-family: var(--font-primary);
+  font-weight: 1;
+  color: #ffffff;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.addressWrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0.5rem 0.75rem;
+  min-height: 36px;
+  background-color: var(--primary-color);
+  border: var(--default-border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.addressText,
+.copiedText {
+  position: absolute;
+  width: 100%;
+  text-align: center;
+  font-family: monospace;
+  font-size: 0.9rem;
+  letter-spacing: 0.5px;
+  transition: opacity 1s ease;
+  white-space: nowrap;
+}
+
+.fadeIn {
+  opacity: 1;
+}
+
+.fadeOut {
+  opacity: 0;
+}
+
+.copyIcon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #ffffff;
+  opacity: 0.8;
+  transition: opacity 0.2s ease;
+}
+
+.addressButton:hover .copyIcon {
+  opacity: 1;
+}
+
+.intro {
+  font-size: 1.1rem;
+  text-align: center;
+  color: #ffffff;
+  margin-bottom: 2rem;
+}
+
+.section {
+  margin-bottom: 2rem;
+}
+
+.sectionTitle {
+  font-size: 1.5rem;
+  font-weight: 1;
+  margin-bottom: 1rem;
+  color: #ffffff;
+}
+
+.rulesList {
+  list-style-position: inside;
+  space-y: 0.75rem;
+}
+
+.rulesList li {
+  margin-bottom: 0.75rem;
+  color: #ffffff;
+  line-height: 1.6;
+}
+
+.section p {
+  color: #ffffff;
+  line-height: 1.6;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .container {
+    padding: 1.5rem;
+    margin: 1rem;
+  }
+
+  .title {
+    font-size: 2rem;
+  }
+
+  .addressButton {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 1.25rem 1rem;
+    min-height: auto;
+  }
+
+  .contractLabel {
+    font-size: 0.9rem;
+    width: 100%;
+    text-align: center;
+  }
+
+  .addressWrapper {
+    width: 100%;
+    order: 2;
+  }
+
+  .copyIcon {
+    order: 3;
+    margin: 0 auto;
+  }
+
+  .addressText,
+  .copiedText {
+    font-size: 0.8rem;
+  }
+}

@@ -1,0 +1,91 @@
+---
+title: Wallet Configuration
+description: Overview of Adding Local Blockchain to Wallets
+---
+# Wallet Configuration
+
+Connect wallets like MetaMask to your Local Blockchain for testing transactions and dApp interactions.
+
+## MetaMask Setup
+
+### Add Network
+
+1. Open MetaMask
+2. Click network dropdown → "Add Network" → "Add Network Manually"
+3. Enter these details:
+
+| Field | Value |
+|-------|-------|
+| **Network Name** | RitoSwap Localnet (or any name) |
+| **RPC URL** | `http://localhost:8545` |
+| **Chain ID** | `90999999` (or your `LOCAL_CHAIN_ID`) |
+| **Currency Symbol** | RITO (or matching `COIN_SYMBOL`) |
+| **Block Explorer URL** | `http://localhost:4000` (or `http://<BLOCKSCOUT_PUBLIC_HOST>:4000`) |
+
+You can also replace "localhost" with the host you set in `.env` as `BLOCKSCOUT_PUBLIC_HOST` so other devices on your LAN can resolve RPC/Explorer URLs.
+
+> **Important**: The Chain ID must match your `LOCAL_CHAIN_ID` from your `.env` that was used to produce the first genesis block with the genesis.json file. If you changed the .env or genesis.json after generating the genesis block, the system still only recognizes the value used during that genesis block's creation. Other fields are cosmetic.
+
+### Import Accounts
+
+#### Import Validator Account
+1. Get private key: `pnpm --filter local-blockchain run reveal:key`
+2. In MetaMask: Menu → "Import Account"
+3. Select "Private Key" and paste
+4. This account has 10,000 ETH for gas
+
+#### Use Test Account
+The pre-funded test account from `.env`:
+- Default: `0xee1520c50f0ee31a37fd9699db29b69565c9eda9`
+- Has 10,000 ETH balance
+- Import via private key if you have it
+
+## Other Wallets
+
+Most Ethereum wallets support custom networks:
+
+### Trust Wallet
+- Settings → Networks → Add Custom Network
+- Use same RPC and Chain ID
+
+### WalletConnect
+- Works automatically once MetaMask is configured
+- Ensure Chain ID matches exactly
+
+### Hardware Wallets
+- Connect through MetaMask or MyCrypto
+- Set custom network before signing
+
+## Connection Verification
+
+After adding the network:
+
+1. Switch to your Local Blockchain in wallet
+2. Check ETH balance appears
+3. Try sending a test transaction
+4. Verify on Blockscout: `http://localhost:4000`
+
+## Troubleshooting
+
+### "Wrong Network" Errors
+- Verify Chain ID matches exactly
+- Clear wallet cache/activity data
+- Re-add network
+
+### No Balance Showing
+- Ensure the stack is running: `pnpm --filter local-blockchain run status`
+- Check the correct account is selected
+- Verify the address was prefunded in `.env` before running setup
+
+### Transaction Failures
+- Confirm Besu is running (RPC responds to `eth_blockNumber`)
+- Ensure sufficient gas (Besu defaults to 0 min gas price, so `1` works)
+- Verify the account balance in Blockscout
+
+## Block Explorer Integration
+
+Blockscout URL in wallet settings enables:
+- Click-through from wallet to explorer
+- Transaction status tracking
+- Contract interaction history
+- Token balance verification

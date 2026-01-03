@@ -1,0 +1,7 @@
+testMode: assertion
+testLimit: 10000
+timeout: 300
+prefix: "echidna_"
+corpusDir: "echidna-corpus"
+coverage: true
+format: text

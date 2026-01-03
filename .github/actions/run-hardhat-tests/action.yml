@@ -1,0 +1,25 @@
+name: Run Hardhat Tests
+description: Compiles and tests smart contracts
+
+inputs:
+  working-directory:
+    description: 'Working directory for contracts'
+    required: false
+    default: './colored-keys'
+
+runs:
+  using: composite
+  steps:
+    - name: Compile contracts
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        NODE_ENV: test
+      run: pnpm compile
+
+    - name: Run Hardhat tests
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        NODE_ENV: test
+      run: pnpm test

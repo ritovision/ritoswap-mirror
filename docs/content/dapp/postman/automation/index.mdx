@@ -1,0 +1,139 @@
+---
+title: "Postman Automation"
+description: "Internals of the scripts that build, sign, and verify the Postman collection."
+---
+
+import { Callout, FileTree, Steps, Table, Tabs } from 'nextra/components'
+
+# Postman Automation
+
+This section documents the code that keeps the Postman collection self-healing. Every helper lives under `dapp/postman` and ships with the repo, so there is no manual clicking inside the Postman UI—the CLI owns the entire lifecycle.
+
+<FileTree>
+  <FileTree.Folder name="postman" defaultOpen>
+    <FileTree.Folder name="collection" />
+    <FileTree.File name="env.schema.ts" />
+    <FileTree.Folder name="scripts" defaultOpen>
+      <FileTree.File name="fetch-openapi.ts" />
+      <FileTree.File name="add-signing-to-collection.ts" />
+      <FileTree.File name="add-tests-to-collection.ts" />
+      <FileTree.File name="add-jwt-capture-test.ts" />
+      <FileTree.File name="add-jwt-requests.ts" />
+      <FileTree.File name="presign-requests.ts" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Environment Validation (`env.schema.ts`)
+
+`dapp/postman/env.schema.ts` is the gatekeeper for every script. It loads `.env.postman`, enforces mandatory keys, and normalizes values before exporting them to callers.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Validation</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`PRIVATE_KEY`</td>
+      <td>Required, auto-adds `0x` prefix, fails fast if missing.</td>
+      <td>Use a throwaway key that maps to the Colored Key you plan to test.</td>
+    </tr>
+    <tr>
+      <td>`TOKEN_ID`</td>
+      <td>Required, coerced to a non-negative number.</td>
+      <td>Shared across gate-access + form-submission requests.</td>
+    </tr>
+    <tr>
+      <td>`CHAIN_ID`</td>
+      <td>Defaults to `1`, must be positive.</td>
+      <td>Stored as a number so the signing helpers can embed it in envelopes.</td>
+    </tr>
+    <tr>
+      <td>`TEST_BASE_URL` / `BASE_URL`</td>
+      <td>Must parse as a URL, strips trailing slashes.</td>
+      <td>Every script rewrites requests to avoid `//api` collisions.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_ENABLE_STATE_WORKER`</td>
+      <td>Boolean-ish string, defaults to `false`.</td>
+      <td>Toggles SIWE behavior; still auto-enables when `/api/nonce` responds.</td>
+    </tr>
+  </tbody>
+</Table>
+
+Successful validation also exposes helpers for building the `postman/collection` directory, so all scripts share the same paths.
+
+## Script Responsibilities
+
+<Tabs items={['fetch-openapi', 'add-signing', 'add-tests', 'jwt helpers', 'presign']}
+      defaultIndex={0}>
+  <Tabs.Tab>
+    ### `fetch-openapi.ts`
+
+    - Pulls the live spec from `env.OPENAPI_URL` (`/api/openapi` by default).
+    - Saves it to `postman/collection/openapi.json` plus a timestamped snapshot for audits.
+    - Refreshes `postman/collection/local.postman_environment.json` with baseline variables (`baseUrl`, `tokenId`, `chainId`, `privateKey`). Existing env files are merged to avoid losing overrides.
+    - Warns when the fetched document is not OpenAPI 3.x so CI can catch stale endpoints.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ### `add-signing-to-collection.ts`
+
+    - Injects a single collection-level **pre-request** script that rewrites bodies based on the active path:
+      - `/api/gate-access` → SIWE payload when `USE_SIWE=true`, otherwise legacy envelope with timestamps.
+      - `/api/form-submission-gate` → legacy submission body with the operator-facing message.
+    - Normalizes every gate/token-status URL so collections never ship with `<integer>` placeholders or `//api` path glitches.
+    - Acts idempotently; running it repeatedly simply replaces the existing pre-request block.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ### `add-tests-to-collection.ts`
+
+    - Parses `openapi.json`, builds a map of method/path pairs, and matches each Postman item to its documented response schemas.
+    - Auto-writes **happy path** tests (status window, response time budgets, content-type, schema validation) and **error tests** for folders or names that imply invalid flows.
+    - Handles special cases like `/api/token-status/{tokenId}` where `usedBy`/`usedAt` can be null by emitting custom assertions instead of raw JSON Schema.
+    - Supports strict mode via `STRICT_SCHEMA=true` if you ever need failures on schema drift instead of warnings.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ### JWT helpers (`add-jwt-capture-test.ts` + `add-jwt-requests.ts`)
+
+    - `add-jwt-capture-test.ts` adds a collection-level **test** script that runs after every response. Whenever a 2xx JSON body contains `accessToken` or `token`, it stores the value in `pm.environment.jwt`.
+    - `add-jwt-requests.ts` clones a working `/api/gate-access` request into two dedicated items:
+      1. **Valid JWT** – replays the captured token and expects 2xx.
+      2. **Invalid JWT** – mutates the last character before sending and expects a 4xx with JSON or Problem+JSON payloads.
+    - Also injects a prerequest snippet that creates `jwt_invalid` whenever a token exists, keeping negative cases deterministic.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ### `presign-requests.ts`
+
+    - Loads the validated env, instantiates an `ethers.Wallet`, and signs **both** legacy envelopes (`/api/gate-access`, `/api/form-submission-gate`).
+    - Calls `/api/nonce` to detect whether SIWE is enabled. If the state worker responds, it marks `USE_SIWE=true`, stores the nonce, builds an EIP-4361 message, and signs it.
+    - Writes timestamps, signatures, the SIWE message, and the nonce into `postman/collection/local.postman_environment.json` so the pre-request script can inject them verbatim.
+    - Leaves the human-readable form-submission string to the collection pre-request script (it falls back to “Requesting access to gated content” unless you override `clientMessage` manually).
+    - Keeps logging verbose (address, host bindings, preview of the SIWE message) to spot mismatched domains quickly.
+  </Tabs.Tab>
+</Tabs>
+
+## Putting It Together
+
+<Steps>
+### Run sequence (`pnpm postman:all`)
+`postman:all` sequences the scripts plus Newman: `fetch → convert → sign → tests → jwt-capture → jwt → presign → run`.
+### Extend coverage
+Add a new OpenAPI path + tag, run `postman:all`, and you automatically get a folder, generated assertions, signing helpers, and JWT coverage (when applicable).
+### Debug failures
+`postman/collection/report.html` (from `postman:report`) preserves each request/response pair. Use it when CI surfaces a regression but you cannot reproduce it locally.
+### Coordinate with Supertest
+Supertest remains the fast loop for handler logic; Postman proves that configuration, middleware, and the state worker still align with the public contract. Run both before cutting a release.
+</Steps>
+
+## Tips
+
+- Treat `.env.postman` like code: commit the example, never the real file. The scripts refuse to run if the env is missing so CI jobs fail loudly.
+- Point `TEST_BASE_URL` at isolates (local dev or staging) because Newman will consume rate-limit quota.
+- Flip `NEXT_PUBLIC_ENABLE_STATE_WORKER` to `true` and confirm `/api/nonce` responds if you want SIWE exercised; otherwise the presign script sticks to legacy envelopes so the same collection can test both worlds.
+- The automation lives entirely inside the repo, so onboarding a new engineer is as simple as `cp .env.postman.example .env.postman && pnpm postman:all`.
+
+Need the high-level justification and runbook? Head back to the [Postman Contract Tests](/dapp/postman) page.

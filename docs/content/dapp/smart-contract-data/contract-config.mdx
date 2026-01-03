@@ -1,0 +1,370 @@
+---
+title: "Contract Configuration"
+description: "Multi-network smart contract address and ABI management"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+
+# Contract Configuration
+
+The contract configuration module serves as the central source of truth for smart contract addresses and Application Binary Interfaces (ABIs) across all supported networks in RitoSwap. This critical infrastructure component enables seamless multichain functionality by dynamically selecting the appropriate contract address based on the runtime environment.
+
+## Configuration Architecture
+
+The contract configuration system implements a sophisticated yet elegant approach to managing contract addresses across multiple blockchain networks. By leveraging environment variables and automated address management, it ensures that the application always interacts with the correct smart contract deployment.
+
+### Address Resolution Strategy
+
+The system uses a hierarchical decision tree to determine which contract address to use:
+
+```typescript
+import { getActiveChain, Chain } from '@config/chain'
+import localhostAddress from '@Contract/local_blockchain.json'
+import mainnetAddress from '@Contract/mainnet.json'
+import sepoliaAddress from '@Contract/sepolia.json'
+
+export const KEY_TOKEN_ADDRESS = (() => {
+  const active = getActiveChain()
+  switch (active) {
+    case Chain.RITONET:
+      return localhostAddress.OnePerWalletKeyToken.address as Address
+    case Chain.SEPOLIA:
+      return sepoliaAddress.OnePerWalletKeyToken.address as Address
+    case Chain.ETHEREUM:
+    default:
+      return mainnetAddress.OnePerWalletKeyToken.address as Address
+  }
+})()
+```
+
+This switch statement defers to the `NEXT_PUBLIC_ACTIVE_CHAIN` environment variable (validated by `@config/chain`) and keeps the logic consistent with the rest of the multichain stack. The type assertion to `Address` ensures type safety throughout the application when interacting with viem and wagmi.
+
+### Address Source Files
+
+Contract addresses are automatically populated by the deployment process in the colored-keys workspace. When contracts are deployed, their addresses are saved to JSON files in the monorepo root:
+
+<FileTree>
+  <FileTree.Folder name="ContractAddresses" defaultOpen>
+    <FileTree.File name="local_blockchain.json" />
+    <FileTree.File name="hardhat.json" />
+    <FileTree.File name="mainnet.json" />
+    <FileTree.File name="sepolia.json" />
+  </FileTree.Folder>
+</FileTree>
+
+Each JSON file follows a consistent structure:
+
+```json
+{
+  "OnePerWalletKeyToken": {
+    "address": "0x...",
+    "deployedAt": "2024-10-04T21:11:00.000Z",
+    "blockNumber": 123456
+  }
+}
+```
+
+This automation eliminates manual address management and reduces deployment errors. The import aliases `@Contract/network.json` provide clean, maintainable imports regardless of the project structure.
+
+## ABI Management
+
+The module organizes ABIs into logical groupings that reflect their usage patterns within the application. This modular approach improves code readability and enables selective importing of only required functions.
+
+### OnePerWallet ABI
+
+The `onePerWalletAbi` contains functions specific to the single-token-per-wallet constraint that defines the Colored Keys NFT system:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Function</th>
+      <th>Type</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`mint()`</td>
+      <td>Write</td>
+      <td>Creates a new NFT for the caller if they don't own one</td>
+    </tr>
+    <tr>
+      <td>`balanceOf(address)`</td>
+      <td>Read</td>
+      <td>Returns the number of tokens owned (0 or 1)</td>
+    </tr>
+    <tr>
+      <td>`getTokenOfOwner(address)`</td>
+      <td>Read</td>
+      <td>Returns token ID and ownership status for an address</td>
+    </tr>
+  </tbody>
+</Table>
+
+The `getTokenOfOwner` function provides a gas-efficient way to check both ownership status and retrieve the token ID in a single call, which is particularly useful for UI updates.
+
+### Key Token ABI
+
+The `keyTokenAbi` contains standard ERC-721 functions plus custom extensions for the Colored Keys system:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Function</th>
+      <th>Type</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`burn(uint256)`</td>
+      <td>Write</td>
+      <td>Destroys a token, allowing the owner to mint a new one</td>
+    </tr>
+    <tr>
+      <td>`getTokenColors(uint256)`</td>
+      <td>Read</td>
+      <td>Returns the algorithmically generated colors for a token</td>
+    </tr>
+    <tr>
+      <td>`transferFrom(...)`</td>
+      <td>Write</td>
+      <td>Transfers token ownership between addresses</td>
+    </tr>
+    <tr>
+      <td>`tokenURI(uint256)`</td>
+      <td>Read</td>
+      <td>Returns the on-chain metadata and image for a token</td>
+    </tr>
+  </tbody>
+</Table>
+
+The inclusion of both `transferFrom` and `safeTransferFrom` ensures compatibility with various NFT marketplaces and protocols that may prefer one method over the other.
+
+### Combined ABI
+
+The `fullKeyTokenAbi` merges both ABI arrays, providing a comprehensive interface for all contract interactions:
+
+```typescript
+export const fullKeyTokenAbi = [...onePerWalletAbi, ...keyTokenAbi] as const
+```
+
+The `as const` assertion ensures TypeScript treats the ABI as a readonly tuple, enabling precise type inference in wagmi hooks. This type safety prevents runtime errors from incorrect function calls or parameter types.
+
+## Environment Configuration
+
+The contract configuration relies on environment variables to determine network selection. These variables follow a specific naming convention for clarity and consistency:
+
+<Callout type="info">
+Environment variables must be prefixed with `NEXT_PUBLIC_` to be accessible in the browser runtime. This is a Next.js security feature that prevents accidental exposure of server-side secrets.
+</Callout>
+
+### Network Selection Variables
+
+<Table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Purpose</th>
+      <th>Example Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`NEXT_PUBLIC_ACTIVE_CHAIN`</td>
+      <td>Selects the chain (`ethereum`, `sepolia`, or `ritonet`)</td>
+      <td>`"sepolia"`</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_LOCAL_CHAIN_ID`</td>
+      <td>Required numeric chain ID when targeting `ritonet`</td>
+      <td>`90999999`</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_LOCAL_BLOCKCHAIN_*`</td>
+      <td>RPC/WSS/name metadata for RitoNet</td>
+      <td>`NEXT_PUBLIC_LOCAL_BLOCKCHAIN_RPC=http://127.0.0.1:8545`</td>
+    </tr>
+  </tbody>
+</Table>
+
+If `NEXT_PUBLIC_ACTIVE_CHAIN` is omitted, the validated public env falls back to **Sepolia**, not mainnet. This ensures fresh checkouts hit a test network until you explicitly opt into Ethereum or RitoNet.
+
+<Callout type="warning">
+When `NEXT_PUBLIC_ACTIVE_CHAIN=ritonet`, `public.env` also enforces `NEXT_PUBLIC_LOCAL_CHAIN_ID`, `NEXT_PUBLIC_LOCAL_BLOCKCHAIN_RPC`, and `NEXT_PUBLIC_LOCAL_BLOCKCHAIN_WSS`. Missing any of them throws during startup, so keep them defined in `.env.local`.
+</Callout>
+
+## Integration Patterns
+
+The contract configuration module integrates seamlessly with wagmi hooks throughout the application. Here are common usage patterns:
+
+### Reading Contract Data
+
+```typescript
+import { useReadContract } from 'wagmi';
+import { KEY_TOKEN_ADDRESS, fullKeyTokenAbi } from '@/app/config/contracts';
+
+function useTokenOwnership(address: Address) {
+  return useReadContract({
+    address: KEY_TOKEN_ADDRESS,
+    abi: fullKeyTokenAbi,
+    functionName: 'getTokenOfOwner',
+    args: [address],
+  });
+}
+```
+
+### Writing Contract Data
+
+```typescript
+import { useWriteContract } from 'wagmi';
+import { KEY_TOKEN_ADDRESS, fullKeyTokenAbi } from '@/app/config/contracts';
+
+function useMintNFT() {
+  const { writeContract, ...rest } = useWriteContract();
+  
+  const mint = useCallback(() => {
+    writeContract({
+      address: KEY_TOKEN_ADDRESS,
+      abi: fullKeyTokenAbi,
+      functionName: 'mint',
+    });
+  }, [writeContract]);
+  
+  return { mint, ...rest };
+}
+```
+
+### Event Monitoring
+
+```typescript
+import { useWatchContractEvent } from 'wagmi';
+import { KEY_TOKEN_ADDRESS, fullKeyTokenAbi } from '@/app/config/contracts';
+
+function useTransferEvents(onTransfer: (event: any) => void) {
+  useWatchContractEvent({
+    address: KEY_TOKEN_ADDRESS,
+    abi: fullKeyTokenAbi,
+    eventName: 'Transfer',
+    onLogs: onTransfer,
+  });
+}
+```
+
+## Type Safety Benefits
+
+The configuration module leverages TypeScript's type system to provide compile-time guarantees:
+
+### Address Type Safety
+
+By casting addresses to Viem's `Address` type, the system ensures that only valid Ethereum addresses can be used in contract calls. This prevents common errors like passing undefined or malformed addresses.
+
+### ABI Type Inference
+
+The `as const` assertion on ABIs enables wagmi to infer exact function signatures, including parameter names and types. This provides autocomplete support and catches type mismatches at compile time rather than runtime.
+
+### Network-Aware Types
+
+The configuration could be extended to provide network-specific types:
+
+```typescript
+type NetworkConfig = {
+  [K in 'ritonet' | 'sepolia' | 'mainnet']: {
+    address: Address;
+    chainId: number;
+    name: string;
+  };
+};
+```
+
+This pattern enables even stronger type safety when building network-aware features.
+
+## Deployment Integration
+
+The contract configuration module integrates tightly with the deployment workflow. When deploying contracts through the [colored-keys workspace](/colored-keys):
+
+<Steps>
+### Step 1: Contract Compilation
+Hardhat compiles the Solidity contracts and generates artifacts.
+
+### Step 2: Network Deployment
+The deployment script deploys to the specified network.
+
+### Step 3: Address Recording
+The deployed contract address is automatically saved to the corresponding JSON file.
+
+### Step 4: Configuration Update
+The dApp's contract configuration immediately reflects the new deployment.
+
+### Step 5: Type Generation
+TypeScript types are regenerated to match the new deployment.
+</Steps>
+
+This automation ensures zero-downtime updates and eliminates manual configuration errors.
+
+## Error Prevention
+
+The configuration module implements several strategies to prevent common errors:
+
+### Missing Address Files
+
+If an address file is missing, the TypeScript compiler will fail at build time rather than runtime:
+
+```typescript
+// This will cause a build error if the file doesn't exist
+import localhostAddress from '@Contract/local_blockchain.json'
+```
+
+### Invalid Network Configuration
+
+The priority-based network selection ensures that invalid configurations fall back to safe defaults rather than failing entirely.
+
+### Type Mismatches
+
+Wagmi's type inference catches ABI/function mismatches at compile time, preventing runtime errors from incorrect contract calls.
+
+## Best Practices
+
+When working with the contract configuration module, follow these guidelines:
+
+### Environment Variable Management
+
+Store environment-specific configurations in `.env.local` files that are not committed to version control. Use `.env.example` files to document required variables:
+
+```bash
+# .env.example
+NEXT_PUBLIC_ACTIVE_CHAIN=sepolia
+NEXT_PUBLIC_LOCAL_BLOCKCHAIN_RPC=http://127.0.0.1:8545 # only when using ritonet
+```
+
+### ABI Versioning
+
+When updating smart contracts, consider versioning ABIs to support backward compatibility during migration periods:
+
+```typescript
+export const keyTokenAbiV1 = [...] as const;
+export const keyTokenAbiV2 = [...] as const;
+export const keyTokenAbi = keyTokenAbiV2; // Current version
+```
+
+### Network Validation
+
+Always validate that the connected wallet is on the expected network before attempting contract interactions. The app no longer ships a `useNetworkCheck` hook, so enforce this in the page or wrapper (or rely on wagmi/wallet errors and prompt users to switch networks).
+
+## Troubleshooting Common Issues
+
+### Contract Address Not Updating
+
+If contract addresses don't update after deployment, verify that the JSON files in ContractAddresses are being properly generated and that your imports are not cached by the build system.
+
+### Type Errors with ABIs
+
+Ensure ABIs are marked `as const` to enable proper type inference. Without this assertion, wagmi cannot determine function signatures accurately.
+
+### Network Mismatch Errors
+
+If transactions fail due to network mismatches, verify that environment variables are set correctly and that the wallet is connected to the expected network.
+
+## Summary
+
+The contract configuration module exemplifies thoughtful architectural design in a multichain environment. By centralizing address management, organizing ABIs logically, and leveraging TypeScript's type system, it provides a robust foundation for smart contract interactions across all supported networks. The tight integration with the deployment pipeline and comprehensive type safety ensures that developers can focus on building features rather than managing infrastructure details.

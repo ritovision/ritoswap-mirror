@@ -1,0 +1,41 @@
+---
+title: Pipelines Overview
+description: The two primary CI/CD pipelines and what they ship.
+---
+
+import { Cards, Table } from 'nextra/components'
+
+# Pipelines Overview
+
+RitoSwap uses two primary pipelines: one for the DApp and one for Docs plus Storybook. Both are triggered by path changes and support manual dispatch.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Pipeline</th>
+      <th>Primary responsibilities</th>
+      <th>Sites deployed</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>DApp Pipeline</td>
+      <td>Lint, unit tests, contract tests, predeploy E2E, testnet deploy + smoke tests + rollback, mainnet deploy</td>
+      <td>Mainnet and Testnet</td>
+    </tr>
+    <tr>
+      <td>Docs and Storybook Pipeline</td>
+      <td>Storybook lint/test, Storybook deploy, docs lint/test, docs deploy</td>
+      <td>Docs and Storybook</td>
+    </tr>
+  </tbody>
+</Table>
+
+<Cards>
+  <Cards.Card title="DApp Pipeline" href="/ci-cd/pipelines/dapp" arrow>
+    Full production pipeline for the DApp, including rollback logic on testnet.
+  </Cards.Card>
+  <Cards.Card title="Docs and Storybook Pipeline" href="/ci-cd/pipelines/docs-storybook" arrow>
+    Ship docs and UI Storybook with independent lint/test gates.
+  </Cards.Card>
+</Cards>

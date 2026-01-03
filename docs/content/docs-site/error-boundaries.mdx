@@ -1,0 +1,86 @@
+---
+title: Error Boundaries
+description: Custom error UI for runtime failures in the docs site.
+---
+
+import { Callout, FileTree, Table } from 'nextra/components'
+import { StorybookEmbed } from '@components/StorybookEmbed'
+
+# Error Boundaries
+
+The docs site wraps pages in a custom error boundary so runtime failures render a branded recovery UI instead of a generic crash.
+
+## Core pieces
+
+<FileTree>
+  <FileTree.Folder name="docs/app/components/errors" defaultOpen>
+    <FileTree.File name="DocsErrorBoundary.tsx" />
+    <FileTree.File name="PageError.tsx" />
+    <FileTree.File name="ErrorShellFullPage.tsx" />
+    <FileTree.File name="ErrorShellInline.tsx" />
+    <FileTree.File name="ErrorShell.module.css" />
+  </FileTree.Folder>
+</FileTree>
+
+## Behavior
+
+<Table>
+  <thead>
+    <tr>
+      <th>Component</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>DocsErrorBoundary</code></td>
+      <td>Top-level boundary using <code>react-error-boundary</code></td>
+    </tr>
+    <tr>
+      <td><code>PageError</code></td>
+      <td>Action-driven fallback UI with reset + navigation options</td>
+    </tr>
+    <tr>
+      <td><code>ErrorShellFullPage</code></td>
+      <td>Full-page branded shell with animated background</td>
+    </tr>
+    <tr>
+      <td><code>ErrorShellInline</code></td>
+      <td>Compact inline error message for localized failures</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Usage pattern
+
+The boundary uses <code>fallbackRender</code> to show <code>PageError</code> and logs the error to the console for debugging.
+
+<Callout type="info">
+  If you need an inline error, use <code>ErrorShellInline</code> in the component itself instead of throwing to the boundary.
+</Callout>
+
+## Sample UI
+
+### Full-page error shell
+
+<StorybookEmbed
+  title="Errors/ErrorShellFullPage"
+  story="Default"
+  height="640px"
+/>
+
+### Inline error shell
+
+<StorybookEmbed
+  title="Errors/ErrorShellInline"
+  story="Default"
+  height="500px"
+/>
+
+### Inline error boundary
+
+<StorybookEmbed
+  title="Errors/InlineErrorBoundary"
+  story="Default"
+  height="640px"
+/>

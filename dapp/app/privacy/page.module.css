@@ -1,0 +1,30 @@
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.title {
+  font-family: var(--font-primary);
+  font-size: 2rem;
+  margin-bottom: 1rem;
+}
+
+.subtitle {
+  font-family: var(--font-primary);
+  font-size: 1.5rem;
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.text {
+  font-family: var(--font-body);
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.link {
+  font-family: var(--font-body);
+  color: var(--accent-color);
+  text-decoration: underline;
+}

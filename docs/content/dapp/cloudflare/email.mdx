@@ -1,0 +1,262 @@
+---
+title: Email Relay API
+description: Internal endpoint that forwards token-gated messages to Brevo via the Cloudflare worker.
+---
+
+
+import { Table } from 'nextra/components'
+
+# Email Relay API
+
+The Email Relay API is an internal JSON endpoint used by the dapp to forward token-gated messages as emails via Brevo. It shares the same Cloudflare Worker as the durable state engine but is routed separately from the `/state` path.
+
+This endpoint is typically invoked by trusted application code after access checks have passed, not directly by untrusted public clients.
+
+---
+
+## Endpoint summary
+
+Within the worker, any request whose path does **not** start with `/state` is handled by the email relay route. In practice, Cloudflare routes map an external path (for example, `/email` or a project-specific URL) into this worker.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Property</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Method</td>
+      <td>`$1` only</td>
+    </tr>
+    <tr>
+      <td>Path</td>
+      <td>Any non-`$1` path mapped to this worker (for example, `$1`)</td>
+    </tr>
+    <tr>
+      <td>Content type</td>
+      <td>`$1`</td>
+    </tr>
+    <tr>
+      <td>Authentication</td>
+      <td>Handled by the calling application; this endpoint relies on environment configuration rather than bearer tokens</td>
+    </tr>
+  </tbody>
+</Table>
+
+If a request uses a method other than `POST`, the handler responds with `405 Method Not Allowed` and a JSON error payload.
+
+---
+
+## Request payload
+
+The Email Relay API expects a JSON body describing the gated message and its context. The worker validates this payload before contacting Brevo.
+
+### Fields
+
+The body is expected to match the following logical shape:
+
+- `tokenId` (string)
+  - Identifier of the NFT or token associated with the gated message.
+- `message` (string)
+  - Free-form user message to be delivered.
+- `address` (string)
+  - Wallet address of the sender.
+- `timestamp` (number)
+  - Unix timestamp in milliseconds, typically populated with `Date.now()` when the message is created.
+
+All fields are required. If any field is missing, empty, or `timestamp` is not a number, the worker responds with `400 Bad Request` and a JSON error.
+
+### Example payload
+
+```json
+{
+  "tokenId": "1",
+  "message": "Hello from a gated message!",
+  "address": "0x1234567890abcdef1234567890ABCDEF12345678",
+  "timestamp": 1731465600000
+}
+```
+
+If the body cannot be parsed as JSON, the worker logs the error and responds with `400` and `"Invalid JSON payload"`.
+
+---
+
+## Environment requirements
+
+The Email Relay API depends on a small set of environment variables provided via Cloudflare secrets:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`$1`</td>
+      <td>API key used to authenticate with Brevo's SMTP email API.</td>
+    </tr>
+    <tr>
+      <td>`$1`</td>
+      <td>From-address used in outbound emails (for example, a no-reply or support address).</td>
+    </tr>
+    <tr>
+      <td>`$1`</td>
+      <td>Destination inbox where gated messages are delivered.</td>
+    </tr>
+  </tbody>
+</Table>
+
+If any of these values are missing at runtime, the worker logs an error and responds with `500 Internal Server Error` and `"Email service misconfigured"`.
+
+Secrets are typically set using Wrangler commands from the `cloudflare` directory (see the Cloudflare Worker overview for details on the `pnpm secret:*` helpers).
+
+---
+
+## Email formatting
+
+When the payload is valid and configuration is complete, the worker constructs both HTML and plain-text representations of the message.
+
+### Subject line
+
+The email subject includes a shortened version of the sender's wallet address:
+
+- Full address is formatted as:
+  - first 5 characters, ellipsis, last 4 characters
+  - for example, `0x12345...5678`.
+- Subject template:
+  - `Gated Msg by {shortenedAddress}`
+
+This keeps the subject concise while still making it easy to visually distinguish different senders.
+
+### HTML body
+
+The HTML body is a simple, structured layout designed for readability:
+
+- Title: "New Token Gate Message".
+- A styled container with:
+  - Token ID.
+  - Full wallet address.
+  - Human-readable timestamp derived from the numeric `timestamp` field.
+  - A block showing the message content with `white-space: pre-wrap` so line breaks are preserved.
+
+The goal is to make it easy to scan key metadata at a glance and then read the gated message in a familiar text block.
+
+### Text body
+
+For clients that do not render HTML, the worker also constructs a plain-text version of the email containing the same information:
+
+- Token ID.
+- Full wallet address.
+- Timestamp.
+- Message content on subsequent lines.
+
+---
+
+## Brevo integration
+
+Once the payload and environment have been validated, the worker sends a request to Brevo's SMTP API:
+
+- Endpoint: `https://api.brevo.com/v3/smtp/email`
+- Method: `POST`
+- Headers:
+  - `accept: application/json`
+  - `content-type: application/json`
+  - `api-key: BREVO_API_KEY`
+- Body: JSON object containing `sender`, `to`, `subject`, `htmlContent`, and `textContent`.
+
+The worker then reads the response body as text and attempts to parse it as JSON:
+
+- If the response cannot be parsed as JSON:
+  - The worker logs the raw response and returns `502 Bad Gateway` with a JSON error indicating that the email provider returned an invalid payload.
+- If the response is JSON but the HTTP status is not successful:
+  - The worker logs the status and provider response.
+  - The worker returns `502 Bad Gateway` with an error payload containing `"Failed to send email"` and a `details` field mirroring the provider's response.
+- If the response is JSON and successful:
+  - The worker looks for a `messageId` field in the parsed object.
+  - The worker logs a success message with this identifier (when present).
+
+---
+
+## Responses
+
+The Email Relay API responds with plain JSON objects that capture either success or error conditions.
+
+### Success
+
+When an email is successfully sent via Brevo, the worker responds with:
+
+```json
+{
+  "success": true,
+  "messageId": "abc123"
+}
+```
+
+The `messageId` field is included when Brevo returns it and may be omitted if the provider response does not include an identifier.
+
+### Error conditions
+
+The worker uses standard HTTP status codes for common failure paths:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Condition</th>
+      <th>Body</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`$1`</td>
+      <td>Body could not be parsed as JSON or required fields are missing/invalid.</td>
+      <td>`$1` or `$1`</td>
+    </tr>
+    <tr>
+      <td>`$1`</td>
+      <td>Request did not use `$1`.</td>
+      <td>`$1`</td>
+    </tr>
+    <tr>
+      <td>`$1`</td>
+      <td>One or more required environment variables (`BREVO_API_KEY`, `SENDER_EMAIL`, `RECEIVER_EMAIL`) are missing.</td>
+      <td>`$1`</td>
+    </tr>
+    <tr>
+      <td>`$1`</td>
+      <td>Brevo returned a non-success status or an invalid payload.</td>
+      <td>`$1` or `$1`</td>
+    </tr>
+  </tbody>
+</Table>
+
+These responses are intended for internal callers and logging, not for direct user-facing error messages.
+
+---
+
+## Testing (overview)
+
+The Email Relay API is covered by a Vitest suite located under `src/__tests__/email.test.ts`.
+
+Tests focus on verifying behavior rather than implementation details:
+
+- Confirms that non-POST requests receive a `405` response.
+- Stubs `fetch` to simulate successful responses from Brevo and asserts that:
+  - The worker calls the correct URL.
+  - The `api-key` header is set from `BREVO_API_KEY`.
+  - Successful responses produce a `200` status and a JSON body with `success: true` and a `messageId` when present.
+- Stubs `fetch` to simulate Brevo errors and asserts that the worker returns `502`.
+- Sends malformed requests (for example, empty fields) and asserts that the worker returns `400`.
+
+To learn more about the testing setup and tools used (Vitest configuration, coverage, and scripts), see the main Cloudflare Worker overview page.
+
+---
+
+## Related topics
+
+- **Overview:** The Cloudflare Worker overview page describes the overall architecture, environment variables, Durable Object binding, and testing setup.
+- **Durable State API:** The `/state` endpoint provides the companion state engine used for nonces, rate limits, and quotas.

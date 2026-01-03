@@ -1,0 +1,376 @@
+---
+title: API Contract & OpenAPI Testing
+description: How RitoSwap validates its key token-gate endpoints against the OpenAPI spec using contract tests.
+---
+
+import { Callout, Tabs, FileTree, Steps, Table } from 'nextra/components'
+
+# API Contract & OpenAPI Testing
+
+This page documents the **RitoSwap-specific** contract test suite in:
+
+```txt
+app/api/__contract__/contract.test.ts
+```
+
+It is focused on the four public, token-gate–related endpoints actually used in this repo:
+
+- `GET  /api/nonce`
+- `POST /api/gate-access`
+- `GET  /api/token-status/{tokenId}`
+- `POST /api/form-submission-gate`
+
+All tests validate against the project's OpenAPI spec:
+
+```txt
+public/openapi.json
+```
+
+<Callout>
+  These tests are **not generic examples**.
+  They encode the exact response shapes, status codes, and error formats that RitoSwap promises at its token-gate surface area.
+</Callout>
+
+<Tabs
+  items={['What these tests cover', 'Endpoint matrix', 'How the validator is wired', 'Keeping spec + tests in sync']}
+  defaultIndex={0}
+  storageKey="ritoswap-contract-testing-tabs"
+>
+  <Tabs.Tab>
+    ## What these tests cover
+
+    The contract suite models **RitoSwap's public contract** at the HTTP layer.
+
+    <FileTree>
+      <FileTree.Folder name="app" defaultOpen>
+        <FileTree.Folder name="api" defaultOpen>
+          <FileTree.Folder name="__contract__" defaultOpen>
+            <FileTree.File name="contract.test.ts" />
+          </FileTree.Folder>
+        </FileTree.Folder>
+      </FileTree.Folder>
+      <FileTree.Folder name="public" defaultOpen>
+        <FileTree.File name="openapi.json" />
+      </FileTree.Folder>
+      <FileTree.Folder name="e2e">
+        <FileTree.Folder name="supertest">
+          <FileTree.File name="openapi-validator.ts" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+    </FileTree>
+
+    At a high level, `contract.test.ts` defines:
+
+    - **Types dedicated to this file**:
+      - `HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH'`
+      - `ContractTestCase` with `name`, `status`, and `response` shape
+      - `ContractTest` grouping a `path`, `method`, and `testCases[]`
+    - A `CONTRACT_TESTS` array with **hand-authored examples** for each RitoSwap endpoint.
+    - A `coerceMessageEnumIfPresent()` helper tuned to the **`/api/form-submission-gate`** success schema.
+    - A `describe('API Contract Tests')` block that:
+      - Hydrates `OpenAPITestValidator` via `getOpenAPIValidator()` from `@/e2e/supertest/openapi-validator`.
+      - Iterates the **RitoSwap endpoints only** and calls `validator.validateResponse(...)`.
+      - Runs two meta-tests to track coverage across all paths and response codes in `openapi.json`.
+
+    No route handlers are imported. This file is **purely about matching RitoSwap's documented contract**.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ## Endpoint matrix (RitoSwap-specific)
+
+    The `CONTRACT_TESTS` array is hand-curated around the four token-gate endpoints.
+
+    ### 1. `GET /api/nonce`
+
+    Used for **SIWE nonce generation**, with cases:
+
+    <Table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Case name</th>
+          <th>Shape (project-specific)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>200</code></td>
+          <td>Returns nonce successfully</td>
+          <td>``{ nonce: '0123456789abcdef0123456789abcdef' }`` (32 hex chars)</td>
+        </tr>
+        <tr>
+          <td><code>501</code></td>
+          <td>SIWE not enabled</td>
+          <td>Problem JSON with <code>type</code>, <code>title: 'SIWE not enabled'</code>, and RitoSwap's error copy.</td>
+        </tr>
+        <tr>
+          <td><code>429</code></td>
+          <td>Rate limited</td>
+          <td>Problem JSON titled <code>'Too many requests'</code> with RitoSwap's nonce-specific detail string.</td>
+        </tr>
+        <tr>
+          <td><code>405</code></td>
+          <td>Method not allowed</td>
+          <td>Legacy simple shape: <code>{'{ error: \'Method not allowed\' }'}</code></td>
+        </tr>
+        <tr>
+          <td><code>500</code></td>
+          <td>Internal server error</td>
+          <td>Problem JSON with <code>'Failed to generate nonce'</code> copy.</td>
+        </tr>
+      </tbody>
+    </Table>
+
+    ### 2. `POST /api/gate-access`
+
+    This is the **core token-gate endpoint**. The contract tests codify the shapes your docs promise:
+
+    - **Success** (`200 Access granted`):
+      - `success: true`, `access: 'granted'`
+      - `content.welcomeText` and `content.textSubmissionAreaHtml`
+      - Fully populated `content.audioData` object with RitoSwap's fields (`headline`, `imageSrc`, `audioSrc`, etc.).
+    - **Failures**, all using RitoSwap's problem+json format with stable titles:
+
+    <Table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Title</th>
+          <th>Scenario</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>400</code></td>
+          <td><code>Invalid request</code></td>
+          <td>Body validation failed or required fields missing.</td>
+        </tr>
+        <tr>
+          <td><code>401</code></td>
+          <td><code>Authentication failed</code></td>
+          <td>SIWE/JWT/signature issues.</td>
+        </tr>
+        <tr>
+          <td><code>403</code></td>
+          <td><code>You do not own this token</code></td>
+          <td>On-chain ownership check fails.</td>
+        </tr>
+        <tr>
+          <td><code>403</code></td>
+          <td><code>This token has already been used</code></td>
+          <td>Token exists but is marked as consumed in DB.</td>
+        </tr>
+        <tr>
+          <td><code>404</code></td>
+          <td><code>Token not found in database</code></td>
+          <td>On-chain token exists but has no DB record yet.</td>
+        </tr>
+        <tr>
+          <td><code>429</code></td>
+          <td><code>Too many requests</code></td>
+          <td>Rate-limit envelope for this endpoint.</td>
+        </tr>
+        <tr>
+          <td><code>500</code></td>
+          <td><code>Internal server error</code></td>
+          <td>Generic "unexpected error" surface for gate access.</td>
+        </tr>
+      </tbody>
+    </Table>
+
+    ### 3. `GET /api/token-status/{tokenId}`
+
+    This endpoint reports whether a key token exists and whether it has been used for gating. The contract tests model:
+
+    - **Token exists and unused** (`200`):
+      - `{'{ exists: true, used: false, count: 1, usedBy: null, usedAt: null }'}`
+    - **Token exists and used** (`200`):
+      - Same fields, with `used: true`, a concrete `usedBy` address, and ISO timestamp `usedAt`.
+    - **Token does not exist** (`200`):
+      - `{'{ exists: false, used: false, count: 0, usedBy: null, usedAt: null }'}`
+    - **Error envelopes**:
+      - `400 Invalid token ID format` (legacy, simple `{'{ error: \'Invalid token ID format\' }'}`).
+      - `405 Method not allowed` with `{'{ error: \'Method not allowed\' }'}`.
+      - `429 Too many requests` problem JSON.
+      - `500 Internal server error` with a simplified `{'{ error: \'Internal server error\' }'}` body.
+
+    The distinction between "token not found" and "invalid token ID" is encoded **explicitly** here, not just implied by implementation.
+
+    ### 4. `POST /api/form-submission-gate`
+
+    This endpoint stores gated form submissions tied to a token. Contract tests cover:
+
+    - **Success** (`200 Submission successful`):
+      - `{'{ success: true, message: \'Form submission saved successfully!\' }'}`
+      - At runtime, `coerceMessageEnumIfPresent()` can tweak `message` to align with the OpenAPI enum if wording drifts.
+    - **Failure shapes**, all project-specific:
+
+    <Table>
+      <thead>
+        <tr>
+          <th>Status</th>
+          <th>Body</th>
+          <th>Meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>401</code></td>
+          <td><code>{'{ success: false, error: \'Invalid signature\' }'}</code></td>
+          <td>Signature mismatch or auth failure.</td>
+        </tr>
+        <tr>
+          <td><code>403</code></td>
+          <td><code>{'{ success: false, error: \'Token not found or already used\' }'}</code></td>
+          <td>Token not present or already consumed.</td>
+        </tr>
+        <tr>
+          <td><code>500</code></td>
+          <td><code>{'{ success: false, error: \'Failed to save message\' }'}</code></td>
+          <td>Persistence failure.</td>
+        </tr>
+        <tr>
+          <td><code>400</code></td>
+          <td><code>{'{ success: false, error: \'Invalid request body\' }'}</code></td>
+          <td>Schema or required field issues.</td>
+        </tr>
+        <tr>
+          <td><code>405</code></td>
+          <td><code>{'{ error: \'Method not allowed\' }'}</code></td>
+          <td>Non-POST usage.</td>
+        </tr>
+        <tr>
+          <td><code>429</code></td>
+          <td>Problem JSON titled <code>'Too many requests'</code></td>
+          <td>Rate limiting for form submissions.</td>
+        </tr>
+      </tbody>
+    </Table>
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ## How the validator is wired (in this repo)
+
+    The contract suite is wired tightly to your existing **supertest-based OpenAPI validator**.
+
+    <Steps>
+      ### 1. Import the validator type
+
+      The test imports `OpenAPITestValidator` from:
+
+      ```ts
+      import type { OpenAPITestValidator } from '@/e2e/supertest/openapi-validator'
+      ```
+
+      and hydrates it in `beforeAll` using `getOpenAPIValidator()` from the same module.
+
+      ### 2. Hydrate the spec from `public/openapi.json`
+
+      Instead of hard-coding schemas, the test reads the exact file that your Swagger UI uses:
+
+      ```ts
+      const openApiSpec = JSON.parse(
+        fs.readFileSync(path.join(process.cwd(), 'public/openapi.json'), 'utf-8')
+      )
+      ```
+
+      ### 3. Build mock responses shaped like supertest output
+
+      For each `ContractTestCase`, the suite builds:
+
+      ```ts
+      const mockResponse = {
+        status,
+        body,
+        headers: {
+          'content-type': 'application/json; charset=utf-8',
+          'x-powered-by': 'Next.js',
+        },
+      }
+      ```
+
+      This mirrors how `supertest` would present a response object to the validator.
+
+      ### 4. Validate per path + method
+
+      The validator is called with **RitoSwap's concrete path and method**:
+
+      ```ts
+      const validation = validator.validateResponse(
+        mockResponse as any,
+        suitePath,
+        method,
+      )
+      ```
+
+      Failures log the method, path, case name, response body, and errors for debugging.
+
+      ### 5. Handle message enums on `/api/form-submission-gate`
+
+      The helper `coerceMessageEnumIfPresent()` inspects the OpenAPI schema for that endpoint and status.
+      If it finds a `properties.message.enum`, it coerces the test body's `message` into an allowed value when needed.
+
+      This keeps the test robust even if you slightly tweak human-facing copy but keep the enum list.
+    </Steps>
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ## Keeping spec + tests in sync (RitoSwap workflow)
+
+    In this project, contract tests are part of your **gated API workflow**, not a generic tutorial.
+
+    ### When to touch `contract.test.ts`
+
+    Update this file whenever you:
+
+    - Add or remove a status code for:
+      - `/api/nonce`
+      - `/api/gate-access`
+      - `/api/token-status/{tokenId}`
+      - `/api/form-submission-gate`
+    - Change the problem+json titles or detail strings you want to commit to.
+    - Adjust the success payloads for gated content or form submission.
+
+    ### Meta-tests in this file
+
+    The bottom of `contract.test.ts` has two project-specific meta-tests:
+
+    <Steps>
+      ### 1. Path coverage
+
+      - Iterates over all `openApiSpec.paths`.
+      - Normalizes path params (e.g. `{tokenId}`) to `{param}` so `/api/token-status/{tokenId}` can match.
+      - Collects any documented paths that do not appear in `CONTRACT_TESTS` as `untestedPaths`.
+      - Logs a warning and expects `untestedPaths` length to be 0.
+
+      ### 2. Response code coverage
+
+      - For each path + method pair in the spec, finds the matching `ContractTest`.
+      - Compares the documented `operation.responses` keys to the `status` codes in that contract test.
+      - Builds a `missingTests` list (e.g. `"POST /api/gate-access - Status 418"` if that ever showed up).
+      - Logs warnings but doesn't fail the suite — by design this is informational only.
+    </Steps>
+
+    ### Coverage helper
+
+    The file exports a small `generateContractCoverage()` utility that prints a project-specific report:
+
+    - Total endpoints found in `openapi.json`.
+    - How many of those have a corresponding `ContractTest`.
+    - A line-by-line list of `✅/❌ METHOD PATH` coverage.
+
+    You can call this function manually if you ever want ad-hoc visibility into contract coverage.
+  </Tabs.Tab>
+</Tabs>
+
+
+## Summary
+
+- This suite is **tailored specifically to RitoSwap's token-gate endpoints**, not a generic example.
+- It encodes the exact success and error shapes for:
+  - `/api/nonce`
+  - `/api/gate-access`
+  - `/api/token-status/{tokenId}`
+  - `/api/form-submission-gate`
+- It uses the same OpenAPI validator as your supertest E2E flow, but runs entirely in Vitest.
+- Meta-tests and `generateContractCoverage()` give you a quick read on whether docs and contract tests are still aligned with the public surface area of the project.

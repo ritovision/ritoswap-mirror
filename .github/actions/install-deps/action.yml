@@ -1,0 +1,29 @@
+name: Install Dependencies
+description: Installs pnpm dependencies with optional workspace filter
+
+inputs:
+  filter:
+    description: 'pnpm filter for monorepo (e.g., "docs" or "colored-keys...")'
+    required: false
+    default: ''
+  working-directory:
+    description: 'Working directory to run install from'
+    required: false
+    default: '.'
+  frozen-lockfile:
+    description: 'Use frozen lockfile'
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Install dependencies
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ -n "${{ inputs.filter }}" ]; then
+          pnpm install --filter "${{ inputs.filter }}" ${{ inputs.frozen-lockfile == 'true' && '--frozen-lockfile' || '' }}
+        else
+          pnpm install ${{ inputs.frozen-lockfile == 'true' && '--frozen-lockfile' || '' }}
+        fi

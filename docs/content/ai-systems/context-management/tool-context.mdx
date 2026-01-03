@@ -1,0 +1,89 @@
+---
+title: Tool Context
+description: How tools are whitelisted, executed, and how their results are fed back into the context window.
+---
+
+# Tool Context (Functional Capabilities)
+
+Context isn't just about *who* the agent is, but *what it can do*. In RitoSwap, the available tools are strictly controlled based on the active mode, and their results are carefully formatted to optimize the context window.
+
+## Mode-Based Whitelisting
+
+Not all tools are available at all times. For example, the `send_crypto_to_signed_in_user` tool is powerful and dangerous; it should only be available in the "Agent Battle" mode when the user has won, not in a casual "Freestyle" chat.
+
+This filtering happens in `dapp/app/lib/llm/tool-bridge.ts`:
+
+```typescript
+// dapp/app/lib/llm/tool-bridge.ts
+export function getOpenAIToolSchemas(mode?: ChatMode) {
+  // 1. Get all registered tools
+  const allTools = toolRegistry.getAll();
+  
+  // 2. Get whitelist for the current mode
+  const modeConfig = getModeConfig(mode);
+  const whitelist = modeConfig?.mcpTools;
+
+  // 3. Filter
+  return allTools.filter(t => whitelist.includes(t.name));
+}
+```
+
+This ensures that even if a user tries to "jailbreak" the agent to send money in the wrong mode, the LLM literally *cannot* call the tool because it wasn't provided in the schema.
+
+## Tool Result Formatting: The "Dual Stream"
+
+When a tool executes (e.g., generating an image or checking a token balance), it produces a result. We handle this result in two different ways simultaneously:
+
+### 1. For the LLM (Text Summary)
+The LLM has a limited context window and doesn't need to see 5MB of base64 image data. It just needs to know "Image generated successfully."
+
+In `formatToolResult`, we prioritize explicit text output or synthesize a summary:
+
+```typescript
+// dapp/app/lib/llm/tool-bridge.ts
+export function formatToolResult(result: unknown): string {
+  // 1. Prefer explicit text parts
+  const texts = content.filter(isTextPart).map((c) => c.text.trim());
+  if (texts.length > 0) return texts.join('\n');
+
+  // 2. If only JSON, synthesize a tiny one-liner
+  // e.g. "Result: balance=100, symbol=ETH"
+  const jsonPart = content.find(isJsonPart);
+  if (jsonPart) {
+     const entries = Object.entries(jsonPart.data).slice(0, 4);
+     return `Result: ${entries.map(([k, v]) => `${k}=${v}`).join(', ')}`;
+  }
+
+  return safeJson(result, 300);
+}
+```
+
+### 2. For the Client (Full JSON)
+The Client (UI), however, *needs* the full data to render the image or the transaction receipt.
+
+The `ToolAwareTransport` and `sse-stream` ensure that the **full JSON payload** is streamed to the browser via a custom SSE event (`tool-output-available`), bypassing the LLM's context window entirely.
+
+## The Tool Lifecycle
+
+1.  **LLM Request**: The model decides to call `generate_image`.
+2.  **Server Execution**: The server runs the MCP tool.
+3.  **Result Splitting**:
+    *   **To Client**: Full JSON sent via SSE. UI renders the image immediately.
+    *   **To LLM**: "Image generated" text string appended to conversation history.
+4.  **Follow-up**: The LLM sees the text confirmation and responds: "Here is your image!"
+
+This architecture allows us to have rich, data-heavy UI interactions without clogging the LLM's memory with raw data.
+
+import { Cards } from 'nextra/components'
+
+## Related Docs
+
+<Cards num={1}>
+  <Cards.Card
+    title="Tool Activity UI"
+    href="/ai-systems/chat-ui/tool-chip"
+    arrow
+  >
+    See how the `ToolActivityRow` and Chips visualize the JSON results streamed to the client.
+  </Cards.Card>
+</Cards>

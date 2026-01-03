@@ -1,0 +1,93 @@
+---
+title: "Postman Contract Tests"
+description: "How the OpenAPI-driven Newman suite validates the live gate APIs alongside Supertest."
+---
+
+import { Callout, Steps, Table } from 'nextra/components'
+
+# Postman Contract Tests
+
+The Postman collection under `dapp/postman/collection` turns the generated OpenAPI file into a runnable suite. Instead of invoking handlers in-process (like the Supertest harness), Newman drives real HTTP calls against whatever `TEST_BASE_URL` points to. Every request uses the same signing envelopes, rate limits, SIWE toggles, and JWT minting that wallet clients rely on, so the suite becomes a contract check for deployments.
+
+<Callout type="info">
+Prefer `pnpm --filter dapp postman:all` to keep the collection, signing metadata, and tests in sync. The command is idempotent, so re-run it after changing OpenAPI definitions, authentication flows, or state-worker settings.
+</Callout>
+
+## Why Run Postman When Supertest Already Exists?
+
+<Table>
+  <thead>
+    <tr>
+      <th>Supertest Harness</th>
+      <th>Postman Contract Suite</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Executes inside the Next.js runtime for fast, deterministic assertions.</td>
+      <td>Traverses the full HTTP edge (Next.js middleware, CDN headers, Cloudflare worker, rate limits, JWT cookies, etc.).</td>
+    </tr>
+    <tr>
+      <td>Mimics wallets by stubbing Prisma, SIWE, and viem calls directly in Vitest.</td>
+      <td>Signs real envelopes via `postman/scripts/presign-requests.ts`, so signatures, nonces, and JWT minting are validated end-to-end.</td>
+    </tr>
+    <tr>
+      <td>Cheap to run on every push; ideal for business-logic regressions.</td>
+      <td>Best suited for pre-release checks and infra drift detection—slower, but it proves the deployed contract still matches `/api/openapi`.</td>
+    </tr>
+    <tr>
+      <td>Focuses on handler internals (Prisma writes, email mocks, token resets).</td>
+      <td>Focuses on observable behavior: HTTP status windows, Problem Details payloads, headers, and OpenAPI schema alignment.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Coverage Highlights
+
+| Endpoint | Scenario | Assertions |
+| --- | --- | --- |
+| `/api/gate-access` | SIWE and legacy unlock, JWT replay, invalid JWT | Generated schema checks + custom follow-up calls that reuse captured `accessToken` values and ensure mutated tokens fail with 400/401/403. |
+| `/api/form-submission-gate` | Legacy message submission | Confirms legacy envelopes continue to pass, Problem Details payloads remain valid JSON, and documented error codes still surface. |
+| `/api/token-status/{tokenId}` | Existence/usage polling | Custom tests enforce nullable fields (`usedBy`, `usedAt`) and logical constraints (`count === 0 → exists === false`). |
+| `/api/nonce` | SIWE enabled/disabled + throttling | Verifies 200 nonce payloads, 501 when SIWE is off, and 429 responses with limiter headers. |
+
+Any new route that lands in the OpenAPI document is automatically imported when you re-run the toolchain. Tag your OpenAPI paths to keep the resulting Postman folders organized.
+
+## Generation + Execution Flow
+
+<Steps>
+### 1. Fetch the contract
+`pnpm postman:fetch` downloads `/api/openapi` into `postman/collection/openapi.json`, snapshots it, and refreshes the Postman environment skeleton with wallet defaults.
+### 2. Convert the spec
+`pnpm postman:convert` runs `openapi2postmanv2` so each tag becomes a folder and every response schema is preserved for later assertions.
+### 3. Patch requests & signing
+`pnpm postman:sign` injects a single collection-level pre-request script that rewrites bodies with SIWE or legacy parameters, normalizes `/api/token-status/{{tokenId}}`, and removes stray `//api/` segments.
+### 4. Layer tests
+`pnpm postman:tests` inspects the OpenAPI responses to build happy-path + error assertions. Token-status gets a bespoke validator for nullable fields.
+### 5. Capture + exercise JWTs
+`pnpm postman:jwt-capture` adds a collection-level listener that stores any `accessToken`. `pnpm postman:jwt` clones `/api/gate-access` calls so valid tokens succeed and mutated tokens fail.
+### 6. Pre-sign the environment
+`pnpm postman:presign` loads `.env.postman`, probes `/api/nonce` to auto-enable SIWE when the state worker is live, signs both SIWE and legacy envelopes, and stores everything inside `postman/collection/local.postman_environment.json`.
+### 7. Execute via Newman
+`pnpm postman:run` (or `postman:report`) hits the live server referenced by `TEST_BASE_URL`, producing console output plus an optional HTML report for auditing.
+</Steps>
+
+## Runbook
+
+1. Copy `dapp/.env.postman.example` → `dapp/.env.postman`, fill in a throwaway wallet (`PRIVATE_KEY`), the `TOKEN_ID` you want to exercise, and (if applicable) the state worker credentials.
+2. Start the target server (local dev, staging, preview, etc.) and ensure it exposes `/api/openapi`.
+3. Execute `pnpm --filter dapp postman:all` to regenerate the collection and run Newman. Add `postman:report` if you need HTML artifacts under `postman/collection/report.html`.
+4. Review Newman output for failures. Because these calls hit real rate limits, prefer a dedicated environment or token bucket.
+
+<Callout type="warning">
+Newman is intentionally noisy: it will honor every limiter, nonce requirement, and JWT expiry. If you run against production, be sure to scope wallet permissions and monitor rate limits so legitimate users are not throttled.
+</Callout>
+
+## When To Reach For This Suite
+
+- **Contract drift:** after editing schemas, DTOs, or `scripts/generate-openapi.ts`.
+- **Edge changes:** when touching middleware, custom headers, or Cloudflare worker routing that Supertest cannot see.
+- **JWT/SIWE regressions:** whenever `@lib/jwt`, SIWE helpers, or the state worker change; the suite re-signs payloads automatically.
+- **Pre-release audits:** use `postman:report` to attach an HTML log to change requests or release notes.
+
+The automation scripts live in `dapp/postman/scripts/*`; see the dedicated [Postman Automation](./automation) page for a deep dive into how each piece works.

@@ -1,0 +1,346 @@
+/* docs/app/components/mockui/DebugPanel.module.css */
+.panel {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: 400px;
+  max-height: 600px;
+  background: var(--primary-color, #007bff);
+  border: var(--default-border, 2px solid #0056b3);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 9999;
+  box-shadow: 0 10px 30px rgba(0, 123, 255, 0.3);
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.minimized {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--primary-color, #007bff);
+  border: var(--default-border, 2px solid #0056b3);
+  border-radius: 20px;
+  padding: 8px 16px;
+  cursor: pointer;
+  z-index: 9999;
+  font-family: monospace;
+  font-size: 14px;
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.minimized:hover {
+  background: var(--secondary-color, #0056b3);
+  transform: scale(1.05);
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  background: rgba(0, 0, 0, 0.2);
+  border-bottom: 1px solid var(--secondary-color, #0056b3);
+}
+
+.header h3 {
+  margin: 0;
+  color: white;
+  font-size: 14px;
+}
+
+.minimize {
+  background: transparent;
+  border: 1px solid var(--secondary-color, #0056b3);
+  color: white;
+  padding: 2px 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.minimize:hover {
+  background: var(--secondary-color, #0056b3);
+}
+
+.section {
+  padding: 15px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.section:last-child {
+  border-bottom: none;
+}
+
+.section h4 {
+  margin: 0 0 10px 0;
+  color: white;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.envList {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.envItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 4px;
+}
+
+.envKey {
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: bold;
+}
+
+.envValue {
+  color: white;
+  text-align: right;
+  word-break: break-all;
+  max-width: 200px;
+}
+
+.endpointTests {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.testRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.testButton {
+  background: var(--secondary-color, #0056b3);
+  border: none;
+  color: white;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: monospace;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.testButton:hover {
+  background: #0066cc;
+  transform: translateY(-1px);
+}
+
+.testButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.testResult {
+  flex: 1;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.footer {
+  padding: 10px 15px;
+  background: rgba(0, 0, 0, 0.2);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Toggle container styles */
+.toggleContainer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1rem;
+  width: 100%;
+  max-width: 600px;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.toggleItem {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  color: white;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.checkbox {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+.checkmark {
+  position: relative;
+  height: 20px;
+  width: 20px;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.toggleItem:hover .checkmark {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.checkbox:checked ~ .checkmark {
+  background-color: #4CAF50;
+  border-color: #4CAF50;
+}
+
+.checkmark:after {
+  content: "";
+  position: absolute;
+  display: none;
+  left: 6px;
+  top: 2px;
+  width: 5px;
+  height: 10px;
+  border: solid white;
+  border-width: 0 3px 3px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox:checked ~ .checkmark:after {
+  display: block;
+}
+
+.toggleLabel {
+  white-space: nowrap;
+}
+
+/* Rate limit modal styles */
+.modalBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  z-index: 10000;
+}
+
+.rateLimitModal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #1a1a1a;
+  border: 2px solid var(--secondary-color, #0056b3);
+  border-radius: 10px;
+  z-index: 10001;
+  box-shadow: 0 10px 30px rgba(0, 123, 255, 0.5);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 90vw;
+}
+
+.modalContent {
+  padding: 2rem;
+  text-align: center;
+  color: white;
+  font-family: monospace;
+}
+
+.modalContent h3 {
+  margin: 0 0 1rem 0;
+  color: #ff4444;
+}
+
+.modalContent p {
+  margin: 0.5rem 0;
+}
+
+.modalButton {
+  margin-top: 1rem;
+  padding: 0.5rem 2rem;
+  background: var(--secondary-color, #0056b3);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.modalButton:hover {
+  background: #0066cc;
+  transform: translateY(-1px);
+}
+
+/* Scrollbar styling */
+.section::-webkit-scrollbar {
+  width: 6px;
+}
+
+.section::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.section::-webkit-scrollbar-thumb {
+  background: var(--secondary-color, #0056b3);
+  border-radius: 3px;
+}
+
+.section::-webkit-scrollbar-thumb:hover {
+  background: #0066cc;
+}
+
+/* Mobile responsiveness */
+@media (max-width: 768px) {
+  .panel {
+    width: 320px;
+    max-height: 400px;
+    bottom: 10px;
+    right: 10px;
+  }
+  
+  .section {
+    padding: 10px;
+    max-height: 150px;
+  }
+  
+  .envValue {
+    max-width: 150px;
+  }
+  
+  .toggleContainer {
+    grid-template-columns: 1fr 1fr;
+    max-width: 320px;
+  }
+  
+  .rateLimitModal {
+    width: 90vw;
+  }
+}

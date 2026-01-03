@@ -1,0 +1,16 @@
+name = "ritoswap-state-worker"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+workers_dev = true
+
+[durable_objects]
+bindings = [
+  { name = "STATE_STORE", class_name = "StateDurableObject" }
+]
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StateDurableObject"]
+
+[vars]
+# STATE_SERVICE_AUTH_TOKEN = "set-me"

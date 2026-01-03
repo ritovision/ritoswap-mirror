@@ -1,0 +1,271 @@
+---
+title: Smart Contract Architecture
+description: Technical architecture and implementation details of the Colored Keys contract system
+---
+
+import { FileTree, Tabs, Cards, Callout } from 'nextra/components'
+
+# Smart Contract Architecture
+
+The Colored Keys contract system implements ERC-721 NFTs with on-chain SVG generation and ownership restrictions. This document describes the technical architecture, implementation patterns, and design decisions.
+
+## Contract Structure
+
+<FileTree>
+  <FileTree.Folder name="contracts" defaultOpen>
+    <FileTree.File name="KeyToken.sol" />
+    <FileTree.File name="OnePerWalletKeyToken.sol" />
+    <FileTree.File name="ColorGenerator.sol" />
+    <FileTree.File name="SVGGenerator.sol" />
+    <FileTree.Folder name="test">
+      <FileTree.File name="ColorGeneratorTestHelper.sol" />
+      <FileTree.File name="EchidnaOnePerWalletKeyToken.sol" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Inheritance Hierarchy
+
+The contract system uses a straightforward inheritance pattern built on OpenZeppelin's ERC-721 implementation:
+
+```
+OpenZeppelin ERC721 + ERC721Enumerable + ERC721Burnable
+                    ↓
+                KeyToken
+                    ↓
+            OnePerWalletKeyToken
+```
+
+### Base Contract: KeyToken
+
+KeyToken extends OpenZeppelin's ERC-721 implementation with three standard extensions: Enumerable for token iteration, Burnable for token destruction, and custom logic for on-chain generation.
+
+The contract stores minimal data per token:
+
+```solidity
+struct ColorData {
+    string backgroundColor;
+    string keyColor;
+    address minter;
+    uint256 mintedAt;
+}
+```
+
+Key implementation details:
+
+- Token IDs start at 1 and increment sequentially
+- Colors are generated once during minting and stored as hex strings
+- All metadata and images are computed on-demand rather than stored
+- No restriction on tokens per wallet in the base contract
+
+### Production Contract: OnePerWalletKeyToken
+
+OnePerWalletKeyToken adds the one-token-per-wallet restriction by overriding the `_update` function:
+
+```solidity
+function _update(address to, uint256 tokenId, address auth)
+    internal override returns (address)
+{
+    address from = _ownerOf(tokenId);
+    
+    if (to != address(0)) {
+        if (balanceOf(to) > 0 && from != to) {
+            revert WouldExceedMaxTokensPerWallet(to);
+        }
+    }
+    
+    return super._update(to, tokenId, auth);
+}
+```
+
+This implementation:
+- Checks all token acquisitions (minting, transfers)
+- Allows self-transfers (from == to)
+- Adds one SLOAD operation per transfer for the balance check
+- Overrides mintBatch to enforce quantity=1
+
+## Library Implementation
+
+### ColorGenerator Library
+
+The ColorGenerator library provides deterministic color generation using keccak256 hashing:
+
+```solidity
+function generateColor(uint256 seed1, uint256 seed2, address seed3) 
+    internal pure returns (string memory)
+{
+    bytes32 hash = keccak256(abi.encodePacked(seed1, seed2, seed3));
+    uint8 r = uint8(hash[0]);
+    uint8 g = uint8(hash[1]);
+    uint8 b = uint8(hash[2]);
+    return string(abi.encodePacked("#", toHexString(r), toHexString(g), toHexString(b)));
+}
+```
+
+Color pair generation:
+- Background color uses: tokenId, block.timestamp, minter
+- Key color uses: tokenId * 2, block.number, minter
+- If colors are identical (exact string match), key color is inverted
+
+<Callout type="warning">
+The "similarity" check only detects identical colors, not visually similar ones. Colors like #FF0000 and #FF0001 would pass as different despite being visually identical.
+</Callout>
+
+### SVGGenerator Library
+
+The SVGGenerator creates a fixed SVG design through string concatenation:
+
+```solidity
+function generateKeySVG(string memory backgroundColor, string memory keyColor) 
+    internal pure returns (string memory)
+```
+
+The SVG consists of:
+- 200x200 viewBox with background rectangle
+- Circle element for key ring (cx=60, cy=100, r=20)
+- Rectangle for key shaft (x=80, y=95, width=100, height=10)
+- Two path elements for teeth at x=145 and x=165
+
+The design uses hardcoded coordinates shifted by 50 pixels vertically for centering.
+
+## On-Chain Metadata Generation
+
+The `tokenURI` function generates complete ERC-721 metadata on-chain:
+
+1. Retrieves stored color data for the token
+2. Generates SVG using the color values
+3. Base64 encodes the SVG to create a data URI
+4. Constructs JSON metadata including name, description, image, and attributes
+5. Base64 encodes the complete JSON
+6. Returns as a data URL
+
+Example output structure:
+```
+data:application/json;base64,[base64-encoded JSON containing:
+  - name: "Colored Key #[tokenId]"
+  - description: Standard text
+  - image: data:image/svg+xml;base64,[encoded SVG]
+  - attributes: backgroundColor, keyColor, minter, mintedAt
+]
+```
+
+## Gas Optimization Strategies
+
+The contracts implement several gas optimizations:
+
+### Storage Minimization
+- Colors stored as strings rather than separate RGB values (one slot vs three)
+- No caching of computed values (SVG, metadata)
+- Token counter starts at 1 to save gas on first mint
+
+### Computation Trade-offs
+- SVG generated on-demand in view functions (no gas cost to users)
+- Metadata computed rather than stored
+- Color generation uses efficient bitwise operations
+
+### String Operations
+- Direct concatenation rather than complex formatting
+- Hex conversion operates on bytes for efficiency
+- Minimal string manipulation in state-changing functions
+
+## Security Considerations
+
+### Reentrancy Protection
+The contracts inherit OpenZeppelin's reentrancy protections. The `_update` function follows checks-effects-interactions pattern with state changes before external calls.
+
+### Input Validation
+- Batch minting limited to 10 tokens (base contract) or 1 (production)
+- All public functions use OpenZeppelin's validation
+- No external inputs in SVG generation (prevents injection)
+
+### Access Control
+The contracts have no admin functions or special privileges. All minting is permissionless with the same rules for all users.
+
+## Testing Infrastructure
+
+### Test Helpers
+
+**ColorGeneratorTestHelper.sol** exposes private library functions for testing:
+```solidity
+function testAreSimilarColors(string memory color1, string memory color2) 
+    public pure returns (bool)
+function testInvertColor(string memory color) 
+    public pure returns (string memory)
+```
+
+This allows validation of the color equality check and inversion logic.
+
+**EchidnaOnePerWalletKeyToken.sol** implements invariants for property-based testing:
+- Validates one-token-per-wallet restriction holds under all conditions
+- Tests that ownership invariants cannot be violated
+- Ensures token supply consistency
+
+## Deployment Architecture
+
+### Development Networks
+Hardhat deployment uses TypeScript scripts with automatic address management:
+```typescript
+const contract = await ethers.deployContract("OnePerWalletKeyToken");
+await contract.waitForDeployment();
+// Address saved to ContractAddresses/{network}.json
+```
+
+### Production Deployment
+Mainnet deployment uses Viem v2 for enhanced control:
+```typescript
+const hash = await walletClient.deployContract({
+  abi: contractJson.abi,
+  bytecode,
+  args: [],
+  gas: 4200000n,
+});
+```
+
+## Integration Points
+
+### Standard Interfaces
+- Full ERC-721 compliance for marketplace compatibility
+- ERC-721 Enumerable for efficient token queries
+- ERC-721 Metadata for NFT display
+
+### Custom Functions
+- `getTokenColors(uint256)` - Direct color access
+- `tokensOfOwner(address)` - Efficient ownership queries
+- `getTokenOfOwner(address)` - Single token lookup for one-per-wallet model
+
+### Event System
+Standard ERC-721 events (Transfer, Approval) enable:
+- Wallet tracking
+- Marketplace indexing
+- dApp real-time updates
+
+## Performance Characteristics
+
+Measured gas consumption (Hardhat network, optimizer enabled):
+
+| Operation | Gas Cost | Notes |
+|-----------|----------|-------|
+| First Mint | ~247,000 | Includes token counter initialization |
+| Subsequent Mint | ~247,000 | Consistent regardless of supply |
+| Transfer | ~83,000 | Includes balance check overhead |
+| Burn | ~47,000 | Standard ERC-721 burn cost |
+| Approval | ~27,000-49,000 | Depends on existing approvals |
+
+View functions (tokenURI, getTokenColors) consume no gas when called externally.
+
+## Limitations and Trade-offs
+
+### Design Limitations
+- Color similarity only detects exact matches, not visual similarity
+- SVG design is fixed and cannot be customized
+- One-per-wallet applies to addresses, not actual wallets
+- No upgrade mechanism (immutable contracts)
+
+### Implementation Trade-offs
+- String storage for colors vs. packed uint256 (simplicity over gas)
+- On-demand computation vs. caching (flexibility over read performance)
+- Fixed SVG coordinates vs. parameterized design (gas over flexibility)
+
+## Summary
+
+The Colored Keys architecture demonstrates a pragmatic approach to NFT implementation. By building on OpenZeppelin's proven foundation and adding minimal custom logic, the system achieves its goals of on-chain generation and ownership restriction while maintaining security and gas efficiency. The architecture prioritizes simplicity and reliability over complex features, resulting in a maintainable and predictable contract system.

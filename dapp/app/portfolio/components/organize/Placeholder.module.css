@@ -1,0 +1,46 @@
+/* app/portfolio/components/organize/Placeholder.module.css */
+.container {
+  width: 80%;
+  max-width: 1000px;
+  max-height: 500px;
+  height: 500px;
+  margin: 2rem auto;
+  border: var(--default-border);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  background-color: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(5px);
+}
+
+.text {
+  font-family: var(--font-primary);
+  font-size: 3rem;
+  text-align: center;
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Mobile styles */
+@media (max-width: 730px) {
+  .container {
+    width: 90%;
+    padding: 1.5rem;
+  }
+  
+  .text {
+    font-size: 2rem;
+  }
+}
+
+/* Tablet/medium screens */
+@media (min-width: 731px) and (max-width: 1024px) {
+  .text {
+    font-size: 2.5rem;
+  }
+}

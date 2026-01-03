@@ -1,0 +1,427 @@
+---
+title: "Overview"
+description: "Interactive UI components for Colored Key NFT minting, burning, and visualization"
+---
+
+import { Steps, Table, Callout, Cards } from 'nextra/components'
+
+# Smart Contract UI System
+
+The smart contract UI system is the **mint screen front-end** for Colored Key NFTs in RitoSwap. It sits on top of the smart-contract data layer `useNFTData`, `useNFTStore`, and `useMintBurn` and turns complex mint/burn rules, account switching, and transaction lifecycles into a smooth, animated experience.
+
+This page is the **entrypoint** for the UI layer. It explains how the components fit together and routes you to the detailed docs for each part of the system.
+
+## Component docs
+
+These are the core UI components that make up the mint screen:
+
+<Cards num={3}>
+  <Cards.Card
+    title="MintPageWrapper"
+    href="/dapp/smart-contract-ui/mint-wrapper"
+    arrow
+  >
+    Event-bridge container that renders the mint UI shell and watches Transfer events.
+  </Cards.Card>
+  <Cards.Card
+    title="TokenStatus"
+    href="/dapp/smart-contract-ui/tokenstatus"
+    arrow
+  >
+    Animated status text that keeps users oriented as wallet and NFT state changes.
+  </Cards.Card>
+  <Cards.Card
+    title="NFTScreen"
+    href="/dapp/smart-contract-ui/nftscreen"
+    arrow
+  >
+    Lock/key visualization that preserves continuity during loading and account switches.
+  </Cards.Card>
+</Cards>
+
+<Cards num={3}>
+  <Cards.Card
+    title="ButtonSection"
+    href="/dapp/smart-contract-ui/button-section"
+    arrow
+  >
+    Adaptive mint/burn control surface that delegates writes to the useMintBurn hook.
+  </Cards.Card>
+  <Cards.Card
+    title="ProcessingModal"
+    href="/dapp/smart-contract-ui/processing-modal"
+    arrow
+  >
+    Transaction feedback modal with Open Wallet on mobile and block explorer links.
+  </Cards.Card>
+  <Cards.Card
+    title="Instructions"
+    href="/dapp/smart-contract-ui/instructions"
+    arrow
+  >
+    Mint &amp; burn rules panel with a copyable contract address that follows the active chain.
+  </Cards.Card>
+</Cards>
+
+## State model & user journey
+
+At a high level, the mint UI is built around four primary user states. These are shared across TokenStatus, NFTScreen, and ButtonSection:
+
+<Table>
+  <thead>
+    <tr>
+      <th>State</th>
+      <th>Description</th>
+      <th>UI Presentation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Not Connected</td>
+      <td>User has not connected their wallet</td>
+      <td>Lock icon (NFTScreen), "You are not signed in" (TokenStatus), connect wallet button (ButtonSection)</td>
+    </tr>
+    <tr>
+      <td>Connected, No NFT</td>
+      <td>Wallet connected but no Colored Key owned</td>
+      <td>Default white key, "You don&apos;t have a key yet", mint button</td>
+    </tr>
+    <tr>
+      <td>Connected, Unused NFT</td>
+      <td>Wallet holds a key that hasn&apos;t accessed the token gate yet</td>
+      <td>Colored key, "You have an unused key!", gate access + burn actions</td>
+    </tr>
+    <tr>
+      <td>Connected, Used NFT</td>
+      <td>Wallet holds a key that has already been used at the token gate</td>
+      <td>Colored key, "You have a used key...", burn button only</td>
+    </tr>
+  </tbody>
+</Table>
+
+The **non-standard NFT rules** (one key per wallet, single-use messaging, and burn-to-reset) are what drive these states. The Instructions component makes those rules explicit; the rest of the UI simply reflects them.
+
+<img 
+  src="/images/ui/mintpagewrapper.png" 
+  alt="Mint page wrapper displaying core UI components" 
+  style={{ width: '100%', maxWidth: '500px', display: 'block', margin: '2rem auto' }} 
+/>
+
+### User experience flow
+
+<Steps>
+### Step 1: Initial connection
+User lands on the mint page and sees the lock icon (NFTScreen) with "You are not signed in" (TokenStatus). ButtonSection shows a connect wallet button.
+
+### Step 2: Wallet connects
+After a brief hydration/connection stabilization window, the UI transitions to a white key with text like "You don&apos;t have a key yet" and a mint button.
+
+### Step 3: Minting
+Clicking the mint button delegates the write to `useMintBurn`. The mint/Burn hooks flip `isProcessing` to true, causing ProcessingModal to appear while wallet + network handle the transaction. Toast + browser notifications track progress.
+
+### Step 4: Unused key state
+On success, `useMintBurn` calls the provided success callbacks. ButtonSection uses these to invoke `onRefresh`, which flows through `useNFTData` and the NFT store. Once the store updates, NFTScreen animates from a default key to a colored key, and TokenStatus shows "You have an unused key!" with gate + burn actions.
+
+### Step 5: Used key state and rebuy loop
+After the token gate usage layer marks the key as used, the UI transitions to "You have a used key..." with a burn-only action. Burning moves the wallet back to the "no NFT" state so the user can mint or receive a new key. The Instructions panel explains this burn-to-reset loop in plain language.
+</Steps>
+
+## UI and data layers
+
+The smart contract UI system is deliberately thin. Most of the heavy lifting lives in the **data layer**, while the UI components render state and wire callbacks.
+
+### Data layer responsibilities
+
+- **`useNFTData`**
+  - Owns blockchain reads for ownership and colors.
+  - Coordinates token status API calls.
+  - Detects account switching, manages `isSwitchingAccount`/`previousData`, and drives cache invalidation.
+  - Exposes a `forceRefresh` callback used by MintPageWrapper and ButtonSection.
+
+- **`useNFTStore`**
+  - Zustand-backed store that holds derived state such as `hasNFT`, `hasUsedTokenGate`, `backgroundColor`, `keyColor`, `tokenId`, `isLoading`, `isSwitchingAccount`, and `previousData`.
+
+- **`useMintBurn`**
+  - Write-side transaction orchestrator for minting and burning.
+  - Wraps wagmi write/receipt hooks and mobile wallet nudges via `openWalletDeeplink`.
+  - Resets the dapp view chain to the active contract chain before writes.
+  - Handles success/error deduplication and notification dispatch.
+  - Exposes `mint`, `burn`, `isProcessing`, `mintHash`, `burnHash`, and `resetAll` for the UI.
+
+- **Transfer watcher (`useWatchContractEvent`)**
+  - Lives in MintPageWrapper.
+  - Listens for `Transfer` events on the key contract.
+  - For logs that involve the connected address, emits notification events and calls `forceRefresh` with a short debounce.
+
+### UI layer responsibilities
+
+- **MintPageWrapper** reads `address` from wagmi, subscribes to `Transfer` events, and calls `useNFTData()` to get `forceRefresh`. It passes `forceRefresh` to ButtonSection and renders the layout shell. It does **not** mutate the NFT store directly.
+- **TokenStatus**, **NFTScreen**, and **ButtonSection** subscribe to specific fields from `useNFTStore` and react to changes.
+- **ButtonSection** uses `useMintBurn` to drive mint/burn actions and to feed transaction hashes into ProcessingModal.
+- **Instructions** is UI-only: it explains the rules and surfaces the contract address, while the hooks handle all reads/writes.
+
+A minimal wiring pattern looks like this:
+
+```tsx
+// dapp/app/mint/components/MintPageWrapper.tsx
+export default function MintPageWrapper() {
+  const { address } = useAccount()
+  const { forceRefresh } = useNFTData()
+
+  useWatchContractEvent({
+    address: KEY_TOKEN_ADDRESS,
+    abi: fullKeyTokenAbi,
+    eventName: 'Transfer',
+    onLogs: (logs) => {
+      // Filter logs for the connected address, notify, then debounce forceRefresh()
+    },
+  })
+
+  return (
+    <div className={styles.container}>
+      <div className={styles.content}>
+        <TokenStatus />
+        <NFTScreen />
+        <ButtonSection onRefresh={forceRefresh} />
+      </div>
+    </div>
+  )
+}
+```
+
+```tsx
+// dapp/app/mint/components/ButtonSection/ButtonSection.tsx
+const { mint, burn, isProcessing, mintHash, burnHash, resetAll } = useMintBurn({
+  onMintSuccess: async () => {
+    setBlockProcessingText(true)
+    await onRefresh?.()
+    setLoading(false)
+  },
+  onBurnSuccess: async () => {
+    setBlockProcessingText(true)
+    await onRefresh?.()
+    setLoading(false)
+  },
+})
+```
+
+This separation keeps cross-cutting logic in hooks while letting the UI focus on what to render for each state.
+
+## Component roles & interactions
+
+### MintPageWrapper
+
+MintPageWrapper is the **event bridge** and layout shell for the mint experience:
+
+- Renders TokenStatus, NFTScreen, and ButtonSection inside a shared container.
+- Calls `useNFTData()` and passes `forceRefresh` into ButtonSection.
+- Subscribes to ERC-721 `Transfer` events via `useWatchContractEvent`.
+- Emits high-level notification events (e.g., `NFT_RECEIVED`, `NFT_TRANSFERRED`).
+- Debounces the `forceRefresh` call so bursts of logs result in a single refresh.
+
+It intentionally does **not** manage account switching or mutate the NFT store; that logic lives in `useNFTData` and the store itself.
+
+### TokenStatus
+
+TokenStatus provides animated text that mirrors wallet and NFT ownership state:
+
+- Maps `isConnected`, `hasNFT`, `hasUsedTokenGate`, and `isLoading` into one of five messages:
+  - `Loading...`
+  - `You are not signed in`
+  - `You don&apos;t have a key yet`
+  - `You have an unused key!`
+  - `You have a used key...`
+- Uses a hydration guard so SSR and first client render match, then begins reacting to real wallet/store data.
+- Implements a fade-out → pause → fade-in transition (roughly 1 second total) for text changes.
+- Cancels in-flight animations when state flips quickly (e.g., on disconnect).
+
+It sits at the top of the mint page and acts as the narrative anchor for the rest of the UI.
+
+### NFTScreen
+
+NFTScreen is the visual centerpiece of the mint interface:
+
+- Renders one of four visual states:
+  - Lock icon when not connected.
+  - Default white key when connected with no NFT.
+  - Colored key when the user owns a key.
+  - Loading (no visual) during initial mount and connection stabilization.
+- Hardcodes the key SVG for performance and consistency.
+- Uses a 300ms initialization delay so wagmi can restore existing connections before deciding whether to show the lock or the key.
+- Debounces visual state changes to avoid flicker during reads.
+- During account switching, uses `isSwitchingAccount` + `previousData` from the store to preserve the previous key visual until new data is ready.
+
+### ButtonSection
+
+ButtonSection provides the primary action interface for minting, burning, and navigating to the token gate:
+
+- Renders different UI based on four main states:
+  - Not connected → wallet connect button.
+  - No NFT → mint button.
+  - Unused NFT → gate link + burn button.
+  - Used NFT → burn button only.
+- Delegates all blockchain concerns to `useMintBurn`:
+  - Mobile wallet nudges via `openWalletDeeplink` when on mobile and using WalletConnect.
+  - Receipt tracking and success deduplication.
+  - Notification dispatch.
+  - Transaction hashes for explorer links.
+- Uses `onRefresh` (from MintPageWrapper/`useNFTData`) to re-query NFT data after successes and cancel operations.
+- Wires `isProcessing`, `mintHash`, and `burnHash` into ProcessingModal.
+- Implements hydration-safe loading and accessibility attributes (`role="status"`, `aria-busy`, grouped actions).
+
+### ProcessingModal
+
+ProcessingModal guides users through the transaction process:
+
+- Uses a two-phase visibility system (`shouldRender` vs `isShowing`) so CSS fade-in/fade-out transitions can run cleanly.
+- Accepts `isVisible`, `onCancel`, and an optional `transactionHash`.
+- When a hash is provided, derives a block explorer URL from the active chain id and renders a "Pending TX at Block Explorer" link.
+- On mobile, calls `isMobileDevice()` and shows an **Open Wallet** button that calls `openWalletDeeplink`.
+- Cancel button resets UI state via the parent component; it does **not** cancel the blockchain transaction.
+
+### Instructions
+
+The Instructions component is a UI-only helper that:
+
+- Explains the **non-standard NFT rules** that govern Colored Keys:
+  - One key per wallet at a time.
+  - Single-use messaging per key.
+  - Used keys must be burned before the wallet can mint/receive another.
+- Renders a "Mint &amp; Burn FAQ" that mirrors the actual behavior enforced by the contract and token gate.
+- Surfaces the **active contract address** via `KEY_TOKEN_ADDRESS`, which is resolved based on the validated active chain.
+- Truncates the address visually on small screens while still copying the full address string to the clipboard on click.
+- Includes tests that seed different environments (RitoNet/local, Sepolia, mainnet) and assert that the copied address matches the deployment.
+
+Placed next to the mint UI, it makes the rules and contract location discoverable for both end users and developers.
+
+## Cross-cutting UX patterns
+
+Several UX patterns are shared across the smart contract UI components:
+
+### Smooth transitions
+
+- **Debounced updates** – NFTScreen and TokenStatus delay transitions just enough to avoid flicker while blockchain queries settle.
+- **CSS-based animations** – All animations use GPU-friendly CSS transitions rather than JavaScript-driven animation loops.
+- **Consistent timing** – Transition durations (typically 300–1000ms) are tuned to feel cohesive across TokenStatus, NFTScreen, ButtonSection, and ProcessingModal.
+
+### Hydration safety
+
+- TokenStatus uses a `mounted` guard and a `"Loading..."` placeholder so SSR and client renders match.
+- NFTScreen waits 300ms before deciding whether to show the lock or key, giving wagmi time to rehydrate connections.
+- ButtonSection renders a hydration-safe loading button before actual state is known.
+
+### Account switching UX
+
+- `useNFTData` detects account switches and manages `isSwitchingAccount` and `previousData` in the store.
+- NFTScreen reads `isSwitchingAccount` and `previousData` to keep the previous key display visible until new data arrives.
+- ButtonSection and TokenStatus respect loading and switching flags to avoid showing contradictory states mid-transition.
+
+### Accessibility
+
+- TokenStatus wraps its heading in a `role="status"` region with `aria-live="polite"` / `aria-atomic="true"` so screen readers hear each state change.
+- ButtonSection groups actions (`role="group"`) and marks buttons `aria-busy` during processing.
+- ProcessingModal manages focus, keyboard navigation, and Escape handling to keep keyboard/assistive users in sync.
+- NFTScreen describes its visuals with `role="img"` and `aria-label` attributes when showing a key.
+
+## Non-standard NFT rules & contract visibility
+
+Colored Keys intentionally deviate from typical ERC-721 behavior:
+
+- Each wallet can hold **only one key at a time**.
+- Each key can be used **once** at the token gate to send a message.
+- Once used, the key must be **burned** before the wallet can mint or receive another key.
+
+These rules explain why the UI sometimes prioritizes **burn** over **mint**, and why wallets cannot stockpile multiple keys.
+
+The Instructions component is the UI-based source of truth for these rules. It also surfaces the **active contract address**:
+
+- Imports `KEY_TOKEN_ADDRESS` from the shared contract configuration.
+- Resolves the address for RitoNet/local, Sepolia, or Ethereum mainnet based on the validated active chain.
+- Displays a truncated version of the address when needed for layout while copying the full address to the clipboard.
+
+If you&apos;re looking for "Where do I find the contract address and what are the exact mint/burn rules?" — the Instructions doc is where to start.
+
+## Transaction feedback & transparency
+
+Transaction UX is shared between ButtonSection, `useMintBurn`, and ProcessingModal:
+
+- `useMintBurn` exposes `isProcessing`, `mintHash`, and `burnHash`.
+- ButtonSection:
+  - Drives mint/burn actions via `mint()` and `burn()`.
+  - Sets `isProcessing` state indirectly through the hook.
+  - Passes `mintHash` or `burnHash` into ProcessingModal&apos;s `transactionHash` prop.
+- ProcessingModal:
+  - Derives a block explorer URL based on the active chain id and supplied hash.
+  - Displays a "Pending TX at Block Explorer" link when a URL is available.
+  - Provides an **Open Wallet** button on mobile devices that deep-links to the connected wallet.
+
+The cancel button in ProcessingModal calls the parent&apos;s `onCancel` handler (typically `resetAll`, `setLoading(false)`, and `onRefresh()`). It **only** resets UI state; it does not cancel the on-chain transaction itself, which must be managed in the wallet.
+
+For deeper behavior across notifications and mobile wallet deeplinking, see:
+
+<Cards num={2}>
+  <Cards.Card
+    title="Notifications"
+    href="/dapp/notifications"
+    arrow
+  >
+    Toast + browser notification presets used by MintPageWrapper, useMintBurn, and the mint UI.
+  </Cards.Card>
+  <Cards.Card
+    title="WalletConnect Deeplinking"
+    href="/dapp/wc-deeplinking"
+    arrow
+  >
+    Mobile wallet deep-linking architecture that ButtonSection and ProcessingModal rely on.
+  </Cards.Card>
+</Cards>
+
+
+## Customization & extension
+
+While the current implementation is optimized for Colored Keys, several extension points are available:
+
+- **NFTScreen** – You can replace the hardcoded key SVG with dynamic image loading or alternative SVGs if your NFTs have different visual structures.
+- **ButtonSection** – Additional actions (e.g., listing, staking, transferring) can be added by extending the state machine and/or introducing new hooks alongside `useMintBurn`.
+- **MintPageWrapper** – Should remain lean; if logic starts to grow beyond event bridging and layout, it likely belongs in `useNFTData` or another data hook.
+
+For deeper customization guidance, see the individual component docs linked at the top of this page.
+
+## Related data layer docs
+
+The UI layer depends heavily on the smart-contract data layer. For details, see:
+
+<Cards num={3}>
+  <Cards.Card
+    title="NFT Store"
+    href="/dapp/smart-contract-data/nft-store"
+    arrow
+  >
+    Zustand-backed global state for token metadata, account switching, and persistence.
+  </Cards.Card>
+  <Cards.Card
+    title="useNFTData Hook"
+    href="/dapp/smart-contract-data/nft-data-hook"
+    arrow
+  >
+    Blockchain + API orchestration layer that drives the read-side of the mint UI.
+  </Cards.Card>
+  <Cards.Card
+    title="useMintBurn Hook"
+    href="/dapp/smart-contract-data/use-mint-burn"
+    arrow
+  >
+    Write-side transaction orchestrator that ButtonSection uses for minting and burning.
+  </Cards.Card>
+</Cards>
+
+## Summary
+
+The smart contract UI system is a thin, animated layer on top of the Colored Key data and transaction hooks. MintPageWrapper, TokenStatus, NFTScreen, ButtonSection, ProcessingModal, and Instructions work together to:
+
+- Communicate wallet and NFT state clearly.
+- Reflect the non-standard one-key-per-wallet, single-use rules.
+- Provide transparent transaction feedback with explorer links and mobile wallet deep-linking.
+- Keep the UI resilient to loading, account switching, and network quirks.
+
+Use this overview to understand how the pieces fit; dive into the individual component and data-layer docs for implementation details and extension patterns.

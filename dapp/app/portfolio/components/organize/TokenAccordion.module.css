@@ -1,0 +1,81 @@
+/* app/portfolio/components/organize/TokenAccordion.module.css */
+.accordionRoot {
+  border: var(--default-border);
+  border-radius: 10px;
+  overflow: hidden;
+  width: 100%;
+}
+.accordionItem:not(:first-child) {
+  border-top: var(--default-border);
+}
+.accordionHeader {
+  margin: 0;
+}
+.accordionTrigger {
+  all: unset;
+  width: 100%;
+  padding: 1rem;
+  display: flex;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+}
+.headerWrapper {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  padding-right: 70px; /* space for icon */
+}
+.title {
+  font-size: 1.5rem;
+  color: var(--foreground);
+  text-align: center;
+  margin: 0;
+  width: 100%;
+  word-wrap: break-word;
+}
+.icon {
+  position: absolute;
+  right: 30px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.iconLine {
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: var(--foreground);
+  transition: all 0.3s ease;
+}
+.iconLine:first-child {
+  transform: rotate(90deg);
+}
+.contentWrapper {
+  overflow: hidden;
+  padding: 0 2rem;
+  will-change: transform;
+}
+.contentWrapper > div {
+  padding: 1rem 0;
+}
+
+/* Mobile tweaks */
+@media (max-width: 730px) {
+  .title {
+    font-size: 1.2rem;
+    padding: 0 20px;
+  }
+  .icon {
+    right: 20px;
+    width: 30px;
+    height: 30px;
+  }
+  .headerWrapper {
+    padding-right: 50px;
+  }
+}
