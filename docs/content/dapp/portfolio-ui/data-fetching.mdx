@@ -1,0 +1,481 @@
+---
+title: Data Fetching & Caching
+description: Deep dive into the useAssets hook, Alchemy API integration, and TanStack Query implementation
+---
+
+import { Callout, Tabs, FileTree } from 'nextra/components'
+
+# Data Fetching & Caching
+
+The portfolio system's data layer is built on a sophisticated React Query implementation that interfaces with Alchemy's blockchain APIs. The `useAssets` hook serves as the primary data fetching interface, providing infinite scrolling, intelligent caching, and seamless error recovery.
+
+## The useAssets Hook
+
+The `useAssets` hook is a custom React Query hook that abstracts the complexity of fetching blockchain assets while providing a clean, type-safe interface to components.
+
+### Core Features
+
+The hook provides comprehensive functionality for asset discovery:
+
+- **Infinite pagination** for NFT collections (ERC-721 and ERC-1155)
+- **Single-page fetching** for ERC-20 tokens (returns all tokens in one request)
+- **Type-safe asset fetching** for ERC-20, ERC-721, and ERC-1155
+- **Intelligent caching** with configurable stale times
+- **Prefetching support** for improved perceived performance
+- **Error recovery** with customizable retry logic
+- **Cache invalidation** for manual refresh scenarios
+
+### Basic Usage
+
+```typescript
+import { useAssets } from '@/app/portfolio/hooks/useAssets'
+
+function MyComponent() {
+  const {
+    assets,
+    totalCount,
+    isLoading,
+    isError,
+    error,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    refetch,
+    prefetch,
+    clearCache,
+  } = useAssets({
+    address: '0x742d35Cc6634C0532925a3b844Bc9e7595f8fA2',
+    chainId: 1,
+    tokenType: 'ERC-20',
+    enabled: true,
+  })
+
+  if (isLoading) return <div>Loading assets...</div>
+  if (isError) return <div>Error: {error?.message}</div>
+
+  return (
+    <div>
+      {assets.map(asset => (
+        <AssetDisplay key={asset.contractAddress} asset={asset} />
+      ))}
+      {hasNextPage && (
+        <button onClick={() => fetchNextPage()}>
+          Load More
+        </button>
+      )}
+    </div>
+  )
+}
+```
+
+## API Reference
+
+### Hook Parameters
+
+The `useAssets` hook accepts a configuration object with the following properties:
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `address` | `string` | Yes | Wallet address to query assets for |
+| `chainId` | `number` | Yes | Blockchain network ID |
+| `tokenType` | `TokenType` | Yes | One of: 'ERC-20', 'ERC-721', 'ERC-1155' |
+| `enabled` | `boolean` | No | Controls whether the query should execute (default: `true`) |
+
+> **Note:** The hook automatically pauses itself when `address` is falsy, so you can leave `enabled` as `true` while waiting for wallet selection without worrying about unnecessary requests.
+
+### Return Values
+
+The hook returns an object containing:
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `assets` | `(ERC20Asset \| NFTAsset)[]` | Flattened array of all fetched assets |
+| `totalCount` | `number` | Total number of assets loaded |
+| `isLoading` | `boolean` | True during initial load |
+| `isError` | `boolean` | True if the query encountered an error |
+| `error` | `Error \| null` | Error object if query failed |
+| `fetchNextPage` | `() => Promise<void>` | Function to load the next page (NFTs only) |
+| `hasNextPage` | `boolean` | Whether more pages are available (always false for ERC-20) |
+| `isFetchingNextPage` | `boolean` | True while fetching additional pages |
+| `refetch` | `() => Promise<void>` | Force refresh all data |
+| `prefetch` | `() => Promise<void>` | Preload data into cache |
+| `clearCache` | `() => void` | Remove query from cache |
+
+## Alchemy API Integration
+
+The portfolio system leverages Alchemy's comprehensive blockchain APIs for asset discovery. Understanding the API structure helps when debugging or extending functionality.
+
+<Callout type="info">
+  All outbound requests reuse the `NEXT_PUBLIC_ALCHEMY_API_KEY` that `useAssets` pulls from `publicEnv`. Make sure that variable is defined in your `.env` file (or project settings) before testing locally; otherwise every request will fail with authentication errors.
+</Callout>
+
+### Network Endpoints
+
+The system maintains separate endpoint configurations for different API versions:
+
+<Tabs items={['ERC-20 Endpoints', 'NFT Endpoints']}>
+  <Tabs.Tab>
+```typescript
+const ALCHEMY_RPC_URLS: Record<number, string> = {
+  1:     `https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+  137:   `https://polygon-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+  42161: `https://arb-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+  43114: `https://avax-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+  8453:  `https://base-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+  10:    `https://opt-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+  250:   `https://fantom-mainnet.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+  11155111: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
+}
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```typescript
+const ALCHEMY_NFT_API_URLS: Record<number, string> = {
+  1:     `https://eth-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}`,
+  137:   `https://polygon-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}`,
+  42161: `https://arb-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}`,
+  8453:  `https://base-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}`,
+  10:    `https://opt-mainnet.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}`,
+  11155111: `https://eth-sepolia.g.alchemy.com/nft/v3/${ALCHEMY_API_KEY}`,
+}
+```
+  </Tabs.Tab>
+</Tabs>
+
+<Callout type="warning">
+  Not all chains support NFT APIs. Avalanche and Fantom currently only support ERC-20 token queries. The system automatically handles these limitations.
+</Callout>
+
+### ERC-20 Token Fetching
+
+The ERC-20 fetching process uses Alchemy's JSON-RPC methods:
+
+```typescript
+// Step 1: Fetch token balances
+const balancesRequest = {
+  jsonrpc: '2.0',
+  method: 'alchemy_getTokenBalances',
+  params: [address, 'DEFAULT_TOKENS'],
+  id: 1,
+}
+
+// Step 2: For each token with balance > 0, fetch metadata
+const metadataRequest = {
+  jsonrpc: '2.0',
+  method: 'alchemy_getTokenMetadata',
+  params: [tokenAddress],
+  id: 1,
+}
+```
+
+The system automatically filters out zero-balance tokens and handles missing metadata gracefully. Note that ERC-20 fetching returns all tokens in a single request without pagination.
+
+### NFT Fetching
+
+NFT queries use Alchemy's REST API v3 with pagination support:
+
+```typescript
+const params = new URLSearchParams({
+  owner: address,
+  pageSize: '100',
+  withMetadata: 'true',
+  pageKey: pageParam, // For pagination
+})
+
+const response = await fetch(
+  `${nftApiUrl}/getNFTsForOwner?${params}`
+)
+```
+
+The NFT fetching includes sophisticated image extraction logic that handles multiple potential image sources.
+
+## Asset Type Definitions
+
+The system uses TypeScript interfaces to ensure type safety across the data layer:
+
+### ERC20Asset
+
+```typescript
+interface ERC20Asset {
+  contractAddress: string
+  name: string
+  symbol: string
+  decimals: number
+  balance: string      // Hex or decimal string
+  logo?: string        // Optional logo URL
+}
+```
+
+<Callout type="info">
+  The `price` field shown in some interfaces is reserved for future implementation but is not currently populated by the Alchemy API integration.
+</Callout>
+
+### NFTAsset
+
+```typescript
+interface NFTAsset {
+  tokenId: string
+  contractAddress: string
+  name?: string
+  description?: string
+  image?: string
+  attributes?: Array<{
+    trait_type: string
+    value: string | number
+  }>
+  balance?: string     // For ERC-1155 tokens
+}
+```
+
+## Caching Strategy
+
+The caching system leverages TanStack Query's powerful cache management with custom configurations per asset type.
+
+### Cache Configuration
+
+```typescript
+// Different stale times based on asset type
+staleTime: tokenType === 'ERC-20' 
+  ? 2 * 60_000    // 2 minutes for ERC-20
+  : 10 * 60_000   // 10 minutes for NFTs
+```
+
+### Cache Keys
+
+The system uses a hierarchical cache key structure:
+
+```typescript
+const queryKey = [
+  'assets',
+  address.toLowerCase(),
+  chainId,
+  tokenType
+] as const
+```
+
+This ensures proper cache isolation between:
+- Different wallet addresses
+- Different blockchain networks
+- Different token types
+
+### Cache Invalidation
+
+Components can manually clear the cache when needed:
+
+```typescript
+const { clearCache } = useAssets({ ... })
+
+// User clicks refresh button
+const handleRefresh = () => {
+  clearCache()  // Removes query from cache
+  refetch()     // Triggers fresh fetch
+}
+```
+
+## Image Handling
+
+NFT image extraction follows a comprehensive fallback strategy to maximize image availability:
+
+```typescript
+const possibleImages = [
+  nft.image?.cachedUrl,       // Alchemy cached version
+  nft.image?.originalUrl,     // Original URL
+  nft.image?.pngUrl,          // PNG conversion
+  nft.image?.thumbnailUrl,    // Thumbnail version
+  nft.media?.[0]?.gateway,    // First media gateway URL
+  nft.media?.[0]?.thumbnail,  // First media thumbnail
+  nft.media?.[0]?.raw,        // First media raw URL
+  nft.metadata?.image,        // Metadata image
+  nft.metadata?.image_url,    // Alternative metadata field
+  nft.raw?.metadata?.image,   // Raw metadata image
+  nft.raw?.metadata?.image_url, // Raw metadata alternative
+]
+
+// IPFS gateway conversion
+if (imageUrl?.startsWith('ipfs://')) {
+  imageUrl = `https://ipfs.io/ipfs/${imageUrl.slice(7)}`
+}
+```
+
+This approach ensures maximum compatibility with different NFT metadata standards by checking the first available image source from multiple locations.
+
+## Error Handling
+
+The system implements multiple layers of error handling to ensure reliability.
+
+### Network-Level Errors
+
+```typescript
+retry: (failureCount, error) => 
+  failureCount < 3 && !error.message.includes('404')
+```
+
+The retry logic:
+- Attempts up to 3 retries for transient failures
+- Skips retry for 404 errors (chain not supported)
+- Uses exponential backoff between attempts
+
+### API-Level Errors
+
+```typescript
+if (!rpc) throw new Error(`ERC-20 not supported on chain ${chainId}`)
+if (!nftApi) throw new Error(`NFT not supported on chain ${chainId}`)
+```
+
+Clear error messages help developers understand API limitations.
+
+### Component-Level Recovery
+
+```typescript
+if (isError) {
+  return (
+    <div className={styles.errorState}>
+      <span>{error?.message || 'Failed to load assets'}</span>
+      <button onClick={() => refetch()} className={styles.retryButton}>
+        Retry
+      </button>
+    </div>
+  )
+}
+```
+
+Users always have the option to manually retry failed requests.
+
+## Performance Optimization
+
+### Prefetching Strategy
+
+The system implements hover-based prefetching to improve perceived performance:
+
+```typescript
+function TokenItem({ chainId, tokenType, address }) {
+  const { prefetch } = useAssets({ 
+    address, 
+    chainId, 
+    tokenType,
+    enabled: false  // Don't fetch until triggered
+  })
+
+  return (
+    <Accordion.Trigger 
+      onMouseEnter={() => prefetch()}
+    >
+      {/* Trigger content */}
+    </Accordion.Trigger>
+  )
+}
+```
+
+This loads data in the background before users open accordions.
+
+### Request Deduplication
+
+TanStack Query automatically deduplicates simultaneous requests:
+
+```typescript
+// These will result in only ONE network request
+const hook1 = useAssets({ address, chainId: 1, tokenType: 'ERC-20' })
+const hook2 = useAssets({ address, chainId: 1, tokenType: 'ERC-20' })
+```
+
+### Pagination Optimization
+
+The system fetches NFT assets in chunks to balance performance and user experience:
+
+```typescript
+pageSize: '100',  // Optimal balance for most use cases
+```
+
+Larger page sizes reduce request count but increase response time and memory usage.
+
+## Testing
+
+The data fetching layer includes comprehensive test coverage using Vitest and fetch stubbing for API mocking.
+
+### Test Setup
+
+```typescript
+import { renderHook, act } from '@testing-library/react-hooks'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useAssets } from '../useAssets'
+
+// Mock fetch globally
+vi.stubGlobal('fetch', fetchMock)
+
+const wrapper = ({ children }) => (
+  <QueryClientProvider client={queryClient}>
+    {children}
+  </QueryClientProvider>
+)
+```
+
+### Example Test Cases
+
+The test suite covers:
+- Successful data fetching for all asset types
+- Empty address and disabled state handling
+- Cache clearing functionality
+- Error states and retry logic
+- Pagination behavior for NFTs
+- No pagination for ERC-20 tokens
+- Metadata fetch failures and fallbacks
+
+<Callout type="info">
+  See `useAssets.test.tsx` for complete test examples and mock data setup.
+</Callout>
+
+## Best Practices
+
+When working with the data fetching layer, follow these guidelines:
+
+**DO:**
+- Always handle loading and error states in UI components
+- Use the `enabled` parameter to prevent unnecessary fetches
+- Implement proper error boundaries for unexpected failures
+- Leverage prefetching for frequently accessed data
+- Monitor API rate limits in production
+
+**DON'T:**
+- Call hooks conditionally (violates Rules of Hooks)
+- Ignore TypeScript types for assets
+- Manually cache data outside TanStack Query
+- Make direct API calls bypassing the hook
+- Expose API keys in client-side code
+
+## Troubleshooting
+
+### Common Issues
+
+**Assets not loading:**
+1. Verify the Alchemy API key is set correctly
+2. Check if the chain supports the requested asset type
+3. Ensure the address parameter is valid
+4. Look for rate limiting errors in console
+
+**Stale data showing:**
+1. Check the stale time configuration
+2. Verify cache keys are unique
+3. Use `refetch()` for manual updates
+4. Consider reducing stale time for critical data
+
+**Performance issues:**
+1. Monitor the number of parallel queries
+2. Implement virtualization for large asset lists
+3. Check for memory leaks in development
+4. Profile component re-renders
+
+## Playground
+
+Use the full Storybook UI to explore the data-fetching flow and controls.
+
+<div style={{ width: '100%', height: 760, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/portfolio-assets-tokenaccordioncontent--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Portfolio/Assets/TokenAccordionContent - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>

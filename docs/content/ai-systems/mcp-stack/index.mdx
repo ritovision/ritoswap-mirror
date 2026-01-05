@@ -1,0 +1,113 @@
+---
+title: MCP Stack
+description: Registry-driven tools, authentication, and chip telemetry
+---
+
+import { Table, Callout, Cards } from 'nextra/components'
+
+# MCP Stack
+
+Every tool RapBotRito can call lives in the **Model Context Protocol** stack housed under `dapp/app/lib/mcp`. The architecture focuses on three qualities:
+
+1. **Central registration** — `toolRegistry` (`dapp/app/lib/mcp/tools/index.ts`) registers each tool once and decides whether it should even exist (e.g., send-crypto tools only load when `AI_PRIVATE_KEY` is set, Pinecone tools only when configured).
+2. **Layered authentication** — The MCP HTTP route (`dapp/app/api/mcp/route.ts`) optionally enforces JWTs globally, while `MCPDispatcher` forces another verification for tools with `requiresJwt`.
+3. **Mode-aware exposure** — `getOpenAIToolSchemas` (`dapp/app/lib/llm/tool-bridge.ts`) filters the registry based on the active chat mode, so rap battles, freestyle, and agent battles each receive different tool manifests.
+
+These tools span multiple systems:
+
+- **On-chain** — Key NFT reads/writes plus ETH transfers via the AI signer.
+- **Semantic search** — Pinecone-backed `pinecone_search` for lore, memes, and rhymes.
+- **Media generation & vision** — OpenAI image workflows and inline renderers (e.g., `generate_image_with_alt`).
+- **Postgres/Prisma** — Quota tracking, Key NFT usage, and other stateful mutations stored in our primary DB.
+
+## Server & Auth Highlights
+
+- **JWT extraction** happens in `dapp/app/lib/mcp/server/auth.ts`, which checks headers, body payloads, and cookies. Verified claims (`sub`, `address`, `tokenId`) are injected into tool args under `__jwt`.
+- **Per-tool gating** is opt-in. Any tool definition can set `requiresJwt: true`, causing the dispatcher to re-run verification and add JWT metadata to the handler args. This pattern powers the Key NFT mutation tools, crypto senders, and quota-sensitive APIs.
+- **Error propagation** uses the `ToolFailure` helper in `tool-errors.ts` so handlers can `fail('message')`. The SSE pipeline picks up these errors to show red chips in the UI and feed concise summaries back to the LLM.
+
+<Cards num={1}>
+  <Cards.Card title="Dive into the MCP Server" href="./mcp-server" arrow>
+    Request lifecycle, authentication, dispatcher internals, and client bridge details.
+  </Cards.Card>
+</Cards>
+
+## Tool Catalog
+
+Each tool now has a dedicated deep dive. Use this table as a hub:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Tool</th>
+      <th>Summary</th>
+      <th>Docs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>generate_rap_verse</code></td>
+      <td>Multi-phase agent that crafts verses, images, and metadata.</td>
+      <td><a href="./generate-rap-verse">Read more →</a></td>
+    </tr>
+    <tr>
+      <td><code>generate_image_with_alt</code></td>
+      <td>Streams store:// images plus alt text for inline rendering.</td>
+      <td><a href="./generate-image-with-alt">Read more →</a></td>
+    </tr>
+    <tr>
+      <td><code>pinecone_search</code></td>
+      <td>Semantic retrieval across memes, rhymes, gifs, and lore.</td>
+      <td><a href="./pinecone-search">Read more →</a></td>
+    </tr>
+    <tr>
+      <td><code>get_eth_balance</code></td>
+      <td>Direct RPC balance checks across every configured chain.</td>
+      <td><a href="./eth-balance">Read more →</a></td>
+    </tr>
+    <tr>
+      <td><code>send_crypto_to_signed_in_user</code></td>
+      <td>Native transfers with JWT gating and crypto quotas.</td>
+      <td><a href="./send-crypto">Read more →</a></td>
+    </tr>
+    <tr>
+      <td><code>send_crypto_agent</code></td>
+      <td>Persona-based reviewer that may call the send-crypto tool.</td>
+      <td><a href="./send-crypto-agent">Read more →</a></td>
+    </tr>
+    <tr>
+      <td><code>mark_key_used</code></td>
+      <td>Marks a user’s Key NFT as consumed inside Prisma.</td>
+      <td><a href="./mark-key-used">Read more →</a></td>
+    </tr>
+    <tr>
+      <td><code>key_nft_read</code></td>
+      <td>All read-only Key NFT actions (balances, holders, metadata).</td>
+      <td><a href="./keynft-read">Read more →</a></td>
+    </tr>
+    <tr>
+      <td><code>manage_key_nft</code></td>
+      <td>Mint/burn/query using the AI signer.</td>
+      <td><a href="./keynft-manage">Read more →</a></td>
+    </tr>
+    <tr>
+      <td><code>keynft_used_count</code></td>
+      <td>Counts how many gated entries have been consumed.</td>
+      <td><a href="./keynft-used-count">Read more →</a></td>
+    </tr>
+  </tbody>
+</Table>
+
+Each page covers registry wiring, handler logic, and the corresponding presenter so you can see how backend behavior maps onto the inline chips described in the Chat Experience section.
+
+## Mode Whitelists
+
+Each chat mode (`dapp/app/lib/llm/modes/configs/*.ts`) declares an `mcpTools` array. For example:
+
+- **Rap Battle** — balances aggression with limited on-chain actions (`get_eth_balance`, `send_crypto_to_signed_in_user`, `mark_key_used`, `pinecone_search`, `generate_image_with_alt`).
+- **Freestyle** — unlocks more playful tools (`key_nft_read`, `keynft_used_count`, `manage_key_nft`, `send_crypto_agent`).
+- **Agent Battle** — relies heavily on `generate_rap_verse`, `send_crypto_to_signed_in_user`, and `mark_key_used` to enforce the high-stakes format.
+
+<Callout type="info">
+  Model manifests are regenerated **per request**. If you add a tool, simply register it and decide which modes may see it—no further wiring is needed.
+</Callout>

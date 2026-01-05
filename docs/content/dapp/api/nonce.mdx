@@ -1,0 +1,103 @@
+---
+title: "Nonce Generation"
+description: "Secure nonce generation for Sign-In with Ethereum (SIWE) authentication in RitoSwap"
+---
+
+import { Callout, Steps } from 'nextra/components'
+import SwaggerDocs from '@components/utilities/swaggerdocs/SwaggerDocs'
+
+# Nonce Generation API
+
+The nonce endpoint is the first step of the SIWE flow in the RitoSwap dapp. It returns a one-time, cryptographically secure value that must be included in the SIWE message a wallet signs.
+
+Use this page for **conceptual context + quickstart**. For the full contract (status codes, schemas, headers), use the OpenAPI block at the bottom.
+
+## When to use this endpoint
+
+- Before asking a wallet to sign a SIWE message.
+- Any time you need a fresh login session tied to a specific address.
+- As part of `/api/gate-access` flows for token-gated content.
+
+## Quickstart
+
+<Steps>
+### 1: Request a nonce
+Call `GET /api/nonce` from your client or backend.
+
+### 2: Build a SIWE message
+Include the returned `nonce` plus `domain`, `address`, `uri`, `chainId`, and `issuedAt`.
+
+### 3: Ask the wallet to sign
+Prompt the user's wallet to sign the prepared SIWE message.
+
+### 4: Verify and establish a session
+Send the signed message to `/api/gate-access` (or your chosen verifier) to establish an authenticated session.
+</Steps>
+
+## Endpoint summary
+
+| Property       | Value                   |
+| -------------- | ----------------------- |
+| URL            | `/api/nonce`           |
+| Method         | `GET`                  |
+| Authentication | None (public endpoint) |
+| Response type  | `application/json`     |
+| Happy-path     | `{ "nonce": string }` |
+
+## Request
+
+```http
+GET /api/nonce
+```
+
+No query params or body are required. The server derives a client identifier (for example, IP or socket address) from the request and uses it for rate limiting and nonce storage.
+
+## Responses
+
+### 200 OK — nonce issued
+
+```json
+{
+  "nonce": "k8Jd93kdo0Sdk39dkD9dk3mdk93kd9Dk"
+}
+```
+
+- Cryptographically secure random string.
+- Valid for a short window (≈5 minutes) and bound to the client identifier.
+- Must be echoed unchanged in the SIWE message you ask the wallet to sign.
+
+### 429 Too Many Requests
+
+The caller has hit the nonce rate limit (roughly 30 requests per sliding 60-second window per client identifier).
+
+- Body is an RFC 7807 `application/problem+json` payload.
+- Headers mirror the numeric fields when available: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `Retry-After`.
+
+Use this to show a human-friendly message or back off / retry in your client.
+
+### 501 SIWE Not Enabled
+
+Returned when SIWE / state-worker support is disabled or not configured for this deployment. If you see this in your environment, check your SIWE/state worker configuration.
+
+### 500 Internal Error
+
+Generic failure to issue a nonce (for example, if the state worker / Durable Object is unavailable). Treat as a temporary server issue and surface an appropriate error to the user.
+
+## Rate limiting & expiry
+
+- **Limit:** ~30 nonce requests per 60 seconds per client identifier.
+- **Window:** Sliding 60-second window.
+- **Scope:** Limited to this endpoint; other APIs use their own limits.
+- **TTL:** Nonces expire after about **5 minutes** and cannot be reused once consumed.
+
+This is enough headroom for realistic login retries while blocking nonce farming and basic abuse.
+
+<Callout type="info">
+In production on Vercel, the client identifier comes from trusted edge headers (for example, forwarded IP). In other environments, the route falls back to the raw socket address to avoid spoofed headers.
+</Callout>
+
+## OpenAPI reference
+
+For the full, exact contract (all status codes, schemas, headers, and examples), use the generated OpenAPI reference:
+
+<SwaggerDocs tag="Nonce" />

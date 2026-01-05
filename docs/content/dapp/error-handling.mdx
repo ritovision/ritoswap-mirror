@@ -1,0 +1,135 @@
+---
+title: Error Handling
+description: How the RitoSwap dapp isolates failures and renders recovery UI.
+---
+
+import { Callout, FileTree, Table } from 'nextra/components'
+import { StorybookEmbed } from '@components/StorybookEmbed'
+
+# Error Handling
+
+RitoSwap uses three layers of error handling: a global boundary for app-wide failures, a route-level boundary for page errors, and inline boundaries to isolate specific UI sections. Each layer captures exceptions to Sentry and renders a styled fallback shell.
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name="app" defaultOpen>
+      <FileTree.File name="error.tsx" />
+      <FileTree.File name="global-error.tsx" />
+    </FileTree.Folder>
+    <FileTree.Folder name="components" defaultOpen>
+      <FileTree.Folder name="errors" defaultOpen>
+        <FileTree.File name="InlineErrorBoundary.tsx" />
+        <FileTree.File name="PageError.tsx" />
+        <FileTree.File name="ErrorShellInline.tsx" />
+        <FileTree.File name="ErrorShellFullPage.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Error boundary layers
+
+- **Global boundary** (`app/global-error.tsx`) catches errors that escape the root layout and renders the full-page shell with a custom message. It calls `Sentry.captureException` on mount.
+- **Route boundary** (`app/error.tsx` -> `components/errors/PageError.tsx`) handles page-level errors using `ErrorShellInline` and the Next.js `reset` callback.
+- **Inline boundary** (`components/errors/InlineErrorBoundary.tsx`) wraps individual sections, so one failure does not crash the rest of a page.
+
+<Callout type="info">
+Next.js App Router error boundaries must be client components. All error UI components here are marked with "use client".
+</Callout>
+
+## InlineErrorBoundary props
+
+<Table>
+  <thead>
+    <tr>
+      <th>Prop</th>
+      <th>Type</th>
+      <th>Default</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`children`</td>
+      <td>`React.ReactNode`</td>
+      <td>Required</td>
+      <td>UI subtree guarded by the boundary.</td>
+    </tr>
+    <tr>
+      <td>`title`</td>
+      <td>`string`</td>
+      <td>`"Something went wrong"`</td>
+      <td>Fallback title for the inline shell.</td>
+    </tr>
+    <tr>
+      <td>`message`</td>
+      <td>`string`</td>
+      <td>Derived</td>
+      <td>Fallback copy. When `showErrorDetails` is true, uses `Dev error: ${error.message}`.</td>
+    </tr>
+    <tr>
+      <td>`component`</td>
+      <td>`string`</td>
+      <td>Unset</td>
+      <td>Sentry tag for grouping (for example `mint-token-status`).</td>
+    </tr>
+    <tr>
+      <td>`showErrorDetails`</td>
+      <td>`boolean`</td>
+      <td>`publicConfig.isDevelopment`</td>
+      <td>Controls whether raw error messages are shown in the fallback.</td>
+    </tr>
+    <tr>
+      <td>`onReset`</td>
+      <td>`() => void`</td>
+      <td>Unset</td>
+      <td>Invoked after retry resets the boundary state.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Fallback shells
+
+- **ErrorShellInline** renders a bordered, inline panel with floating orbs and an optional retry button.
+- **ErrorShellFullPage** renders a full-viewport error screen with the same visual language.
+
+Both shells accept optional `title`, `message`, and `onRetry` props. The retry button is only rendered when `onRetry` is provided.
+
+## Storybook previews
+
+<StorybookEmbed
+  title="Errors/ErrorShellInline"
+  story="WithRetry"
+  height={520}
+  viewMode="story"
+/>
+
+<StorybookEmbed
+  title="Errors/ErrorShellFullPage"
+  story="Default"
+  height={640}
+  viewMode="story"
+/>
+
+## Usage example
+
+```tsx
+import InlineErrorBoundary from '@/components/errors/InlineErrorBoundary';
+import TokenStatus from './TokenStatus/TokenStatus';
+
+<InlineErrorBoundary
+  component="mint-token-status"
+  title="Status unavailable"
+>
+  <TokenStatus />
+</InlineErrorBoundary>
+```
+
+## Current placements
+
+Inline boundaries are used throughout the app to isolate critical sections:
+
+- `dapp/app/mint/page.tsx` and `dapp/app/mint/components/MintPageWrapper.tsx`
+- `dapp/app/swap/page.tsx`
+- `dapp/app/gate/components/GatePageWrapper.tsx`
+- `dapp/app/portfolio/PortfolioClient.tsx`

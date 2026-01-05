@@ -1,0 +1,85 @@
+---
+title: Running Blockchain & Block Explorer
+description: Running the Local Blockchain and Blockscout Explorer
+---
+
+
+# Running the Network
+
+This guide covers basic operations for your local blockchain: a Hyperledger Besu QBFT network (a Byzantine-fault-tolerant flavor of Proof-of-Authority).
+
+## Starting Services
+
+### Start Besu + Blockscout
+```bash
+pnpm --filter local-blockchain run start
+```
+
+### Start Only the Besu Validator
+```bash
+pnpm --filter local-blockchain run start:node
+```
+
+## Stopping Services
+
+```bash
+pnpm --filter local-blockchain run stop
+```
+
+To stop only the validator compose file:
+```bash
+pnpm --filter local-blockchain run stop:node
+```
+
+## Reading Logs
+
+View all logs:
+```bash
+pnpm --filter local-blockchain run logs
+```
+
+Besu-only logs:
+```bash
+pnpm --filter local-blockchain run logs:node
+```
+
+Blockscout frontend/backend logs:
+```bash
+pnpm --filter local-blockchain run logs:blockscout
+```
+
+## Using RPC to Communicate
+
+The node exposes standard Ethereum JSON-RPC at:
+- HTTP: `http://localhost:8545`
+- WebSocket: `ws://localhost:8546`
+
+Test the connection:
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  http://localhost:8545
+```
+
+Besu exposes the same Ethereum JSON-RPC API surface, so any tools compatible with Geth endpoints will work.
+
+## Using Blockscout
+
+Access at `http://<BLOCKSCOUT_PUBLIC_HOST>:${BLOCKSCOUT_PORT}` (defaults to `http://localhost:4000`). Use your LAN IP as `BLOCKSCOUT_PUBLIC_HOST` if browsing from phones/tablets.
+
+Blockscout provides:
+- Block and transaction explorer
+- Address balance and history lookup  
+- Smart contract verification
+- Token tracking (ERC-20/721/1155)
+- API for programmatic access
+
+For detailed features and usage, see [Blockscout documentation](https://docs.blockscout.com/).
+
+## Deleting Data
+
+### Clean Everything
+```bash
+pnpm --filter local-blockchain run clean
+```
+Prompts before stopping containers, removing Docker volumes, deleting Besu data, validator keys, genesis, and the Blockscout clone. Run `pnpm --filter local-blockchain run setup` afterward to re-initialize.

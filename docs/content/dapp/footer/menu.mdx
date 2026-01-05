@@ -1,0 +1,312 @@
+---
+title: Menu
+description: A two-column footer navigation component with manually configured links for flexible footer-specific routing
+---
+
+import { FileTree } from 'nextra/components'
+import Image from 'next/image'
+
+# Footer Menu Component
+
+## Understanding the Design Philosophy
+
+When you first encounter the Footer Menu component, you might wonder why it doesn't reuse the centralized [MenuLinks component](/dapp/navbars#menulinks-component) that powers the navigation bars throughout the application. This deliberate architectural decision stems from a fundamental understanding of how footers differ from primary navigation in modern web applications.
+
+Think of your navbar as the main highway system of your application—it needs to be consistent, predictable, and identical across every page. Your footer, however, is more like the local roads—it often needs to include additional routes, skip certain pages, or present navigation in a completely different organizational structure. By maintaining separate menu configurations, you gain the flexibility to optimize each navigation context for its specific purpose.
+
+## Visual Design and Layout
+
+<Image 
+  src="/images/ui/footermenu.png" 
+  alt="Footer Menu Component showing two-column layout"
+  width={400}
+  height={280}
+  style={{ margin: '2rem auto', display: 'block', borderRadius: '10px' }}
+/>
+
+The Footer Menu employs a distinctive two-column layout that balances functionality with visual appeal. On the left, navigation links stack vertically with generous spacing and hover effects. On the right, a simple "Menu" heading provides visual balance and clearly identifies the component's purpose. This asymmetrical design creates visual interest while maintaining clarity—users immediately understand where to click while the design avoids the monotony of a simple link list.
+
+## Component File Structure
+
+<FileTree>
+  <FileTree.Folder name="utilities" defaultOpen>
+    <FileTree.Folder name="footerMenu" defaultOpen>
+      <FileTree.File name="FooterMenuServer.tsx" />
+      <FileTree.File name="FooterMenuClient.tsx" />
+      <FileTree.File name="FooterMenu.module.css" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Server and Client Responsibilities
+
+The Footer Menu is implemented as a small server/client pair:
+
+- **`FooterMenuServer`** is the entrypoint you render from layouts and footer shells. It stays as a server component so the rest of your footer tree does not need to opt into client behavior.
+- **`FooterMenuClient`** is the interactive, `"use client"` component that handles rendering, focusable links, and hover states.
+
+Today, `FooterMenuServer` is a thin wrapper:
+
+```tsx
+import FooterMenuClient from "./FooterMenuClient";
+
+export default function FooterMenuServer() {
+  return <FooterMenuClient />;
+}
+```
+
+Even though it is simple, this split gives you room to evolve the footer later (for example, by reading feature flags or configuration on the server) without turning your entire footer layout into a client component. Consumers import `FooterMenuServer` in their footer layouts and rarely need to touch `FooterMenuClient` directly.
+
+## The Architecture: Manual Configuration by Design
+
+Let’s walk through the heart of this component and explain why manual configuration isn't a limitation—it's a feature. In the `FooterMenuClient` component, the links are defined directly within the component:
+
+```tsx
+"use client";
+
+import styles from "./FooterMenu.module.css";
+import Link from "next/link";
+
+const menuItems = {
+  Home: "/",
+  Swap: "/swap",
+  Mint: "/mint",
+  Gate: "/gate",
+  Portfolio: "/portfolio",
+};
+
+export default function FooterMenuClient() {
+  return (
+    <nav 
+      className={styles.footerMenuContainer}
+      aria-label="Footer navigation menu"
+      role="navigation"
+    >
+      <ul className={styles.leftColumn} role="list">
+        {Object.entries(menuItems).map(([label, url]) => (
+          <li key={label} className={styles.footerMenuItem} role="listitem">
+            <Link 
+              href={url}
+              aria-label={`Navigate to ${label} page`}
+            >
+              {label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+      <div className={styles.rightColumn}>
+        <h3 aria-label="Navigation menu section">Menu</h3>
+      </div>
+    </nav>
+  );
+}
+```
+
+This approach differs fundamentally from the shared `MenuLinks` pattern used in the navbar. While `MenuLinks` centralizes navigation configuration for consistency across headers, the footer menu intentionally keeps its configuration local. This design decision enables several important capabilities that make footer navigation more flexible and purposeful.
+
+## Accessibility and Semantics
+
+The implementation uses semantic HTML and ARIA attributes so the footer menu is easy to navigate with assistive technologies:
+
+- The outer wrapper is a `nav` landmark with `aria-label="Footer navigation menu"`, which lets screen reader users quickly jump to footer navigation.
+- Links are rendered inside a semantic list: `ul` with `role="list"` and `li` elements with `role="listitem"`. This communicates that the footer contains a structured set of navigation options.
+- Each individual link receives an `aria-label` like `"Navigate to Home page"`, which can make the destination clearer when link text is short.
+
+If you customize labels, keep this behavior in mind—concise but descriptive labels make the ARIA descriptions more helpful.
+
+## Why Not Use the Shared MenuLinks Component?
+
+To understand this architectural choice, let's consider the different roles that navigation plays in various parts of your application. Your main navigation bar needs absolute consistency—users rely on it being identical on every page. It's your application's primary wayfinding system, and any inconsistency would confuse users and break their mental model of your site structure.
+
+Footer navigation serves a different purpose. It often includes:
+- Subset of main navigation items (not every navbar link belongs in the footer)
+- Additional utility pages like "About Us" or "Contact" that don't belong in primary navigation  
+- Different link ordering optimized for footer scanning patterns
+- Potential for footer-specific features like newsletter signup or social links mixed with navigation
+
+By maintaining separate configuration, you preserve the flexibility to optimize footer navigation for its unique context without affecting the critical consistency of your main navigation.
+
+## Understanding the CSS Architecture
+
+The styling system reveals thoughtful decisions about responsive design and user interaction. Here’s the core container styling:
+
+```css
+.footerMenuContainer {
+    border: var(--default-border);
+    border-radius: 10px;
+    padding: 15px 20px;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    width: 80%;
+    max-width: 300px;
+    margin-top: 7%;
+    height: min(70vw, 400px);
+}
+```
+
+The container creates a bordered box that feels substantial without being overwhelming. The `min()` function for height ensures the component scales proportionally on small screens (70% of viewport width) while capping at a reasonable maximum (400px) on larger displays. This creates a component that feels native to any screen size.
+
+The two-column layout uses flexbox for alignment:
+
+```css
+.leftColumn {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    flex: 1;
+}
+
+.rightColumn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+}
+```
+
+Equal `flex: 1` values ensure both columns receive equal space, creating visual balance despite their different content types. The left column aligns items to the start for a clean edge, while the right column centers its content for visual harmony.
+
+## The Interactive Experience
+
+The menu items implement a hover experience that goes beyond simple color changes:
+
+```css
+.footerMenuItem {
+    font-family: var(--font-primary);
+    font-size: 1.2rem;
+    color: white;
+    text-decoration: none;
+    padding: 6px 20px;
+    transition: background-color 0.75s ease-in-out, color 0s;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    min-height: 34px;
+    margin-bottom: 12px;
+    box-sizing: border-box;
+}
+
+.footerMenuItem a {
+    color: inherit;
+    text-decoration: none;
+    display: block;
+    width: 100%;
+}
+
+.footerMenuItem:last-child {
+    margin-bottom: 0; 
+}
+
+.footerMenuItem:hover {
+    background-color: white;
+    color: var(--primary-color);
+}
+```
+
+Notice the asymmetric transition timing—the background color transitions over `0.75s`, creating a smooth, premium feel, while the text color changes instantly. This prevents the text from being unreadable during the transition, a subtle but important detail that shows attention to user experience.
+
+The `a` selector ensures the clickable area fills the pill-shaped button and inherits the hover color, so the entire row feels like a single, obvious tap target. The `:last-child` rule removes the trailing gap beneath the final item, which keeps the stack visually tight.
+
+## Responsive Design Strategy
+
+The component implements intelligent responsive behavior that goes beyond simple scaling:
+
+```css
+@media (min-width: 730px) {
+    .footerMenuContainer {
+        width: 100%;  
+        max-width: 300px;  
+        margin-top: 3%; 
+    }
+    .rightColumn h3 {
+        font-size: 2rem;
+    }
+}
+```
+
+On mobile devices, the component uses 80% width to ensure breathing room on small screens. On larger viewports, it expands to fill its container (up to a compact `300px`), creating a more substantial presence without dominating the footer. The margin-top reduction from 7% to 3% on desktop recognizes that desktop footers typically have tighter spacing requirements.
+
+## Customization Patterns
+
+When you need to modify the footer menu for your specific needs, the manual configuration approach makes changes straightforward. Here are common customization scenarios:
+
+To add or remove navigation items, simply modify the `menuItems` object:
+
+```tsx
+const menuItems = {
+  Home: "/",
+  Swap: "/swap",
+  Mint: "/mint",
+  // Add new items
+  About: "/about",
+  Blog: "/blog",
+  // Remove items by commenting out or deleting
+  // Gate: "/gate",
+  Portfolio: "/portfolio",
+};
+```
+
+For more complex footer navigation needs, you might want to add section headers or grouped links:
+
+```tsx
+const menuSections = {
+  Products: {
+    Swap: "/swap",
+    Mint: "/mint",
+    Gate: "/gate",
+  },
+  Company: {
+    About: "/about",
+    Blog: "/blog",
+    Careers: "/careers",
+  }
+};
+```
+
+You can then map over `menuSections` to render grouped sections, while preserving the same styling and accessibility patterns.
+
+## Maintenance Considerations
+
+The manual configuration approach does mean you need to remember to update footer links when your site structure changes. This is a deliberate trade-off—you gain flexibility and independence from your main navigation at the cost of needing to maintain two separate navigation configurations.
+
+To manage this effectively, consider:
+- Documenting your navigation structure in a central location
+- Creating tests that verify all footer links point to valid routes
+- Including footer navigation updates in your deployment checklist
+- Using TypeScript to ensure type safety between your routes and menu configurations
+
+## Integration with the Footer System
+
+The Footer Menu component integrates seamlessly with both mobile and desktop footer layouts. Both variants can render the component identically, ensuring consistent navigation regardless of device type. The component's self-contained width and spacing management means it adapts naturally to different footer contexts without requiring wrapper-specific adjustments.
+
+In the desktop footer, it might appear alongside other menu components or utilities, while in the mobile footer, it typically stacks vertically with other footer elements. The consistent border and spacing ensure it maintains its identity and usability in both contexts.
+
+## Future Enhancement Possibilities
+
+The architecture of this component opens several paths for enhancement. You might consider adding active link highlighting to show users their current page, implementing animated transitions between menu states, or creating a collapsible mobile version for sites with extensive footer navigation.
+
+The local configuration approach also makes it easy to add footer-specific features like a "Recently Viewed" section that pulls from user history or seasonal navigation items that appear only during certain times of the year. These enhancements would be much more complex if the footer were tightly coupled to your main navigation system.
+
+## Conclusion
+
+The Footer Menu component exemplifies thoughtful architectural decisions in modern web development. By choosing manual configuration over shared navigation components, it preserves the flexibility that footer navigation requires while maintaining clean, maintainable code. The two-column design creates visual interest without sacrificing usability, and the responsive behavior ensures a premium experience across all devices.
+
+Sometimes, strategic decoupling creates better user experiences and more maintainable systems—especially when different parts of your application serve fundamentally different purposes.
+
+## Playground
+
+Use the full Storybook UI to explore the footer menu and tweak controls in real time.
+
+<div style={{ width: '100%', height: 640, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/footer-utilities-footermenu--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Footer/Utilities/FooterMenu - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>

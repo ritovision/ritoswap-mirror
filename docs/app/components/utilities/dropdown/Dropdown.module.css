@@ -1,0 +1,104 @@
+/* app/components/utilities/dropdown/Dropdown.module.css */
+
+.dropdownContainer {
+  display: inline-flex;
+  flex-direction: column;
+  position: relative;
+  font-family: var(--font-body);
+  cursor: pointer;
+}
+
+.dropdownButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 300px;
+  padding: 8px 12px;
+  border: var(--default-border);
+  border-radius: 30px;
+  background: transparent;
+  color: var(--foreground);
+  outline: none;
+}
+
+/* when the button itself has the “open” class, collapse its bottom corners */
+.dropdownButton.open {
+  border-bottom-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.displayText {
+  flex: 1;
+  text-align: center;
+  white-space: normal;
+  word-wrap: break-word;
+}
+
+.triangleIcon {
+  margin-left: 8px;
+  transition: transform 0.2s ease;
+}
+.triangleDown {
+  transform: rotate(0deg);
+}
+.triangleUp {
+  transform: rotate(180deg);
+}
+
+/* WRAPPER for list + bottom cap */
+.dropdownListWrapper {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+}
+
+/* scrollable middle */
+.middleSection {
+  max-height: 150px;
+  overflow-y: auto;
+  background-color: var(--background-dark, #0d1b2a);
+  border-left: var(--default-border);
+  border-right: var(--default-border);
+  z-index: 2;
+}
+
+/* the UL itself */
+.dropdownList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dropdownItem {
+  padding: 8px 12px;
+  color: var(--foreground);
+  text-align: center;
+  transition: background-color 0.1s ease;
+  cursor: pointer;
+}
+.dropdownItem:hover {
+  background: #fff;
+  color: #000;
+}
+
+/* bottom “cap” behind the scroll area */
+.bottomSection {
+  margin-top: -2px;
+  background-color: var(--background-dark, #0d1b2a);
+  border: var(--default-border);
+  border-top: none;
+  border-radius: 0 0 90px 90px;
+  height: 10px;
+  z-index: 1;
+}
+
+/* scrollbar styling */
+.middleSection::-webkit-scrollbar {
+  width: 10px;
+}
+.middleSection::-webkit-scrollbar-thumb {
+  background-color: var(--secondary-color);
+  border-radius: 5px;
+}

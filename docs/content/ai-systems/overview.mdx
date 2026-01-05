@@ -1,0 +1,149 @@
+---
+title: AI Systems
+description: Overview of the multi-modal agentic stack that powers RapBotRito
+---
+
+import { Cards, Callout, FileTree } from 'nextra/components'
+
+# Multi-Modal AI Systems
+
+<img
+  src="/brand/glitchy-rapbotrito.jpg"
+  alt="Glitchy RapBotRito portrait"
+  style={{ width: '100%', maxWidth: 400, borderRadius: '12px', margin: '1.5rem auto' }}
+/>
+
+RapBotRito is the musical AI game inside RitoSwap. It extends Rito Rhymes into a mode-driven rap battle experience where tools, media, and blockchain state shape the rules and outcomes, not just the wording. Under the hood it is still a multi-modal, tool-using, streaming runtime with an MCP server, inline UI affordances, and a spoken-word voice clone, but the product surface is a game, not simply a chatbot.
+
+Battle modes start with a Battle Form (see [BattleFormModal](/ai-systems/chat-ui/sub-modals#battleformmodal)) that lets players define themselves and RapBotRito’s opponent persona before the match begins.
+
+Architecturally, the game runs on **Next.js streaming** (`dapp/app/lib/llm/handler.ts`), a **Model Context Protocol server** (`dapp/app/lib/mcp/server/index.ts`), and dozens of inline UI affordances (`dapp/components/chatBot`) plus a spoken-word voice clone. This page frames the system at a high level before you dive into the detailed architecture.
+
+## Why RapBotRito Exists
+
+Rito (aka Rito Rhymes) comes from infotainment rap and spoken-word performance, so the goal is not just to answer questions but to deliver a high-energy experience that can teach, flex, and entertain without collapsing into another neutral interface. RapBotRito is designed to feel opinionated and recognizable, even though any single response only carries a slice of the full context.
+
+## Game Design
+
+RapBotRito is designed as a mode-driven game loop, not a single static assistant personality:
+
+- **Modes are rule sets** — Chat modes (`dapp/app/lib/llm/modes/configs/*.ts`) change tool access, prompt rules, and battle structure so the experience behaves differently, not just sounds different.
+- **Battle structure is explicit** — Rap battles are designed as three-round matches, with mode rules determining how each round is scored, escalates, and resolves.
+- **Battle setup is part of play** — Battle modes start with a Battle Form (see [BattleFormModal](/ai-systems/chat-ui/sub-modals#battleformmodal)) so players can define themselves and RapBotRito’s opponent persona before a match begins.
+- **Tools are visible “moves”** — Inline tools surface images, GIFs, chain badges, and Music Bar commands so the rap is delivered as an animated interface with readable actions, not a plain transcript.
+- **Blockchain state shapes outcomes** — Wallet state, key access, and limited on-chain actions influence what the game can do and how a session resolves.
+
+**Freestyle mode doesn't have a game-structure, it's just a free flow rap session with tools enabled.**
+
+### Stakes & Outcomes
+
+Rap battles have real outcomes. If you win, RapBotRito can trigger a small crypto reward transfer (on testnet only, no real monetary value). If you lose, RapBotRito can mark your key as used, revoke token gate access, and force a page refresh to kick you out of the gate and end the session. You then need to burn your current token and get a new one in order to regain access to the token gate and play again or access the other token-gate features.
+
+## Memory Layers
+
+Rito uses three memory layers that serve different roles in the stack:
+
+- **Chat history** keeps the immediate thread coherent inside the current session.
+- **Context management** injects tool schemas, wallet and NFT state, and mode rules so the model knows what it can do.
+- **Semantic retrieval (Pinecone)** supplies durable lore, memes, GIFs, and image metadata on demand.
+
+Together, history handles continuity, context enforces authority, and Pinecone powers long-term recall.
+
+## Multimodal Performance Layer
+
+RapBotRito is built to perform, not just reply. Inline tools render GIFs, images, chain badges, and a Music Bar, while the voice clone turns text into spoken-word audio so the experience reads like an animated game with visible tool activity, not a plain transcript.
+
+<Cards>
+  <Cards.Card
+    title="Runtime Surfaces"
+    href="./foundation/architecture"
+  >
+    Next.js route handlers stream tokens via Server-Sent Events, while the client `ToolAwareTransport` mirrors tool lifecycle events into the inline chip UI.
+  </Cards.Card>
+  <Cards.Card
+    title="Governed Agent"
+    href="./operations/quotas"
+  >
+    JWT-gated access, Redis-like durable quotas, and Pinecone-backed semantics keep the agent safe while still acknowledging on-chain context.
+  </Cards.Card>
+  <Cards.Card
+    title="Extensible Tools"
+    href="./mcp-stack"
+  >
+    Tools are registered centrally, authenticated per-call, and surfaced to the model based on chat mode.
+  </Cards.Card>
+  <Cards.Card
+    title="Inline Tools"
+    href="./chat-ui/inline-tools"
+  >
+    Media renderers, goodbye timers, and the Music Bar make the experience feel live while mirroring tool activity.
+  </Cards.Card>
+  <Cards.Card
+    title="Voice Clone (TTS)"
+    href="./chat-ui/voice-clone"
+  >
+    ElevenLabs-powered spoken-word output, cached in memory and routed through the global music player.
+  </Cards.Card>
+  <Cards.Card
+    title="Semantic Database"
+    href="./pinecone"
+  >
+    Pinecone indexes power meme, rhyme, and image retrieval through the MCP search tool.
+  </Cards.Card>
+</Cards>
+
+## Code Map
+
+Use this mental map while reading the detailed pages:
+
+<FileTree>
+  <FileTree.Folder name="dapp/app/lib">
+    <FileTree.Folder name="llm">
+      <FileTree.File name="handler.ts" />
+      <FileTree.File name="client/ToolAwareTransport.ts" />
+      <FileTree.File name="modes/" />
+      <FileTree.File name="providers/registry.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="mcp">
+      <FileTree.File name="server/" />
+      <FileTree.File name="tools/" />
+      <FileTree.File name="tool-activity/" />
+    </FileTree.Folder>
+    <FileTree.Folder name="tts">
+      <FileTree.File name="providers/" />
+    </FileTree.Folder>
+    <FileTree.Folder name="quotas">
+      <FileTree.File name="token-quota.ts" />
+      <FileTree.File name="crypto-quota.ts" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="dapp/app/api">
+    <FileTree.Folder name="tts">
+      <FileTree.File name="route.ts" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="dapp/components">
+    <FileTree.Folder name="chatBot">
+      <FileTree.File name="index.tsx" />
+      <FileTree.File name="ToolActivity/" />
+      <FileTree.File name="forms/" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="dapp/cloudflare/src">
+    <FileTree.File name="durable/state.ts" />
+  </FileTree.Folder>
+</FileTree>
+
+## Key Capabilities
+
+<Callout type="info" icon="💡">
+  **Multi-provider orchestration.** `ai.server.ts` lets you switch between OpenAI and local LM Studio models, define dedicated vision models, and configure the image generation backend.
+</Callout>
+
+- **Agentic chat modes** - `dapp/app/lib/llm/modes/configs/*.ts` define aggressive rap battles, freestyle sessions, and agent battles, each with bespoke tool allow-lists.
+- **Inline tooling UX** - `dapp/components/chatBot/ToolActivity` renders per-tool chips, while `useHydrateToolImages.ts` feeds base64 images to the client without ever placing large blobs in the chat stream.
+- **Voice clone output** - `dapp/app/api/tts/route.ts` and `dapp/app/lib/tts/providers` power ElevenLabs text-to-speech for spoken-word raps, with client caching in `dapp/app/store/ttsAudioStore.ts`.
+- **Semantic context** - `pinecone.config.ts`, the seeding scripts under `dapp/pinecone`, and the MCP `pinecone_search` tool let the agent pull memes, rhymes, and lore on demand. See the [Pinecone database](./pinecone) for index layout and seeding.
+- **Crypto-aware automation** - `send-crypto.ts`, `send-crypto-agent.ts`, and `mark-key-used.ts` demonstrate how JWT claims, quotas, and chain configs combine to gate real transfers.
+
+Continue with **Runtime Architecture** to see how these pieces stream together.

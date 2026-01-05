@@ -1,0 +1,266 @@
+/* Prompt Edit Modal Component Styles */
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  touch-action: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.promptModal {
+  width: min(520px, calc(100% - 32px));
+  max-height: min(72vh, 680px);
+  background-color: var(--primary-color);
+  border: var(--default-border);
+  border-radius: 12px;
+  padding: 24px;
+  z-index: 1001;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin: auto;
+}
+
+.editModalContent {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.editModalContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.editModalContent::-webkit-scrollbar-track {
+  background-color: var(--primary-color);
+  border-radius: 4px;
+}
+
+.editModalContent::-webkit-scrollbar-thumb {
+  background-color: var(--secondary-color);
+  border-radius: 4px;
+}
+
+.editModalContent::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent-color);
+}
+
+.editInstructions {
+  margin: 0;
+  color: #FFFFFF;
+  font-family: 'Michroma', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formLabel {
+  color: #FFFFFF;
+  font-family: 'Michroma', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.promptTextarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 12px;
+  background-color: transparent;
+  border: var(--default-border);
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-family: 'Michroma', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.promptTextarea:focus {
+  outline: none;
+  border-color: #FFFFFF;
+}
+
+.promptTextarea::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.promptInput {
+  width: 100%;
+  height: 44px;
+  padding: 12px;
+  background-color: transparent;
+  border: var(--default-border) !important;
+  border-radius: 8px;
+  color: #FFFFFF;
+  font-family: 'Michroma', sans-serif;
+  font-size: 13px;
+  transition: border-color 0.2s ease;
+}
+
+.promptInput:focus {
+  outline: none;
+  border-color: #FFFFFF !important;
+}
+
+.promptInput::placeholder,
+.promptInput::-webkit-input-placeholder,
+.promptInput::-moz-placeholder,
+.promptInput:-ms-input-placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+  opacity: 1 !important;
+}
+
+.promptModal input#promptNameInput::placeholder,
+.promptModal input#promptNameInput::-webkit-input-placeholder,
+.promptModal input#promptNameInput::-moz-placeholder,
+.promptModal input#promptNameInput:-ms-input-placeholder {
+  color: rgba(255, 255, 255, 0.4) !important;
+  opacity: 1 !important;
+}
+
+.promptTextarea.inputError,
+.promptInput.inputError {
+  border-color: var(--accent-color) !important;
+}
+
+.promptTextarea.inputError:focus,
+.promptInput.inputError:focus {
+  border-color: #FFFFFF !important;
+}
+
+.editModalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+}
+
+.editActionButton {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: var(--default-border);
+  padding: 0 16px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  font-family: 'Michroma', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.editActionButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editActionButton.backButton {
+  width: 44px;
+  padding: 0;
+  background-color: transparent;
+  border-color: var(--secondary-color);
+  color: #FFFFFF;
+  flex-shrink: 0;
+  margin-right: auto;
+}
+
+.editActionButton.backButton:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.editActionButton.saveButton {
+  width: auto;
+  gap: 8px;
+  background-color: transparent;
+  border-color: var(--utility-green);
+  color: var(--utility-green);
+}
+
+.editActionButton.saveButton:hover:not(:disabled) {
+  background-color: rgba(17, 192, 69, 0.1);
+}
+
+.editActionButton.saveButton:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.editActionButton.saveButton span {
+  color: #FFFFFF;
+}
+
+.editActionButton.saveButton svg {
+  color: var(--utility-green);
+}
+
+.editActionButton.deleteButton {
+  width: 44px;
+  padding: 0;
+  background-color: transparent;
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.editActionButton.deleteButton:hover {
+  background-color: var(--accent-color);
+  color: #FFFFFF;
+}
+
+.checkIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.arrowIcon {
+  width: 20px;
+  height: 20px;
+}
+
+.editActionButton.deleteButton svg {
+  width: 18px;
+  height: 18px;
+}
+
+.editModalActions.noDelete {
+  position: relative;
+}
+
+.editModalActions.noDelete .saveButton {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1;
+}
+
+@media (max-width: 767px) {
+  .modalOverlay {
+    align-items: flex-start;
+    padding: 10vh 16px 16px;
+  }
+
+  .promptModal {
+    width: 100%;
+    max-height: 50vh;
+    max-height: 50dvh;
+    padding: 20px;
+    margin: 0;
+  }
+}

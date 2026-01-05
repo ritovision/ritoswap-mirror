@@ -1,0 +1,51 @@
+---
+title: "Policy"
+description: "Terms of Service and Privacy Policy overview for RitoSwap"
+---
+
+import { FileTree, Tabs } from 'nextra/components'
+import ViewPage from '@components/utilities/viewpage/viewpage'
+
+# Policy Pages Overview
+
+The Terms of Service and Privacy Policy pages lay out the legal ground rules for using RitoSwap. They tell users what they agree to (e.g. on-chain token actions), what data we do—and don’t—collect, and how the blockchain’s immutability affects their information. Both pages also include standard disclaimers, intellectual-property notes, and a support contact.
+
+<Tabs items={['Terms of Service','Privacy Policy']}>
+  <Tabs.Tab>
+    *Terms of Service page links active*
+    <ViewPage
+      mainnetUrl="https://ritoswap.com/terms"
+      testnetUrl="https://testnet.ritoswap.com/terms"
+    />
+  </Tabs.Tab>
+  <Tabs.Tab>
+  *Privacy Policy page links active*
+    <ViewPage
+      mainnetUrl="https://ritoswap.com/privacy"
+      testnetUrl="https://testnet.ritoswap.com/privacy"
+    />
+  </Tabs.Tab>
+</Tabs>
+
+## File Paths
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name="app" defaultOpen>
+      <FileTree.Folder name="privacy" defaultOpen>
+        <FileTree.File name="page.tsx" />
+        <FileTree.File name="page.module.css" />
+        <FileTree.File name="metadata.ts" />
+        <FileTree.File name="page.unit.test.ts" />
+        <FileTree.File name="page.integration.test.tsx" />
+      </FileTree.Folder>
+      <FileTree.Folder name="terms" defaultOpen>
+        <FileTree.File name="page.tsx" />
+        <FileTree.File name="page.module.css" />
+        <FileTree.File name="metadata.ts" />
+        <FileTree.File name="page.unit.test.ts" />
+        <FileTree.File name="page.integration.test.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>

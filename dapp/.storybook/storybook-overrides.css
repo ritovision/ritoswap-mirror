@@ -1,0 +1,12 @@
+/* Storybook-only stacking fixes for mobile nav overlay.
+   In the app this layering works, but Storybook's preview wrappers can change stacking contexts. */
+
+#storybook-root [aria-controls='mobile-navigation'] {
+  z-index: 1103 !important;
+}
+
+/* Hamburger renders the MobileNav as a sibling after the toggle element. */
+#storybook-root [aria-controls='mobile-navigation'] ~ div {
+  z-index: 1102 !important;
+}
+

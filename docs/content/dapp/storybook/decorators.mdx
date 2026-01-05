@@ -1,0 +1,109 @@
+---
+title: Decorators & Providers
+description: Global wrappers and Storybook parameters that power mocked UI states.
+---
+
+import { Callout, FileTree, Table } from 'nextra/components'
+
+# Decorators & Providers
+
+Storybook applies two global decorators defined in `dapp/.storybook/preview.tsx`:
+
+1. **Debug panel overlay** (optional) for showing `DebugPanel`.
+2. **MockAppProviders** wrapper that seeds Wagmi, React Query, chain info, and rate-limit providers.
+
+<Callout type="info">
+`preview.tsx` also sets `window.__RITO_ASSET_PREFIX__ = '/storybook-static'`. Use
+`applyStorybookAssetPrefix` (from `@storybook-utils/assetPrefix`) when a component
+references `/images`, `/gifs`, or `/audio` so assets resolve inside Storybook embeds.
+</Callout>
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name=".storybook" defaultOpen>
+      <FileTree.File name="preview.tsx" />
+      <FileTree.Folder name="decorators" defaultOpen>
+        <FileTree.File name="MockAppProviders.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## MockAppProviders
+
+`MockAppProviders` composes:
+
+- `QueryClientProvider` with retries disabled for deterministic story behavior.
+- `WagmiProvider` using a mocked config (`createMockWagmiConfig`).
+- `ChainInfoProvider` to align chain metadata and visuals.
+- `RateLimitModalProvider` for any rate-limit overlays.
+- `AutoConnect` helper to simulate connecting when `mockWallet.connected` is true.
+
+It also seeds **ENS** and **balance** data into React Query using `applyEnsMocks` and `applyBalanceMocks`.
+
+## Global toolbar: Debug Panel
+
+The preview defines a `debugPanel` global toolbar with values:
+
+- `auto` (dev-only)
+- `show` (always visible)
+- `hide` (force hidden)
+
+The overlay is suppressed for the `Debug/DebugPanel` story itself.
+
+## Story args read by preview
+
+The preview file reads select `context.args` values to build mock wallet data. These are **optional** and only applied when provided.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Arg</th>
+      <th>Type</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`walletConnected`</td>
+      <td>`boolean`</td>
+      <td>When true, auto-connects the mock wallet.</td>
+    </tr>
+    <tr>
+      <td>`walletNetwork`</td>
+      <td>`string`</td>
+      <td>Chain name (e.g. `mainnet`, `sepolia`, `polygon`, `arbitrum`).</td>
+    </tr>
+    <tr>
+      <td>`walletAccountsCsv`</td>
+      <td>`string`</td>
+      <td>Comma or space-delimited list of account addresses.</td>
+    </tr>
+    <tr>
+      <td>`showMainnet` ... `showFantom`</td>
+      <td>`boolean`</td>
+      <td>Enable or disable specific chain IDs for the wallet mock.</td>
+    </tr>
+    <tr>
+      <td>`ensEnabled`, `ensName`</td>
+      <td>`boolean`, `string`</td>
+      <td>Control whether ENS is available and which name is shown.</td>
+    </tr>
+    <tr>
+      <td>`balanceEnabled`, `balanceEth`</td>
+      <td>`boolean`, `string`</td>
+      <td>Controls mock balance availability and ETH amount.</td>
+    </tr>
+  </tbody>
+</Table>
+
+<Callout type="info">
+You can also pass `mockWallet`, `mockEns`, and `mockBalance` in `story.parameters` for more control. The preview merges those with any args above.
+</Callout>
+
+## Preview parameters
+
+`preview.tsx` also sets:
+
+- `parameters.nextjs.appDirectory = true` for App Router compatibility.
+- `parameters.docs.theme = RitoTheme` to match the RitoSwap visual system.

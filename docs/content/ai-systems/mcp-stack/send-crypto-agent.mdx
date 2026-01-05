@@ -1,0 +1,95 @@
+---
+title: MCP Tool · send_crypto_agent
+description: Persona-driven reviewer that decides whether to tip the user.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# `send_crypto_agent`
+
+Defined in `dapp/app/lib/mcp/tools/send-crypto-agent.ts`, this tool lets the chatbot role-play as a gatekeeper: it reads user justifications, applies persona spectra, and either approves or denies an ETH transfer after running its own balance and membership checks.
+
+## How It Works
+
+- **Inputs** — Optional `reason`, `userAddress`, and `messages` (chat history). JWT data supplies the wallet address; the tool never accepts an `amount` parameter.
+- **Persona sampling** — `samplePersona` picks paired spectra (`grumpy/kind`, `greedy/generous`) whose scores always sum to 10. Extremely harsh personas with flimsy reasons can trigger an immediate decline before any RPCs are made.
+- **Runtime checks** — Successful calls gather evidence first: `get_eth_balance` reports the user’s holdings, `key_nft_read` confirms ownership, and a Prisma query checks whether that Key NFT has already been used.
+- **Deliberation** — The agent-only LLM (`providerRegistry.getProvider({ modelIndex: 2 })`) receives the above facts, returns JSON (`decision`, `reason`, optional `amountEth`), and the handler enforces hard constraints (no key or key already marked used) plus soft signals (balances above 2 ETH).
+- **Payouts** — Approved decisions clamp the amount to 0.1–0.3 ETH, call `send_crypto_to_signed_in_user`, and surface tx metadata alongside the persona reasoning in the JSON payload the presenter consumes.
+
+```ts
+// dapp/app/lib/mcp/tools/send-crypto-agent.ts
+const tool: Tool<Params> = {
+  name: 'send_crypto_agent',
+  requiresJwt: true,
+  inputSchema: InputSchema,
+  async handler(params) {
+    const persona = samplePersona();
+    const reason = extractUserReason(params);
+    const balance = await callMCPTool('get_eth_balance', { address: userAddress, chain: chainKey }, jwt);
+    const membership = await keyLookup(userAddress);
+    const deliberation = await getAgentLLM().invoke([
+      { role: 'system', content: SYSTEM_RULES },
+      { role: 'user', content: JSON.stringify({ persona, reason, balance, membership }) },
+    ]);
+    const { decision, amountEth } = parseDecision(deliberation);
+    if (decision === 'send') {
+      return await callMCPTool('send_crypto_to_signed_in_user', { amountEth: clampAmount(amountEth ?? 0.2) }, jwt);
+    }
+    return buildDenial(persona, reason, deliberation);
+  },
+};
+```
+
+## Presenter Mapping
+
+`dapp/components/chatBot/ToolActivity/catalog/presenters/send_crypto_agent.presenter.ts` conveys the verdict:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Display</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>pending</td>
+      <td>`Agent: Evaluating`</td>
+    </tr>
+    <tr>
+      <td>success (send)</td>
+      <td>`Agent Sent Crypto.` with `<amount> ETH sent to <short addr> on <network>`.</td>
+    </tr>
+    <tr>
+      <td>success (deny)</td>
+      <td>`Agent Declined.` plus the denial reason extracted from the JSON/text stream.</td>
+    </tr>
+    <tr>
+      <td>error</td>
+      <td>`Agent Error` with the raw error text.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Playground Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--send-crypto-agent-interactive&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Send Crypto Agent (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Notes
+
+<Callout type="info">
+Even when the agent approves a send, quotas are still enforced by `send_crypto_to_signed_in_user`. The agent simply decides whether to initiate that downstream tool.
+</Callout>

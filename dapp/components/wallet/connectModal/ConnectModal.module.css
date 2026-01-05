@@ -1,0 +1,629 @@
+/* components/utilities/wallet/connectModal/ConnectModal.module.css */
+
+/* Backdrop */
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 2000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+/* Modal wrapper */
+.modalWrapper {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 9999;
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Main modal - default state */
+.modal {
+  width: 420px;
+  max-width: 90vw;
+  background: var(--primary-color);
+  border: var(--default-border);
+  border-radius: 10px;
+  overflow: hidden;
+  animation: modalOpen 0.3s ease-out;
+}
+
+/* Modal content wrapper for default state */
+.modalContent {
+  border-bottom: none;
+  border-radius: 10px 10px 0 0;
+}
+
+/* Loading state modal (smaller) */
+.modalLoading {
+  width: 300px;
+  max-width: 90vw;
+  background: var(--primary-color);
+  border: var(--default-border);
+  border-radius: 10px;
+  padding: 3rem 2rem;
+  text-align: center;
+  animation: modalResize 0.3s ease-out;
+}
+
+/* Header section */
+.header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 1.5rem 2rem;
+  border-bottom: var(--default-border);
+  position: relative;
+}
+
+.title {
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1.5rem;
+  margin: 0;
+  text-align: center;
+}
+
+.closeButton {
+  position: absolute;
+  right: .5rem;
+  top: -120%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+  border-radius: 50%;
+}
+
+.closeButton:hover {
+  opacity: 0.7;
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.closeButton svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* Wallets container */
+.walletsContainer {
+  padding: 1.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Custom scrollbar */
+.walletsContainer::-webkit-scrollbar {
+  width: 8px;
+}
+
+.walletsContainer::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.walletsContainer::-webkit-scrollbar-thumb {
+  background: var(--secondary-color);
+  border-radius: 4px;
+}
+
+/* Terms section */
+.termsSection {
+  background: var(--secondary-color);
+  border-top: var(--default-border);
+  border-radius: 0 0 10px 10px;
+  padding: 1rem 2rem;
+  text-align: center;
+  margin-top: 1rem;
+  margin-left: -2px;
+  margin-right: -2px;
+  margin-bottom: -2px;
+}
+
+.termsText {
+  color: var(--primary-body);
+  font-family: var(--font-body);
+  font-size: 0.6rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.termsLink {
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.termsLink:hover,
+.termsLink:active,
+.termsLink:visited,
+.termsLink:focus {
+  color: inherit;
+  text-decoration: none;
+  outline: none;
+}
+
+/* Button hover effects */
+.walletButton {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: var(--default-border);
+  border-radius: 200px;
+  cursor: pointer;
+  transition: background-color 1s ease;
+  width: 100%;
+  font-family: var(--font-primary);
+}
+
+.walletButton:hover {
+  background-color: var(--secondary-color);
+}
+
+.walletButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.walletButton:disabled:hover {
+  background-color: transparent;
+}
+
+.walletIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  object-fit: contain;
+}
+
+.walletName {
+  color: white;
+  font-size: 1rem;
+  flex: 1;
+  text-align: left;
+}
+
+/* QR Code Content */
+.qrContent {
+  padding: 2rem;
+  position: relative;
+}
+
+.qrTitle {
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1.5rem;
+  margin: 0 0 2rem 0;
+  text-align: center;
+  padding: 0 3rem; /* Space for back button */
+}
+
+.backButton {
+  position: absolute;
+  top: 1.5rem;
+  left: 1.5rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.5rem;
+  transition: opacity 0.2s ease;
+}
+
+.backButton:hover {
+  opacity: 0.7;
+}
+
+.backButton svg {
+  width: 24px;
+  height: 24px;
+}
+
+.qrContainer {
+  margin: 2rem 0;
+  display: flex;
+  justify-content: center;
+}
+
+.qrWrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.qrCodeContainer {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  background: #000000;
+  border: 2px solid #000000;
+  border-radius: 10px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+/* React QR Code SVG styling - let the component props handle colors */
+.qrCodeContainer svg {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.qrLogoContainer {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 60px;
+  height: 60px;
+  background: #000000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-radius: 8px;
+}
+
+.qrLogo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.qrLoading {
+  width: 220px;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.6);
+  font-family: var(--font-primary);
+  border: var(--default-border);
+  border-radius: 10px;
+}
+
+.copyButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: var(--default-border);
+  border-radius: 200px;
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 1s ease;
+}
+
+.copyButton:hover {
+  background-color: var(--secondary-color);
+}
+
+.copyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.copyButton:disabled:hover {
+  background-color: transparent;
+}
+
+.copyIcon {
+  width: 20px;
+  height: 20px;
+}
+
+/* Get Wallet Content */
+.getWalletContent {
+  padding: 2rem;
+  position: relative;
+}
+
+.getWalletTitle {
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1.5rem;
+  margin: 0 0 2rem 0;
+  text-align: center;
+  padding: 0 3rem; /* Space for back button */
+}
+
+.walletFeatures {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.featureItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.checkIcon {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.featureText {
+  color: var(--primary-body);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.walletInfo {
+  color: var(--primary-body);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  text-align: center;
+  line-height: 1.5;
+  margin: 1.5rem 0 2rem;
+}
+
+.getWalletButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: var(--default-border);
+  border-radius: 200px;
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 1s ease;
+  text-decoration: none;
+}
+
+.getWalletButton:hover {
+  background-color: var(--secondary-color);
+}
+
+/* No wallet yet button */
+.noWalletButton {
+  background: none;
+  border: none;
+  color: var(--primary-body);
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  cursor: pointer;
+  padding: 0.5rem;
+  margin: 1rem auto 0;
+  display: block;
+  transition: opacity 0.2s ease;
+}
+
+.noWalletButton:hover {
+  opacity: 0.7;
+}
+
+/* Loading Content */
+.loadingContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.5rem;
+  position: relative;
+}
+
+.loadingIcon {
+  width: 80px;
+  height: 80px;
+  border-radius: 20px;
+  object-fit: contain;
+}
+
+.loadingText {
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.checkWalletText {
+  color: #white;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-style: italic;
+  margin: 0.5rem 0 0 0;
+}
+
+/* Action buttons container */
+.actionButtons {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  width: 100%;
+  justify-content: center;
+}
+
+.cancelButton {
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: 1px solid var(--accent-color);
+  border-radius: 200px;
+  color: var(--accent-color);
+  font-family: var(--font-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: none;
+  min-width: 100px;
+}
+
+.openWalletButton {
+  padding: 0.75rem 1.5rem;
+  background: var(--secondary-color);
+  border: 1px solid var(--secondary-color);
+  border-radius: 200px;
+  color: white;
+  font-family: var(--font-primary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: none;
+  min-width: 100px;
+}
+
+.openWalletButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.errorText {
+  color: var(--accent-color);
+  font-family: var(--font-primary);
+  font-size: 1.25rem;
+  margin: 0;
+}
+
+.canceledText {
+  color: var(--accent-color);
+  font-family: var(--font-primary);
+  font-size: 1rem;
+  margin: 0;
+  text-align: center;
+}
+
+/* Dots animation */
+.dotsContainer {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.dot1, .dot2, .dot3 {
+  color: white;
+  font-size: 1.5rem;
+  animation: dotFade 1.5s infinite;
+}
+
+.dot1 {
+  animation-delay: 0s;
+}
+
+.dot2 {
+  animation-delay: 0.3s;
+}
+
+.dot3 {
+  animation-delay: 0.6s;
+}
+
+@keyframes dotFade {
+  0%, 100% { opacity: 0; }
+  33% { opacity: 1; }
+}
+
+@keyframes qrFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.qrFadeIn {
+  animation: qrFadeIn 1s ease-in;
+}
+
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -45%);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%);
+  }
+}
+
+@keyframes modalOpen {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes modalResize {
+  from {
+    transform: scale(1.1);
+  }
+  to {
+    transform: scale(1);
+  }
+}
+
+/* Responsive */
+@media (max-width: 730px) {
+  .modal,
+  .modalLoading {
+    width: 95vw;
+    max-width: 400px;
+  }
+  
+  .header,
+  .walletsContainer,
+  .qrContent {
+    padding: 1rem;
+  }
+
+  .termsSection {
+    padding: 0.75rem 1rem;
+  }
+
+  .termsText {
+    font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .walletIcon {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .walletButton {
+    padding: 0.6rem 1rem;
+  }
+}
+
+.logoWrapper {
+  display: flex;
+  justify-content: center;
+  margin: 1.5rem 0 1rem; 
+}
+.logo {
+  max-width: 250px;
+  width: 100%;
+  height: auto; 
+}

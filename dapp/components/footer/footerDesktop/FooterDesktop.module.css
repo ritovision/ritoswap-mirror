@@ -1,0 +1,62 @@
+.footer {
+  background-color: var(--primary-color);
+  padding: 40px 5%;
+  position: relative;
+  z-index: 1500;
+  width: 100%;
+  display: grid;
+  grid-template-rows: auto auto auto auto;
+  gap: 20px;
+}
+
+/* Top row: wordmark + socials */
+.topRow {
+  display: flex;
+  flex-direction: column;    /* stack logo above socials */
+  align-items: center;       /* center both */
+  gap: 1rem;                 /* spacing between logo & socials */
+  position: relative;
+  margin-bottom: 3rem;
+}
+
+.logoContainer {
+  display: block;
+}
+.wordmark {
+  width: 350px;
+  height: auto;
+}
+
+.footerMenuRow {
+  display: flex;
+  justify-content: space-evenly;
+  align-items: center;
+  width: 100%;
+  margin: 0 auto;
+  padding: 0 5%;
+}
+.footerMenuLeft {
+  display: flex;
+  justify-content: flex-end;
+  width: 50%;
+  padding-right: 5%;
+}
+.footerMenuRight {
+  display: flex;
+  justify-content: flex-start;
+  width: 50%;
+  padding-left: 5%;
+}
+
+/* Co-brands */
+.coBrands {
+  display: flex;
+  justify-content: center;
+}
+
+/* Legal */
+.footerLegal {
+  display: flex;
+  justify-content: center;
+}
+

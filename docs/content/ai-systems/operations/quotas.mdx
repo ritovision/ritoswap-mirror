@@ -1,0 +1,82 @@
+---
+title: Quotas & Limits
+description: Token budgeting, crypto ceilings, and reset flows
+---
+
+import { Callout, Table, Steps } from 'nextra/components'
+
+# Quotas & Limits
+
+Two independent quota systems keep the agent from overspending: **token quotas** govern LLM usage, and **crypto quotas** govern how much ETH the MCP tools can send.
+
+## Token Quotas
+
+- Implemented in `dapp/app/lib/quotas/token-quota.ts`.
+- Controlled by `AI_CHAT_QUOTA_ENABLED`, `AI_CHAT_QUOTA_TOKENS`, and `AI_CHAT_QUOTA_WINDOW_SEC` in `ai.server.ts`.
+- Only enforced when JWTs are mandatory and the state worker is active. `handleChatRequest` performs a **pre-check** before streaming and records usage (`addUsage`) when the SSE session ends.
+- Token estimates rely on simple heuristics (`estimateInputTokensFromModelMessages` + `estimateTokensFromText`) so they work regardless of provider.
+
+## Crypto Quotas
+
+- Implemented in `dapp/app/lib/quotas/crypto-quota.ts`.
+- Configured via `AI_CRYPTO_QUOTA_ENABLED`, `AI_CRYPTO_QUOTA_DAILY_LIMIT`, `AI_CRYPTO_QUOTA_USER_LIMIT`, and `AI_CRYPTO_QUOTA_DURATION`.
+- `precheckCryptoSpend` is called before any send-crypto tool executes, covering both a **global per-network** window and a **per-address** window. Success/failure reasons bubble up into tool chips so the user knows whether the global pool or their individual allowance ran out.
+- `recordCryptoSpend` increments both windows via the state service after a transaction is mined.
+
+<Callout type="warning">
+  Crypto quotas require the same Durable Object service as token quotas. If `NEXT_PUBLIC_ENABLE_STATE_WORKER` is false, the tooling falls back to “unlimited” windows, which is acceptable in local development but not production.
+</Callout>
+
+## Durable State Service
+
+The Cloudflare Durable Object at `dapp/cloudflare/src/durable/state.ts` handles nonce storage, rate limiting, and quota windows. The Next.js side communicates through `dapp/app/lib/state/client.ts`, which throws if the service is disabled or misconfigured.
+
+## Reset API
+
+`dapp/app/api/quota-reset/route.ts` offers a guarded POST endpoint for admins. It supports three modes:
+
+<Steps>
+  {<h3>1. Full reset</h3>}
+  POST with `{ "all": true, "scope": "token|crypto|both" }`. Deletes every quota key for the selected scope(s).
+
+  {<h3>2. Targeted tokens</h3>}
+  POST with `{ "tokenIds": ["123", "456"] }`. The handler maps token IDs to per-user keys and deletes them in batches.
+
+  {<h3>3. Targeted crypto addresses</h3>}
+  POST with `{ "scope": "crypto", "addresses": ["0xabc..."] }`. Resets the per-address windows for the active network.
+</Steps>
+
+All requests must include the `AI_QUOTA_RESET_SECRET` via either the dedicated headers (`x-quota-reset-secret`), Authorization bearer, JSON body, or `?secret=` query param. The route also refuses to run if the state service is disabled.
+
+## Summary Table
+
+<Table>
+  <thead>
+    <tr>
+      <th>Quota</th>
+      <th>Storage Key</th>
+      <th>Enforced By</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Token</td>
+      <td><code>{'chat:quota:{tokenId}'}</code></td>
+      <td><code>handleChatRequest</code></td>
+      <td>Only active when JWTs are in play; guard rails for LLM consumption.</td>
+    </tr>
+    <tr>
+      <td>Crypto (global)</td>
+      <td><code>{'crypto:quota:{network}:all'}</code></td>
+      <td><code>send-crypto*.ts</code></td>
+      <td>Caps total daily spending for the active network.</td>
+    </tr>
+    <tr>
+      <td>Crypto (per user)</td>
+      <td><code>{'crypto:quota:{network}:addr:{user}'}</code></td>
+      <td><code>send-crypto*.ts</code></td>
+      <td>Prevents a single wallet from draining the pool.</td>
+    </tr>
+  </tbody>
+</Table>

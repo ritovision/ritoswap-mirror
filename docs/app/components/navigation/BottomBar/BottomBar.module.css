@@ -1,0 +1,236 @@
+/* Bottom Bar - Core Component Styles */
+
+.bottomBar {
+  display: flex;
+  flex-direction: column-reverse;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 19;
+  background-color: var(--primary-color);
+  border-top: var(--default-border);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.3);
+  transition: opacity 0.3s ease;
+  opacity: 1;
+}
+
+/* Fade out near footer */
+.bottomBar.fadeOut {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Bar Container - Three Column Grid */
+.barContainer {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background-color: var(--primary-color);
+}
+
+/* Sections */
+.leftSection {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.centerSection {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.rightSection {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+/* TOC Toggle Button */
+.tocButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 20px;
+  background-color: var(--secondary-color);
+  color: #FFFFFF;
+  border: 2px solid var(--secondary-color);
+  border-radius: 30px;
+  font-family: 'Michroma', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 44px;
+  width: fit-content;
+  white-space: nowrap;
+}
+
+.tocButton.hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.tocButton.active {
+  transform: scale(0.98);
+}
+
+.tocButton:focus {
+  outline: 3px solid var(--accent-color);
+  outline-offset: 3px;
+}
+
+.tocButton.disabled {
+  background-color: #666;
+  border-color: #666;
+  color: #999;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Caret icon */
+.caret {
+  font-size: 11px;
+  line-height: 1;
+  transition: transform 0.3s ease;
+  display: inline-block;
+}
+
+.caret.rotated {
+  transform: rotate(180deg);
+}
+
+.tocLabel {
+  font-size: 13px;
+  line-height: 1;
+}
+
+/* Drawer Content */
+.drawerContent {
+  max-height: 0;
+  overflow: hidden;
+  background-color: var(--primary-color);
+  border-top: 2px solid var(--secondary-color);
+  transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.drawerContent.open {
+  max-height: 60vh;
+  max-height: 60dvh;
+}
+
+.drawerPanels {
+  position: relative;
+  padding: 0 16px;
+}
+
+.drawerInner {
+  width: min(600px, 100%);
+  margin: 0 auto;
+}
+
+/* Custom scrollbar for drawer content */
+.drawerContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.drawerContent::-webkit-scrollbar-track {
+  background-color: var(--primary-color);
+  border-radius: 4px;
+}
+
+.drawerContent::-webkit-scrollbar-thumb {
+  background-color: var(--secondary-color);
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.drawerContent::-webkit-scrollbar-thumb:hover {
+  background-color: var(--accent-color);
+}
+
+/* AI Button - Base */
+.aiButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background-color: var(--secondary-color);
+  border: 2px solid var(--secondary-color);
+  border-radius: 25%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 0;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.aiButton.hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  transform: scale(1.1);
+}
+
+.aiButton.active {
+  transform: scale(0.95);
+}
+
+.aiButton:focus {
+  outline: 3px solid var(--accent-color);
+  outline-offset: 3px;
+}
+
+/* Sidebar toggle holder (hidden by default; enabled ≥768px) */
+.sidebarButton {
+  display: none;
+}
+
+/* Center AI variant with text (hidden by default; enabled ≥1280px) */
+.aiWithText {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 16px;
+  height: 40px;
+  border-radius: 30px;
+  width: auto;
+}
+
+.aiText {
+  font-family: 'Michroma', sans-serif;
+  font-size: 13px;
+  line-height: 1;
+  color: #FFFFFF;
+  white-space: nowrap;
+}
+
+/* ≥768px: show sidebar button and keep layout */
+@media (min-width: 768px) {
+  .sidebarButton {
+    display: flex;
+  }
+  .leftSection {
+    gap: 8px;
+  }
+}
+
+/* ≥1280px: hide TOC button, center AI with text, hide left AI circle */
+@media (min-width: 1280px) {
+  .centerSection .tocButton {
+    display: none;
+  }
+  .leftSection .aiButton {
+    display: none;
+  }
+  .centerSection .aiWithText {
+    display: inline-flex;
+  }
+}

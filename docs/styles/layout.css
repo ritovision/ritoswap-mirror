@@ -1,0 +1,239 @@
+/* docs/styles/layout.css */
+body {
+  background-color: var(--primary-color);
+}
+
+/* 1) Change the hr divider color: */
+.nextra-border {
+  border-color: var(--secondary-color) !important;
+}
+
+/* 2) Change the Footer container background: */
+div[class*="x:bg-gray-100"] {
+  background-color: var(--primary-color) !important;
+}
+
+/* 3) Change the <footer> text color & padding: */
+footer[class*="x:flex"] {
+  color: #FFFFFF !important;        /* white text */
+  padding-top: 2rem !important;     /* e.g. increase top padding */
+  padding-bottom: 2rem !important;
+}
+
+/* 4) Tweak the switchers row (locale + theme): */
+div[class*="x:flex"][class*="x:max-w-"] {
+  justify-content: center !important;  /* center the icons */
+}
+
+/* Always use your primary blue for the input background */
+.nextra-search input {
+  background-color: var(--primary-color) !important;
+  border: 1px solid transparent; /* ensure a border exists */
+}
+
+/* On hover, make the border your secondary blue */
+.nextra-search input:hover {
+  border-color: var(--secondary-color) !important;
+}
+
+.labelBkg * {
+  background-color: var(--primary-color) !important;
+}
+
+/* Change background fill of main node container to primary blue */
+rect.label-container {
+  fill: var(--primary-color) !important;
+  stroke: var(--secondary-color) !important;
+}
+
+/* Also update any nested rects (fallback for nested .label > rect) */
+g.label rect {
+  fill: var(--primary-color) !important;
+  stroke: var(--secondary-color) !important;
+}
+
+html.dark .nextra-sidebar-footer {
+  background-color: var(--primary-color);
+}
+
+.x\:not-first\:mt-6.x\:leading-7 {
+  max-width: 40ch;        /* prevent super–long lines */
+  margin: 1.5rem auto 0;  /* top margin + horizontal auto-centering */
+  padding: 0 1rem;        /* gutter on left & right */
+  text-align: center;     /* center the text */
+}
+
+/* match your footer span’s Tailwind‐generated classes */
+.x\:flex.x\:font-semibold.x\:items-center.x\:gap-2.x\:p-4 {
+  max-width: 40ch;         /* don’t let it run too wide */
+  margin: 1rem auto;       /* vertical gutter + auto-center */
+  padding: 1rem;           /* keep its own padding */
+  justify-content: center; /* center its contents in the flex */
+  text-align: center;      /* just in case */
+}
+
+/* Always give each card a 2px border in --secondary-color */
+.nextra-cards > .nextra-card {
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: var(--secondary-color) !important;
+}
+
+/* Base dark-mode overlay */
+html.dark .nextra-cards > .nextra-card {
+  background-color: rgba(128, 128, 128, 0.1) !important;
+  transition: background-color 0.2s ease;
+}
+
+/* On hover, bump the opacity to 0.2 */
+html.dark .nextra-cards > .nextra-card:hover {
+  background-color: rgba(128, 128, 128, 0.2) !important;
+}
+
+/* Always give standalone cards a 2px border in --secondary-color */
+.nextra-card:not(.nextra-cards > .nextra-card) {
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: var(--secondary-color) !important;
+  margin-top: 1.5rem;
+}
+
+/* Base dark-mode overlay for standalone cards */
+html.dark .nextra-card:not(.nextra-cards > .nextra-card) {
+  background-color: rgba(128, 128, 128, 0.1) !important;
+  transition: background-color 0.2s ease;
+}
+
+/* On hover, bump the opacity to 0.2 */
+html.dark .nextra-card:not(.nextra-cards > .nextra-card):hover {
+  background-color: rgba(128, 128, 128, 0.2) !important;
+}
+
+
+html.dark button.x\:text-gray-500 {
+  color: white !important; /* Tailwind’s gray-500 */
+}
+
+/* In dark mode, make non-hover link text gray again */
+html.dark a.x\:text-gray-500 {
+  color: white !important; /* Tailwind’s gray-500 */
+}
+
+/* Force footer to center content on all screen sizes */
+footer.x\:mx-auto {
+  justify-content: center !important; /* override md:justify-start */
+  text-align: center;
+}
+
+html.dark .x\:mt-12.x\:mb-8.x\:text-xs.x\:text-gray-500.x\:text-end {
+  color: #ffffff !important;
+}
+
+/* Dark-mode banner gradient: primary-blue on top, black on bottom */
+.dark .nextra-banner {
+  background:  var(--primary-color) !important;
+  border: 1px solid var(--secondary-color);
+  color: white;
+}
+
+/* Override the 404 heading */
+.next-error-h1 {
+  font-size: 3rem !important;
+  line-height: 1.2 !important;
+}
+
+/* Override the subheading immediately after it */
+.next-error-h1 + div h2 {
+  font-size: 2rem !important;
+  line-height: 1.6 !important;
+}
+
+/* 1) Slightly increase letter-spacing on each step’s heading */
+.nextra-steps h3 {
+  letter-spacing: 0.05em; /* tweak this value to dial spacing up/down */
+}
+
+/* 2) Force the left border to use your secondary-blue variable */
+.nextra-steps {
+  border-left-width: 1px;       /* ensure you still have a 1px left border */
+  border-left-style: solid;
+  border-left-color: var(--secondary-color) !important;
+}
+
+/* 3) (Optional) ensure dark mode uses the same border color */
+.dark .nextra-steps {
+  border-left-color: var(--secondary-color) !important;
+}
+
+/* make the step-number circles transparent with white border & text */
+.nextra-steps h3::before {
+  /* transparent fill */
+  background-color: var(--primary-color) !important;
+  /* white ring */
+  border: 1px solid white !important;
+  /* white number */
+  color: white !important;
+  /* keep ’em perfectly round */
+  border-radius: 9999px !important;
+  padding-top: 2.5px;
+  padding-left: 2px;
+}
+
+/* apply to all tables */
+table th,
+table td {
+  padding: 1rem;
+}
+
+table th,
+table td {
+  border: 1px solid var(--secondary-color);
+  border-collapse: collapse;
+}
+
+table {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* 1) remove any bottom border from all nextra-scrollbar containers */
+.nextra-scrollbar {
+  border-bottom: none !important;
+}
+
+/* 2) re-apply the white bottom border only on the tablist */
+.nextra-scrollbar[role="tablist"] {
+  border-bottom: 1px solid #fff !important;
+}
+
+/* Triple the bottom border on the “selected” tab */
+div[role="tablist"] button[aria-selected="true"],
+div[role="tablist"] button[data-headlessui-state="selected"],
+div[role="tablist"] button:focus-visible {
+  border-bottom-width: 6px !important;
+}
+
+/* 1) Remove the light/dark border & shadow on the open dropdown panel */
+div.nextra-scrollbar[role="menu"] {
+  border: none !important;
+}
+
+/* 2) Kill any focus outline/box-shadow on the panel itself */
+div.nextra-scrollbar[role="menu"]:focus,
+div.nextra-scrollbar[role="menu"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 3) Remove the white “focus square” on the menu button after click */
+button[aria-haspopup="menu"]:focus,
+button[aria-haspopup="menu"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--primary-color);
+  border-radius: 4px;
+  border: 2px solid var(--primary-color);
+}

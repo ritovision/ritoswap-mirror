@@ -1,0 +1,99 @@
+---
+title: Manual Workflows
+description: On-demand workflows for deploys and targeted test runs.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# Manual Workflows
+
+All manual workflows are triggered via <code>workflow_dispatch</code> in GitHub Actions. They are used for one-off deploys or targeted test runs without waiting for the full pipeline.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Workflow</th>
+      <th>What it does</th>
+      <th>Environment</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Manual - Deploy Testnet</td>
+      <td>Prebuilt Vercel deploy for the DApp</td>
+      <td>testnet</td>
+    </tr>
+    <tr>
+      <td>Manual - Deploy Mainnet</td>
+      <td>Prebuilt Vercel deploy for the DApp</td>
+      <td>mainnet</td>
+    </tr>
+    <tr>
+      <td>Manual - Deploy Docs</td>
+      <td>Prebuilt Vercel deploy for docs (local build)</td>
+      <td>docs</td>
+    </tr>
+    <tr>
+      <td>Manual - Deploy Storybook</td>
+      <td>Build Storybook and deploy with Vercel CLI</td>
+      <td>storybook</td>
+    </tr>
+    <tr>
+      <td>Manual - ESLint</td>
+      <td>Run ESLint for the dapp workspace</td>
+      <td>n/a</td>
+    </tr>
+    <tr>
+      <td>manual-vitest-tests</td>
+      <td>Run Vitest tests without Codecov</td>
+      <td>n/a</td>
+    </tr>
+    <tr>
+      <td>manual-vitest-tests-codecov</td>
+      <td>Run Vitest tests with Codecov upload</td>
+      <td>n/a</td>
+    </tr>
+    <tr>
+      <td>Manual - Hardhat Tests</td>
+      <td>Compile and test smart contracts</td>
+      <td>n/a</td>
+    </tr>
+    <tr>
+      <td>Manual - Pre-deploy E2E</td>
+      <td>Local build + Playwright smoke tests with Postgres service</td>
+      <td>n/a</td>
+    </tr>
+    <tr>
+      <td>Manual - Smoke E2E</td>
+      <td>Playwright smoke tests against testnet</td>
+      <td>testnet</td>
+    </tr>
+    <tr>
+      <td>Manual - Smoke API</td>
+      <td>Supertest API smoke tests against testnet</td>
+      <td>testnet</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Mirror dispatch workflows
+
+The public mirror repo (<code>https://github.com/ritovision/ritoswap-mirror</code>) includes wrapper
+workflows that can be triggered manually when we want to run the private pipelines.
+
+- <code>Dispatch DApp</code> (<code>dispatch-dapp.yml</code>) -> <code>pipeline-dapp.yml</code>
+- <code>Dispatch Docs &amp; Storybook</code> (<code>dispatch-docs-storybook.yml</code>) ->
+  <code>pipeline-docs-storybook.yml</code>
+
+These wrappers use the <code>ci-dispatch</code> environment and the <code>RITOSWAP_PAT</code>
+secret in the mirror repo.
+
+<Callout type="info">
+  Manual deploys reuse the same Vercel secrets as the pipelines. Test workflows rely on the same
+  TEST_BASE_URL, CHAIN_ID, and auth-related vars described in the environments page.
+</Callout>
+
+<Callout type="warning">
+  The <code>manual-vitest-tests-codecov</code> workflow requires <code>CODECOV_TOKEN</code> when
+  Codecov enforces tokens (for example, protected branches).
+</Callout>

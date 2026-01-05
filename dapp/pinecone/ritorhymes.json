@@ -1,0 +1,154 @@
+[
+  {
+    "id": "song1_v1_r1",
+    "text": "A trillionaire, I'm a young crypto trillionaire\nZeros longer than Warren Buffets shares\nall my GPU’s compared to your one pair just isn’t fair",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 1, "lines": [1,2,3], "rhyme_key": "AIR" }
+  },
+  {
+    "id": "song1_v1_r2",
+    "text": "I’m a binary disease, bleeding zeroes ones threes",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 1, "lines": [4], "rhyme_key": "EES" }
+  },
+  {
+    "id": "song1_v1_r3",
+    "text": "All these miners wanna rage like their underage and blind\nSo I don’t mine shit cuz I don’t got a mind",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 1, "lines": [5,6], "rhyme_key": "IND", "edited": { "line6": "I don’t mine it" } }
+  },
+  {
+    "id": "song1_v1_r4",
+    "text": "My only proof of work goes to the almighty ledger",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 1, "lines": [7], "rhyme_key": "LEDGER" }
+  },
+  {
+    "id": "song1_v1_r5",
+    "text": "And the almighty transfer to the U U S D dollar",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 1, "lines": [8], "rhyme_key": "AR" }
+  },
+  {
+    "id": "song1_v1_r6",
+    "text": "Kraken, Coinbase, Binance, Gemini all get it poppin’\nGot Satoshi on a bridge crump dancing and pop lockin’",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 1, "lines": [9,10], "rhyme_key": "IN/IN’" }
+  },
+  {
+    "id": "song1_v1_r7",
+    "text": "tell regulators ha-ha-ha-ha",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 1, "lines": [11], "rhyme_key": "HA" }
+  },
+  {
+    "id": "song1_v1_r8",
+    "text": "you can't track him, you can't stop him",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 1, "lines": [12], "rhyme_key": "HIM" }
+  },
+  {
+    "id": "song1_v1_r9",
+    "text": "I play by them dumb rules, hablo Spanish then I vanish\nI can't spend it until later\nMixed like meat with my potaters\nYou haters couldn't trace it with Adobe illustrator",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 1, "lines": [13,14,15,16], "rhyme_key": "ANISH/ATER" }
+  },
+
+  {
+    "id": "song1_v2_r1",
+    "text": "A trillion here, a trillion there\nCyberpunk chick with blue hair\nBinary thinking I’m the one cuz I got zeroes I could spare",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 2, "lines": [1,2,3], "rhyme_key": "AIR" }
+  },
+  {
+    "id": "song1_v2_r2",
+    "text": "I do business on the Ledger, hoping killer whales see me",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 2, "lines": [4], "rhyme_key": "EE-ME" }
+  },
+  {
+    "id": "song1_v2_r3",
+    "text": "as the laser eyed free Willy",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 2, "lines": [5], "rhyme_key": "ILLY" }
+  },
+  {
+    "id": "song1_v2_r4",
+    "text": "Your laser beams are weak you're like cyclops as a toddler\nOK you're a whale but what's a whale to a hodler",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 2, "lines": [6,7], "rhyme_key": "ODLER" }
+  },
+  {
+    "id": "song1_v2_r5",
+    "text": "Paris Hilton thought it’s hot, enough to drop some dollars\nAsking for advice like someone tell me what's the answer",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 2, "lines": [8,9], "rhyme_key": "ARS/ANSER", "note": "looser/slant pair" }
+  },
+  {
+    "id": "song1_v2_r6",
+    "text": "Aboard my yacht a bored ape talked shit about harambe\nI beat his moneymaker to a billionaire zombie",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 2, "lines": [10,11], "rhyme_key": "AMBE/OMBIE", "edited": { "line10": "was talking smack about" } }
+  },
+  {
+    "id": "song1_v2_r7",
+    "text": "Don't you love an NFT, NFTs be temptin me\nI bought so much from open sea, it changed its name to empty sea",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 2, "lines": [12,13], "rhyme_key": "EE" }
+  },
+  {
+    "id": "song1_v2_r8",
+    "text": "Forreal my wallet almost crashed it,\nEven If I wanted dollars no atm could cash this\nOnly USBs beneath my mattress,\nLike a browser with no data, bitch I’m cacheless",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 2, "lines": [14,15,16,17], "rhyme_key": "ASH/ASS-ISH" }
+  },
+  {
+    "id": "song1_v2_r9",
+    "text": "Buko crypto makem trolls talk sick,\nMy sole response to when they talk’s, ick\nI handle conversations that are so truly toxic,\nTime is still money, so I keep em all tiktoksic",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 2, "lines": [18,19,20,21], "rhyme_key": "ICK" }
+  },
+
+  {
+    "id": "song1_v3_r1",
+    "text": "See…they say I hoddle like the Winklevoss twins or Michael Saylor\nimagine whales were, in a tub, In the thousand x club…",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [1,2], "rhyme_key": "NARR/SETUP", "note": "setup bars; not a tight rhyme pair" }
+  },
+  {
+    "id": "song1_v3_r2",
+    "text": "rubba dub dub, and can Rito Rhymes join?\nMy name aint Bit but I keep that Coin, boy",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [3,4], "rhyme_key": "OIN" }
+  },
+  {
+    "id": "song1_v3_r3",
+    "text": "Red pill, blue pill, you will, drool, chew before you swallow\nButerin or Hoskinson, who you gonna follow?",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [5,6], "rhyme_key": "OLLOW" }
+  },
+  {
+    "id": "song1_v3_r4",
+    "text": "I don’t owe you like ou I know the answer\nFor a trillie let’s kill covid with cancer",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [7,8], "rhyme_key": "ANSER" }
+  },
+  {
+    "id": "song1_v3_r5",
+    "text": "My wallet shakes the ledger, aint no luxury for stealth\nTrusting is for dummies and for backstabbing elfs\nTrust me, smart contracts or else,\nOn some Hari Kari how it executes itself",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [9,10,11,12], "rhyme_key": "ELF/ELSE" }
+  },
+  {
+    "id": "song1_v3_r6",
+    "text": "Jack Dorsey to the rescue during distress.\nThinkin out the box he made a square into success\nthen turned the square into a block he made it 6x,",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [13,14,15], "rhyme_key": "ESS/EX" }
+  },
+  {
+    "id": "song1_v3_r7",
+    "text": "with two chains dude’s brain turns crypto into cube chains.",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [16], "rhyme_key": "AINS" }
+  },
+  {
+    "id": "song1_v3_r8",
+    "text": "Motherfuckin, bears look at me but they poutin\ninspite of all they doubtin, them chickens gettin floundered,\nI do what I do while bulls look at me astounded,\nthe way I rock the boat I turn a ocean to a mountain",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [17,18,19,20], "rhyme_key": "OUT/OUND/AIN", "note": "slant chain; keeps the momentum" }
+  },
+  {
+    "id": "song1_v3_r9",
+    "text": "And that’s that",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [21], "rhyme_key": "THAT" }
+  },
+  {
+    "id": "song1_v3_r10",
+    "text": "The whole market’s getting hacked,",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [22], "rhyme_key": "ACKED" }
+  },
+  {
+    "id": "song1_v3_r11",
+    "text": "I’ll just let the bottom crash like a heiny getting slapped cuz I’m the IBM of rap.",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [23], "rhyme_key": "AP/RAP" }
+  },
+  {
+    "id": "song1_v3_r12",
+    "text": "No cap. Code cracked. Rito’s Rhymes are key… cryptically . no math.",
+    "metadata": { "song": "Crypto Trillionaire", "verse": 3, "lines": [24], "rhyme_key": "ATH" }
+  }
+]

@@ -1,0 +1,104 @@
+---
+title: Sentry
+description: Error monitoring wiring for client, server, and edge runtimes.
+---
+
+import { Callout, FileTree, Table } from 'nextra/components'
+
+# Sentry
+
+Sentry is wired through Next.js instrumentation plus explicit capture calls in error boundaries. The setup is split into runtime-specific config files and a shared instrumentation entrypoint.
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.File name="instrumentation.ts" />
+    <FileTree.File name="instrumentation-client.ts" />
+    <FileTree.File name="sentry.server.config.ts" />
+    <FileTree.File name="sentry.edge.config.ts" />
+    <FileTree.File name="sentry.client.config.ts" />
+    <FileTree.Folder name="app" defaultOpen>
+      <FileTree.File name="error.tsx" />
+      <FileTree.File name="global-error.tsx" />
+    </FileTree.Folder>
+    <FileTree.Folder name="components" defaultOpen>
+      <FileTree.Folder name="errors" defaultOpen>
+        <FileTree.File name="InlineErrorBoundary.tsx" />
+        <FileTree.File name="PageError.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Instrumentation entrypoints
+
+- `instrumentation.ts` registers Sentry based on `process.env.NEXT_RUNTIME` and exports `onRequestError` for server and edge requests.
+- `instrumentation-client.ts` imports the client config and exports `onRouterTransitionStart` to track client navigations.
+
+<Callout type="info">
+Next.js automatically picks up `instrumentation.ts` and `instrumentation-client.ts` when they live at the project root.
+</Callout>
+
+## Runtime configuration
+
+<Table>
+  <thead>
+    <tr>
+      <th>Runtime</th>
+      <th>Config file</th>
+      <th>DSN source</th>
+      <th>Environment tag</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Client</td>
+      <td>`sentry.client.config.ts`</td>
+      <td>`NEXT_PUBLIC_SENTRY_DSN`</td>
+      <td>`NEXT_PUBLIC_ACTIVE_CHAIN`</td>
+      <td>Debug on in non-production, `sendDefaultPii: false`, `tracesSampleRate: 1`, assigns `window.Sentry`.</td>
+    </tr>
+    <tr>
+      <td>Edge</td>
+      <td>`sentry.edge.config.ts`</td>
+      <td>`SENTRY_DSN` then `NEXT_PUBLIC_SENTRY_DSN`</td>
+      <td>`SENTRY_ENVIRONMENT` then `NEXT_PUBLIC_ACTIVE_CHAIN`</td>
+      <td>Uses the same defaults for PII and sampling as client and server.</td>
+    </tr>
+    <tr>
+      <td>Server</td>
+      <td>`sentry.server.config.ts`</td>
+      <td>`SENTRY_DSN` then `NEXT_PUBLIC_SENTRY_DSN`</td>
+      <td>`SENTRY_ENVIRONMENT` then `NEXT_PUBLIC_ACTIVE_CHAIN`</td>
+      <td>Debug on in non-production. Adds `domain` tag in production.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Default behavior
+
+- `sendDefaultPii` is disabled in all runtimes.
+- `tracesSampleRate` is set to `1` across client, server, and edge.
+- A `domain` tag is attached in production using `NEXT_PUBLIC_DOMAIN`.
+- Each config logs its initialization details to the console (DSN present and environment).
+
+## Error capture sources
+
+- `InlineErrorBoundary` wraps section-level UI and reports exceptions with a `component` tag plus React component stack context.
+- `PageError` captures page-level errors.
+- `global-error.tsx` captures uncaught errors that bubble to the app root.
+- `onRequestError` and `onRouterTransitionStart` are exported from instrumentation to hook into Next.js request and navigation flows.
+
+## Storybook safety
+
+Storybook aliases `@sentry/nextjs` to a no-op mock so Sentry does not ship in the Storybook bundle. See `dapp/.storybook/main.ts` and `dapp/.storybook/mocks/sentry.ts`.
+
+## Environment variables
+
+Set these in addition to the base `.env` config:
+
+- `NEXT_PUBLIC_SENTRY_DSN` (client and edge DSN)
+- `SENTRY_DSN` (server and edge override)
+- `SENTRY_ENVIRONMENT` (server and edge override)
+
+See [Environment Config](/dapp/env-config) for the full variable list.

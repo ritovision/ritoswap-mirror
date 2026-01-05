@@ -1,0 +1,37 @@
+{
+  "name": "ritoswap-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "scripts": {
+    "dev": "turbo run dev",
+    "dev:localhost": "turbo run dev --filter=local-network --filter=dapp",
+    "dev:sepolia": "turbo run dev:sepolia --filter=dapp",
+    "dev:mainnet": "turbo run dev:mainnet --filter=dapp",
+    "deploy:localhost": "turbo run deploy:localhost --filter=colored-keys",
+    "deploy:sepolia": "turbo run deploy:sepolia --filter=colored-keys",
+    "deploy:mainnet": "turbo run deploy:mainnet --filter=colored-keys",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "clean": "pnpm -r exec -- npx rimraf node_modules",
+    "dev:docs": "pnpm generate:versions && turbo run dev --filter=docs",
+    "build:docs": "pnpm generate:versions && turbo run build --filter=docs",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "generate:versions": "tsx scripts/generate-versions.ts",
+    "release": "pnpm install --no-frozen-lockfile && changeset publish",
+    "version-packages": "changeset version && pnpm install --no-frozen-lockfile",
+    "snapshot": "tsx scripts/snapshot.ts"
+
+
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.5",
+    "@types/node": "^24.2.0",
+    "cross-env": "^7.0.3",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.20.3",
+    "turbo": "^1.12.4",
+    "typescript": "^5.9.2"
+  }
+}

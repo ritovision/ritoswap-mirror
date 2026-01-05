@@ -1,0 +1,515 @@
+---
+title: "Processing Modal"
+description: "Transaction feedback modal with mobile wallet deep-linking and block explorer integration"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+
+# ProcessingModal
+
+<img 
+  src="/images/ui/processingmodal.png" 
+  alt="ProcessingModal screenshot" 
+  style={{ width: '100%', maxWidth: '400px', display: 'block', margin: '2rem auto' }} 
+/>
+
+The ProcessingModal component provides essential user feedback during blockchain transactions, guiding users through wallet interactions and offering recovery options when transactions become stuck. This specialized modal serves as a critical bridge between the application and wallet interfaces, particularly on mobile devices where it enables seamless deep-linking to wallet applications. Through its careful design and mobile-aware features, it transforms potentially confusing transaction states into clear, actionable user experiences.
+
+## Component Architecture
+
+ProcessingModal implements a sophisticated visibility system that goes beyond simple show/hide functionality. The component manages its own rendering lifecycle to enable smooth CSS transitions, maintains separate state for DOM presence and visual appearance, and provides platform-specific features like mobile wallet deep-linking. This architecture ensures the modal appears and disappears smoothly while providing immediate functionality when needed.
+
+### Modal State Management
+
+The component uses a two-phase visibility system to enable proper CSS transitions:
+
+```typescript
+const [shouldRender, setShouldRender] = useState(false)
+const [isShowing, setIsShowing] = useState(false)
+```
+
+This separation allows the modal to remain in the DOM during exit animations while CSS handles the visual transition, creating a polished user experience.
+
+### Transition Timing
+
+<Steps>
+### Entry Phase
+1. Component adds to DOM (`shouldRender = true`)
+2. After 50ms delay, CSS transition begins (`isShowing = true`)
+3. Modal fades in over 1 second CSS transition duration
+
+### Exit Phase
+1. CSS transition begins immediately (`isShowing = false`)
+2. Modal fades out over 1 second CSS transition duration
+3. After 1000ms, component removes from DOM (`shouldRender = false`)
+</Steps>
+
+This timing ensures smooth animations while preventing the modal from lingering invisibly in the DOM. The total entry time is approximately 1.05 seconds (50ms delay + 1s fade), while exit takes 1 second.
+
+## Props Interface
+
+ProcessingModal accepts a minimal but essential set of props:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Prop</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`isVisible`</td>
+      <td>`boolean`</td>
+      <td>Controls modal visibility state</td>
+    </tr>
+    <tr>
+      <td>`onCancel`</td>
+      <td>`() => void`</td>
+      <td>Callback when cancel button clicked</td>
+    </tr>
+    <tr>
+      <td>`transactionHash`</td>
+      <td>`0x${string} | null`</td>
+      <td>Optional transaction hash for block explorer link</td>
+    </tr>
+  </tbody>
+</Table>
+
+The transaction hash prop enables the modal to provide direct links to block explorers, allowing users to monitor their transaction status in real-time.
+
+## Transaction Tracking with Block Explorer Integration
+
+One of ProcessingModal's most powerful features is its ability to provide direct links to block explorers for pending transactions. This functionality transforms an otherwise opaque waiting period into a transparent process where users can track their transaction's progress through the blockchain.
+
+### Dynamic Block Explorer URL Generation
+
+The component intelligently determines the appropriate block explorer based on the current network:
+
+```typescript
+const getBlockExplorerUrl = (hash: string) => {
+  const chainId = getTargetChainId()
+  
+  switch (chainId) {
+    case CHAIN_IDS.sepolia:
+      return `https://sepolia.etherscan.io/tx/${hash}`
+    case CHAIN_IDS.ethereum:
+      return `https://etherscan.io/tx/${hash}`
+    case CHAIN_IDS.ritonet: {
+      const ritonetExplorerUrl = publicEnv.NEXT_PUBLIC_LOCAL_BLOCKCHAIN_EXPLORER_URL
+      return ritonetExplorerUrl ? `${ritonetExplorerUrl}/tx/${hash}` : null
+    }
+    default:
+      return null
+  }
+}
+```
+
+By reusing the same lowercase `CHAIN_IDS` enum and the `publicEnv` helper that drive the rest of the dapp configuration, the modal stays aligned with the runtime environment. This approach supports Ethereum mainnet with Etherscan integration, the Sepolia testnet for development environments, and custom networks like Ritonet where the explorer URL is provided via environment variables.
+
+### Transaction Hash Lifecycle
+
+The component manages the transaction hash display through careful state management:
+
+```typescript
+useEffect(() => {
+  if (transactionHash && isVisible) {
+    const url = getBlockExplorerUrl(transactionHash)
+    if (url) {
+      setShowExplorerLink(true)
+      setCurrentExplorerUrl(url)
+    }
+  }
+}, [transactionHash, isVisible])
+```
+
+When a parent component passes a transaction hash, the modal automatically generates and displays the appropriate block explorer link. This link appears seamlessly within the modal interface, providing users with immediate access to transaction details.
+
+### Explorer Link Reset
+
+The component implements proper cleanup when the modal closes:
+
+```typescript
+useEffect(() => {
+  if (!isVisible) {
+    const resetTimer = setTimeout(() => {
+      setShowExplorerLink(false)
+      setCurrentExplorerUrl(null)
+    }, 1000) // Reset after fade out completes
+    return () => clearTimeout(resetTimer)
+  }
+}, [isVisible])
+```
+
+This ensures the explorer link doesn't persist between different transactions, preventing confusion if the modal is reused for multiple operations.
+
+### User Interface Integration
+
+The block explorer link appears prominently within the modal when a transaction is pending:
+
+```typescript
+{showExplorerLink && currentExplorerUrl && (
+  <a
+    href={currentExplorerUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    className={styles.explorerLink}
+  >
+    Pending TX at Block Explorer
+  </a>
+)}
+```
+
+The link opens in a new tab, allowing users to monitor their transaction without leaving the application. This design choice maintains application context while providing transparency into blockchain operations.
+
+<Callout type="info">
+The block explorer integration is particularly valuable for development environments where Blockscout provides detailed transaction debugging information. For production networks, it offers users peace of mind by showing real-time confirmation progress.
+</Callout>
+
+## Mobile Device Detection
+
+ProcessingModal uses the `isMobileDevice()` utility to determine platform-specific features:
+
+```typescript
+const isMobile = isMobileDevice()
+```
+
+This detection combines multiple strategies for accuracy. It checks for touch support through ontouchstart events or maxTouchPoints, analyzes the user agent string for mobile keywords, and considers viewport width as a secondary indicator. This multi-faceted approach ensures reliable mobile detection across various devices and browsers.
+
+## Wallet Deep-Linking
+
+On mobile devices, the modal displays an additional "Open Wallet" button that triggers a best-effort deeplink:
+
+```typescript
+{isMobile && (
+  <button
+    data-testid="open-wallet-button"
+    className={styles.openWalletButton}
+    onClick={() => openWalletDeeplink()}
+  >
+    Open Wallet
+  </button>
+)}
+```
+
+The `openWalletDeeplink` helper performs a lightweight navigation to a WC-style URI. It does not validate session state; its job is to nudge mobile wallets to foreground when possible.
+
+<Callout type="info">
+The Open Wallet button only appears on mobile devices where deep-linking is supported. Desktop users must manually switch to their wallet extension or application.
+</Callout>
+
+### Dedicated OpenWalletButton Component
+
+Mobile surfaces outside the modal reuse the same deeplink helper through the `OpenWalletButton` component found at `components/wallet/OpenWalletButton`. It renders only when `isMobileDevice()` is true, the user is connected, and the connector id is `walletConnect`. Clicking the button calls `openWalletDeeplink`, giving users a consistent entry point to reopen their wallet whether they are inside the modal or elsewhere in the UI (see `OpenWalletButton.test.tsx` for the gating logic).
+
+## Cancel Functionality
+
+The cancel button serves a specific purpose in the transaction flow:
+
+```typescript
+<button
+  data-testid="cancel-button"
+  className={styles.cancelButton}
+  onClick={onCancel}
+>
+  Cancel
+</button>
+```
+
+The cancel functionality does not actually cancel blockchain transactions. Instead, it resets the UI state of the parent component, allowing users to recover from stuck states or retry operations. The modal includes explanatory text to set proper expectations about transaction cancellation.
+
+## Modal Content Structure
+
+The modal presents information in a clear hierarchy:
+
+```typescript
+<div className={styles.modal}>
+  <p className={styles.message}>
+    Open your connected wallet app or extension to continue
+  </p>
+  
+  {showExplorerLink && currentExplorerUrl && (
+    <a
+      href={currentExplorerUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={styles.explorerLink}
+    >
+      Pending TX at Block Explorer
+    </a>
+  )}
+  
+  <div className={styles.buttonRow}>
+    {/* Buttons */}
+  </div>
+  <p className={styles.subtext}>
+    You may still need to clear stale transaction requests from your wallet manually
+  </p>
+</div>
+```
+
+The primary message provides immediate guidance, the optional block explorer link offers transaction transparency, action buttons provide clear next steps, and subtext manages expectations about transaction handling.
+
+## CSS Implementation
+
+ProcessingModal uses CSS modules for scoped styling with sophisticated transition effects:
+
+### Overlay Transitions
+
+```css
+.modalOverlay {
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+
+.modalOverlay.visible {
+  opacity: 1;
+}
+```
+
+The overlay fades in and out smoothly over 1 second, providing visual continuity during modal lifecycle.
+
+### Modal Positioning
+
+```css
+.modalOverlay {
+  position: fixed;
+  top: 80px; /* Below nav bar */
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 1s ease-in-out;
+  pointer-events: none;
+}
+
+.modalOverlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal {
+  background: rgba(0, 0, 0, 0.95);
+  border-radius: 12px;
+  padding: 2rem;
+  min-width: 320px;
+  max-width: 400px;
+}
+```
+
+Rather than stretching edge-to-edge, the overlay anchors itself at the horizontal center of the viewport and enables pointer events only while it is visible. This keeps the modal visually tied to the wallet action area while still dimming the background and preventing stray interactions.
+
+### Responsive Design
+
+The modal adapts its layout and sizing for mobile devices, ensuring buttons remain easily tappable and text remains readable at smaller viewport sizes.
+
+## Deeplink Helper Integration
+
+ProcessingModal imports the deeplink helper directly:
+
+```typescript
+import { openWalletDeeplink } from '@/app/utils/walletDeeplink'
+```
+
+This keeps the "Open Wallet" handler local without prop drilling or a shared store.
+
+## Lifecycle Management
+
+The component implements careful lifecycle management to prevent memory leaks:
+
+```typescript
+useEffect(() => {
+  if (isVisible) {
+    setTimeout(() => setShouldRender(true), 0)
+    const showTimer = setTimeout(() => {
+      setIsShowing(true)
+    }, 50)
+    return () => clearTimeout(showTimer)
+  } else {
+    setTimeout(() => setIsShowing(false), 0)
+    const hideTimer = setTimeout(() => {
+      setShouldRender(false)
+    }, 1000)
+    return () => clearTimeout(hideTimer)
+  }
+}, [isVisible])
+```
+
+Zero-delay timeouts decouple these state flips from the render cycle so that CSS transitions can start cleanly. All timers are cleared when the component unmounts or when visibility changes, preventing potential memory leaks.
+
+## Integration Patterns
+
+ProcessingModal is typically integrated within transaction-handling components like ButtonSection:
+
+```typescript
+function TransactionComponent() {
+  const isProcessing = isMinting || isBurning || isConfirming
+  const transactionHash = mintHash || burnHash // Current transaction hash
+  
+  const handleCancel = async () => {
+    resetTransactionState()
+    await refreshData()
+  }
+  
+  return (
+    <>
+      {/* Main UI */}
+      <ProcessingModal 
+        isVisible={isProcessing} 
+        onCancel={handleCancel}
+        transactionHash={transactionHash} // Pass hash for explorer link
+      />
+    </>
+  )
+}
+```
+
+The modal appears automatically when transaction processing begins, displays the block explorer link when a hash is available, and disappears when the transaction completes.
+
+## Testing Strategies
+
+Testing ProcessingModal requires mocking both mobile detection and the deeplink helper:
+
+```typescript
+vi.spyOn(mobileUtils, 'isMobileDevice').mockReturnValue(true)
+vi.spyOn(walletDeeplink, 'openWalletDeeplink').mockImplementation(mockOpenWallet)
+```
+
+Key test scenarios include verifying correct rendering based on visibility prop, ensuring proper button display based on mobile detection, confirming cancel callback execution, validating transition timing behavior, and testing block explorer link generation for different networks.
+
+## Accessibility Considerations
+
+ProcessingModal implements accessible keyboard handling in addition to semantic structure. A visually hidden heading announced through `aria-labelledby` gives context, focus automatically moves to the Cancel button when the modal opens, Tab/Shift+Tab are trapped within the modal, pressing Escape calls `onCancel`, and focus returns to the previously active control after the modal closes. These behaviors keep keyboard and assistive-technology users in sync with the modal lifecycle.
+
+## Performance Characteristics
+
+The component is optimized for minimal performance impact:
+
+**Conditional Rendering** - Only renders when needed, reducing React reconciliation work.
+
+**CSS Transitions** - Uses GPU-accelerated properties for smooth animations.
+
+**Lightweight Dependencies** - Direct helper import keeps dependencies small.
+
+**Efficient State Updates** - Batches state changes to minimize re-renders.
+
+## Customization Options
+
+While ProcessingModal is designed for transaction feedback, it can be adapted for other use cases:
+
+### Additional Actions
+
+Extra buttons can be added for specific workflows beyond the block explorer link.
+
+### Styling Variants
+
+CSS modules allow complete visual customization while maintaining functionality.
+
+## Common Issues and Solutions
+
+<Table>
+  <thead>
+    <tr>
+      <th>Issue</th>
+      <th>Cause</th>
+      <th>Solution</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Modal appears/disappears instantly</td>
+      <td>Missing CSS transitions</td>
+      <td>Verify CSS module imports</td>
+    </tr>
+    <tr>
+      <td>Open Wallet button missing on mobile</td>
+      <td>Mobile detection failing</td>
+      <td>Check isMobileDevice logic</td>
+    </tr>
+    <tr>
+      <td>Cancel doesn't reset state</td>
+      <td>Improper callback implementation</td>
+      <td>Ensure parent handles state reset</td>
+    </tr>
+    <tr>
+      <td>Modal remains after transaction</td>
+      <td>isVisible not updated</td>
+      <td>Verify parent state management</td>
+    </tr>
+    <tr>
+      <td>Explorer link not appearing</td>
+      <td>Missing transaction hash prop</td>
+      <td>Ensure parent passes hash when available</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Best Practices
+
+When implementing or extending ProcessingModal:
+
+**Clear Messaging** - Always provide clear, actionable guidance about what users should do next.
+
+**Proper Expectations** - Make it clear that cancel only resets UI state, not blockchain transactions.
+
+**Mobile Testing** - Test wallet deep-linking on actual devices rather than browser emulation.
+
+**Error Recovery** - Ensure the cancel callback properly resets all relevant state for retry attempts.
+
+**Transition Timing** - Maintain consistent timing with other UI animations for cohesive feel.
+
+**Transaction Transparency** - Always pass transaction hashes when available to enable block explorer links.
+
+## Integration with Transaction Flow
+
+ProcessingModal plays a specific role in the transaction lifecycle:
+
+<Steps>
+### Transaction Initiated
+Parent component starts blockchain transaction and sets processing state to true.
+
+### Modal Appears
+ProcessingModal renders with appropriate message and button options.
+
+### Transaction Hash Available
+Parent component receives hash from blockchain and passes it to modal.
+
+### Explorer Link Appears
+Modal displays block explorer link for transaction tracking.
+
+### User Waits or Acts
+User either waits for wallet interaction, uses Open Wallet button on mobile, or clicks explorer link.
+
+### Transaction Completes or Fails
+Parent component detects completion and sets processing state to false.
+
+### Modal Disappears
+ProcessingModal animates out and removes itself from DOM.
+</Steps>
+
+This flow ensures users always understand the current state and have options for proceeding or monitoring progress.
+
+## Future Enhancement Possibilities
+
+The ProcessingModal pattern could be extended for additional functionality such as transaction progress indicators showing confirmation counts, estimated time remaining based on network conditions, real-time updates from block explorer APIs, and automated timeout handling with retry options. These enhancements would maintain the component's focus on user guidance while providing more detailed feedback for advanced users.
+
+## Summary
+
+ProcessingModal represents a focused solution to a specific UX challenge in blockchain applications. By providing clear feedback during transaction processing, enabling mobile wallet deep-linking, offering recovery options through the cancel mechanism, and providing direct block explorer access for transaction monitoring, it significantly improves the user experience during one of Web3's most friction-filled moments. The component's careful attention to transition timing, mobile optimization, clear messaging, and transaction transparency demonstrates how thoughtful design can smooth the rough edges of blockchain interaction. While simple in concept, its implementation showcases best practices for modal management, mobile detection, user communication, and blockchain transparency that can be applied throughout Web3 applications.
+
+## Playground
+
+Use the full Storybook UI to explore the modal states and tweak controls in real time.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/wallet-processingmodal--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Wallet/ProcessingModal - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>

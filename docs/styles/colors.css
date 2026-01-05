@@ -1,0 +1,42 @@
+/* docs/styles/colors.css */
+:root,
+html[data-theme='dark'] {
+  /* 1) Brand blue as defined in theme.config.tsx */
+  --nextra-primary-hue: 204;
+  --nextra-primary-saturation: 96%;
+
+  /* 2) White text everywhere */
+  --nextra-foreground-default: #FFFFFF;
+  --nextra-foreground-muted:   #FFFFFF;
+  --nextra-foreground-dim:     #FFFFFF;
+
+  /* 3) Your secondary-blue & red for custom uses */
+--primary-color: #012035;
+  --secondary-color: #04426C;
+  --accent-color:    #f61715;
+  --accent-color-2: #FF5700; 
+  --utility-green: #11C045;
+  --default-border: 2px solid var(--secondary-color);
+
+  /* 4) Override key colour slots in the docs theme: */
+  --nextra-link-text-color:    var(--primary-color);
+  --nextra-link-hover-color:   var(--secondary-color);
+  --nextra-link-active-color:  var(--accent-color);
+
+  --nextra-border-color:       var(--secondary-color);
+  --nextra-blockquote-border:  var(--secondary-color);
+
+  --nextra-heading-color:      var(--primary-color);
+  --nextra-heading-border:     var(--secondary-color);
+
+  --nextra-code-inline-bg:     rgba(1,32,53,0.1);
+  --nextra-code-pre-bg:        rgba(1,32,53,0.15);
+
+  --nextra-section-divider:    var(--secondary-color);
+  --nextra-scrollbar-thumb:    var(--secondary-color);
+  --nextra-scrollbar-track:    var(--primary-color);
+
+  /* 5) Selection, focus rings, etc */
+  --nextra-selection-bg:       rgba(4,66,108,0.3);
+  --nextra-focus-outline:      var(--accent-color);
+}

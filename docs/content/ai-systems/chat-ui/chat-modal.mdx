@@ -1,0 +1,137 @@
+---
+title: Chat Modal
+description: Layout, transcript, and composer details for RapBotRito's scrollable modal chat.
+---
+
+import { Callout, Cards } from 'nextra/components'
+
+# Chat Modal
+
+The RapBotRito AI game experience lives inside the `ChatBot` modal rather than a full chat page taking over the full viewport. It has to float above other docs content, let you scroll past it, and still feel like a neon performance venue with inline tool chips and a music player strapped to the bottom.
+
+<Callout type="info">
+Because this UI is not a fixed, full-screen overlay, it relies on flexible heights (`80vh`, mobile overrides, and the `textareaExpanded` signal) plus scroll-pinning logic in `ChatMessages.tsx` to keep the transcript readable even while the on-page document continues to scroll underneath.
+</Callout>
+
+## What this page covers
+
+- Layout and stacking via `ChatContainer.tsx` and `ChatWithPlayer.module.css`
+- Brand-forward header treatment (`ChatHeader.tsx`)
+- Transcript scaffolding in `ChatMessages.tsx` and its CSS module
+- `MessageContent.tsx`'s segment parser hook-up (inline renderers will get their own doc)
+- The adaptive composer defined in `ChatForm.tsx`
+- Packages and stores that wire AI streaming, wallet identity, and tool chips into the modal
+
+## Layout & Stacking (`ChatContainer.tsx`, `ChatWithPlayer.module.css`)
+
+`ChatContainer` wraps everything inside a rounded, glowing frame with a translucent image overlay (`/images/rito/rito-thinker.jpg`). The CSS module:
+
+- Keeps the modal at `width: 100%` with an `800px` cap so it can fit both desktop and mobile breakpoints.
+- Sets `height: 80vh` with `overflow: hidden` (and `95vh` / `max-height: 80vh` on screens under `729px`) so the chat feels anchored even though the page can scroll past it.
+- Animates a soft glow via `@keyframes containerGlowPulse` and injects the `blueglow` utility class for more neon ambience.
+- Uses `.container > *:not(.imageOverlay):not([data-modal-overlay])` to ensure only the decorative overlay sits at `z-index: 1`—all interactive children remain at `z-index: 2` and stay clickable.
+
+`ChatWithPlayer.module.css` adds the structure that makes the modal feel like a self-contained device:
+
+- `.stack` is a centered column with a `12px` gap, so the chat body and `MusicBar` stack naturally even when the overall docs page scrolls.
+- `.fullWidthRow` centers `ChatContainer` itself, keeping the border radius symmetrical regardless of viewport width.
+- Because the player sits outside the container, the modal always reserves space for audio controls—see the placeholder card below for the upcoming audio deep-dive.
+
+## Header & Identity (`ChatHeader.tsx`)
+
+The header keeps the content approachable and on-brand:
+
+- `ChatHeader` simply renders `🤖 RapBotRito 🎤`, but the CSS cranks the font to `3.5rem`, paints it with `--accent-color`, and adds a heavy drop shadow so it reads clearly over the translucent background.
+- Media queries drop the size to `2.5rem` under `500px`, preventing the header from crowding the transcript on mobile screens.
+
+## Transcript Scaffolding (`ChatMessages/*.tsx` & `.module.css`)
+
+`ChatMessages.tsx` is a `forwardRef` component that exposes `jumpToBottomAndPin`, `jumpToLatestUserMessageBottomAndPin`, and `pinToCurrent` so the parent `ChatBot` can keep the latest user turn in view after every submission.
+
+### Message bubble composition
+
+- `MessageBubble` decides between `AssistantHeader` and the Wagmi-powered `UserHeaderWithWagmi` (wrapped in `WagmiBoundary` for SSR safety) so each role is visually distinct.
+- Assistant messages call `splitPartsAtAnchor` to separate streamed text into `before` and `after` chunks relative to the current tool anchor. `ToolActivityRow` drops inline chips in the middle—those chips will get their own doc, but this component guarantees they expand inside the bubble instead of drifting below it.
+- Both roles render `<MessageContent>` for text/media. Assistant bubbles run on a black background with `redGlowPulse`; user bubbles adopt `var(--secondary-color)` with `blueGlowPulse`.
+- Assistant bubbles also render `AssistantAudioButton.tsx`, which mounts the "Play Audio" control below the content and uses `.ttsButton` styles from `ChatMessages.module.css`.
+
+### Scroll & layout behavior
+
+- `.messagesContainer` is a flex child (`flex: 1`) sandwiched between the header and form. The plumbing for `textareaExpanded`/`messagesContainerShrunk` is already wired so we can reclaim vertical space when we eventually lock the textarea height, though today `ChatForm` always reports `'auto'` so the transcript keeps its full height.
+- Scroll management keeps the modal usable while the surrounding page scrolls: `scrollbar-gutter: stable` avoids layout jumps when the inner scrollbar appears, `overscroll-behavior: contain` prevents touchpads from propagating scroll to the document, and the MutationObserver in `useEffect` reapplies the pinned scroll position whenever the DOM mutates mid-stream.
+- `scrollNodeBottomIntoViewAndPin` lets the parent jump directly to the last user message using bounding-rect math, so the view tracks interactive elements rather than just setting `scrollTop = scrollHeight`.
+
+### Streaming affordances
+
+- A looping loading indicator (`RapBotRito is cooking up bars…`) shows whenever `isLoading` is true.
+- Error recovery happens via the global `ErrorModal` (the `error` prop passed to `ChatMessages` is currently `null`), so the inline error block is dormant until we decide to expose transcript-level retries again.
+
+## Message Content Segments (`MessageContent.tsx`)
+
+While `ChatMessages` decides *where* to render, `MessageContent` decides *how* to render each part:
+
+- It iterates every `parts` entry, calls `parseContentWithMedia(part.text)`, and feeds the resulting `MediaSegment[]` to `RenderSegment`.
+- Supported segments already include `formattedText`, headings (`h1`–`h4`), `<music>` cues, `<gif>`s, inline `<svg>` strings, chain logos, and the `<goodbye />` refresh animation. When the assistant emits a `<mongoose>`-style inline renderer, `RenderSegment` chooses the right presenter so CSS classes can color-match the active bubble.
+- Because inline renderer details deserve their own walkthrough (component registry, hydrated image store, etc.), we will ship a dedicated doc—see the placeholder card below.
+
+## Composer & Controls (`ChatForm.tsx` & `.module.css`)
+
+The composer is tuned for both mobile comfort and streaming control.
+
+### Auto-sizing input
+
+- `ChatForm` stores a `textareaRef` and reads the `--textarea-max-height` CSS variable via `getComputedStyle`. Desktop uses `240px`, while the mobile media query drops it to `180px`—this is the “special structuring logic” that keeps the modal from covering the whole screen when you open the keyboard.
+- `resizeToContent` runs on mount, on every input change, and on `window.resize`. It temporarily sets `height: auto`, measures the scroll height, clamps to the CSS var, and toggles the textarea’s overflow so the user never sees double scrollbars.
+- On submit we currently reset straight back to `'auto'`, so the shrink state never kicks in, but the prop plumbing is ready for when we introduce capped multi-line states in a future iteration.
+
+### Submission controls
+
+- `handleKeyDown` intercepts `Enter` (without `Shift`) to submit only when the chat status is `ready`/`error` and the input is not disabled. Holding `Shift` respects multi-line editing.
+- The icon buttons share a single `.iconButton` style: square, bordered, and animated on hover. The send button swaps to a textual `...` indicator whenever `isLoading` is true.
+- When the AI is streaming, the send button swaps to a coral `Stop` pill that calls `onStop`, mirroring the `useChat` cancel method.
+- The trash button sits on the left and calls `onTrash`, which in turn opens `ConfirmResetModal`—this keeps destructive actions gated by the modal store.
+
+### State-aware logging
+
+The component’s `createLogger` helper reads `publicConfig.logLevel` and prefixes every log line with timestamps and scope labels. It’s invaluable when debugging how mobile Safari handles keyboard resize events or why a submit was blocked.
+
+## Packages & Stores In Play
+
+- `@ai-sdk/react` — `useChat` provides `messages`, `status`, `sendMessage`, `stop`, and `regenerate`. The modal reacts to those states to show the stop button, spinner, and inline error.
+- `wagmi` — `UserHeaderWithWagmi` uses `useAccount`, `useEnsName`, and `useChainId` to decorate user bubbles with ENS avatars, addresses, and network metadata.
+- Custom stores (`useChatModeStore`, `useModalStore`, `useToolActivityStore`, `useMusic`) — Zustand stores let the UI lock modes, open/close modals, attach tool chips to assistant messages, and stream music commands without prop-drilling.
+- `MusicProvider` and `MusicBar` — even though the audio controls live outside this page’s scope, the modal always renders them under the chat. The stack layout keeps enough breathing room for the player while still letting the entire stack scroll with the document.
+- `createToolAwareTransport` + `useHydrateToolImages` — transport injects mode metadata for every `useChat` request, while the hydration hook makes sure `<img src="store://..." />` segments referenced by `MessageContent` have bytes ready before they render.
+
+## Demo Playground
+
+Use the full Storybook controls to explore the chat modal states.
+
+<div style={{ width: '100%', height: 1230, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-playground--default&nav=0&panel=controls&addons=1"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/Playground - Default"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Related Docs & Placeholders
+
+<Cards num={3}>
+  <Cards.Card title="Inline Tool Renderers" href="/ai-systems/chat-ui/inline-renderers" icon="🧩" arrow>
+    Coming soon: a registry-level tour of `RenderSegment` and the custom components that turn `<gif />`, `<music />`, and `<goodbye />` tags into UI.
+  </Cards.Card>
+  <Cards.Card title="Tool Chips" href="/ai-systems/chat-ui/tool-chips" icon="🧲" arrow>
+    Placeholder for a deep dive on `ToolActivityRow`, chip grouping, and error/success badges that sit inside assistant bubbles.
+  </Cards.Card>
+  <Cards.Card title="Music Bar & Player" href="/ai-systems/chat-ui/music-bar" icon="🎧" arrow>
+    Future coverage of `MusicProvider`, `MusicBar`, and how `ChatWithPlayer` keeps the audio controls aligned with the modal.
+  </Cards.Card>
+  <Cards.Card title="Context & Identity" href="/ai-systems/context-management/client-context" icon="🆔" arrow>
+    How `UserHeaderWithWagmi` and `WagmiBoundary` visually represent the user's injected context.
+  </Cards.Card>
+</Cards>

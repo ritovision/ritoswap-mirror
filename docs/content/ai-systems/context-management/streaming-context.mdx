@@ -1,0 +1,84 @@
+---
+title: Streaming Context
+description: How context is maintained and synchronized in real-time during the streaming lifecycle.
+---
+
+# Streaming Context (Real-Time State)
+
+In a streaming AI application, "context" is not just the static history; it's the live, flowing state of the conversation. RitoSwap uses a custom Server-Sent Events (SSE) protocol to keep the Client and Server in perfect sync.
+
+## Demo
+
+Submit a message to see streaming flow.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-playground--slow-streaming&nav=0&panel=none&addons=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/Playground - Slow Streaming"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## The SSE Protocol
+
+Standard text streaming is insufficient for our needs because we need to stream *structured events* (Tool Inputs, Tool Outputs, Errors) alongside the text generation.
+
+Our `sse-stream.ts` utility defines a custom protocol:
+
+| Event Type | Payload | Purpose |
+|------------|---------|---------|
+| `start` | `{ messageId }` | Signals the beginning of a response. |
+| `text-delta` | `{ delta }` | A chunk of generated text. |
+| `tool-input-start` | `{ toolCallId, toolName }` | The agent has decided to call a tool. |
+| `tool-input-delta` | `{ delta }` | Streaming the arguments for the tool (e.g., JSON). |
+| `tool-output-available` | `{ output }` | The **Full JSON** result of the tool (for the UI). |
+| `finish` | `{}` | The stream is complete. |
+
+This protocol ensures that the Client's `ToolActivityStore` always has the exact same context as the Server's execution log.
+
+## Message Conversion: Normalization
+
+The UI sends messages in a format optimized for React rendering (with `parts`, `uiState`, etc.). The LLM expects messages in a strict format (System, Human, AI).
+
+The `message-converter.ts` acts as the translator between these two worlds.
+
+### The `UiMessage` Format
+The client sends:
+```json
+{
+  "role": "user",
+  "parts": [
+    { "type": "text", "text": "Draw a cat" },
+    { "type": "image", "data": "..." }
+  ]
+}
+```
+
+### The `BaseMessage` Format
+The converter flattens each message into a LangChain `HumanMessage`/`AIMessage`. Today we collapse everything to plain text via `contentToText`, so non-text parts (images, UI hints) drop out before the LLM receives the history:
+
+```typescript
+// dapp/app/lib/llm/message-converter.ts
+const content = contentToText(msg.content ?? msg.parts ?? msg.text ?? '');
+switch (msg.role) {
+  case 'user':
+    messages.push(new HumanMessage(content));
+    break;
+  case 'assistant':
+    messages.push(new AIMessage(content));
+    break;
+}
+```
+
+This keeps the provider-facing transcript linear and predictable. If we later route to a vision-capable model, this is the seam where we would preserve `image` parts instead of stripping them.
+
+## Error Context
+
+If a tool fails or the stream is interrupted, the context must be preserved.
+
+*   **Tool Errors**: If a tool throws an error, we catch it on the server, format it as a "Tool Output" (e.g., `Error: API unavailable`), and feed it back to the LLM. This allows the agent to *apologize* or *retry* rather than crashing.
+*   **Stream Interruption**: If the user closes the tab, the server detects the closed stream (`isClosed()`) and aborts execution to save resources, preventing "zombie context" from continuing to run in the background.

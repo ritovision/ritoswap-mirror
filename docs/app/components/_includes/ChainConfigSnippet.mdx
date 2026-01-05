@@ -1,0 +1,54 @@
+import { Callout } from 'nextra/components'
+
+## Network-Aware Database Operations
+
+This API leverages RitoSwap's sophisticated network routing infrastructure to ensure all operations target the correct blockchain network and corresponding database table. The system automatically handles network detection and routing, allowing the API to work seamlessly across Ethereum mainnet, Sepolia testnet, and local RitoNet development networks.
+
+### Automatic Network Routing
+
+The API uses two key utilities from the prismaNetworkUtils module to handle multichain operations:
+
+**Database Operations via `getTokenModel()`**  
+This function returns a unified interface that automatically routes database queries to the correct network-specific table:
+
+```typescript
+import { getTokenModel } from '@/app/lib/prisma/prismaNetworkUtils'
+
+const tokenModel = getTokenModel()
+// Automatically queries token_ethereum, token_sepolia, or token_ritonet
+const token = await tokenModel.findUnique({
+  where: { tokenId }
+})
+```
+
+**Blockchain Configuration via `getChainConfig()`**  
+This function provides the correct RPC endpoints and chain metadata for the active network:
+
+```typescript
+import { getChainConfig } from '@/app/lib/prisma/prismaNetworkUtils'
+import { createPublicClient, http } from 'viem'
+
+const chainConfig = getChainConfig()
+const publicClient = createPublicClient({
+  chain: chainConfig.chain,
+  transport: http(chainConfig.transport)
+})
+```
+
+### Network Detection
+
+The active network is defined by the single `NEXT_PUBLIC_ACTIVE_CHAIN` environment variable (`ethereum`, `sepolia`, or `ritonet`). For local development, additional metadata (`NEXT_PUBLIC_LOCAL_CHAIN_ID`, RPC/WSS URLs, etc.) must also be provided so the helpers can construct a viable viem client.
+
+### Cross-Network Isolation
+
+Each blockchain network maintains its own isolated database table with identical structure:
+
+- **Ethereum Mainnet** → `token_ethereum` table
+- **Sepolia Testnet** → `token_sepolia` table
+- **RitoNet Local** → `token_ritonet` table
+
+This isolation prevents cross-network data conflicts while enabling network-specific optimizations and simplified debugging. The same token ID can exist on different networks representing entirely different assets, and this architecture ensures they never interfere with each other.
+
+<Callout type="info">
+The network routing happens transparently to the API logic. Developers write network-agnostic code while the infrastructure handles proper routing behind the scenes. For detailed information about the network utilities, see the [Network-Aware Database Utils](/dapp/internal-libraries/prisma/network-utils) documentation.
+</Callout>

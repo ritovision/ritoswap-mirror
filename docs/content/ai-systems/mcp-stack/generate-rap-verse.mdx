@@ -1,0 +1,99 @@
+---
+title: MCP Tool · generate_rap_verse
+description: Agentic rap verse generator with semantic retrieval, media planning, and presenter behavior.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# `generate_rap_verse`
+
+The flagship tool lives at `dapp/app/lib/mcp/tools/agent-rap-verse/index.ts`. It wraps the multi-phase orchestrator in `orchestrator.ts`, letting the MCP registry expose a single function the LLM can call during rap battle flows.
+
+## Handler Flow
+
+- **Inputs** — `AgentParams` accepts `chatHistory`, `userContext` (wallet, NFT palette), and an optional `roundNumber`.
+- **Phases** — `runAgent` walks through strategy planning, resource gathering (`pinecone_search`, meme/rhyme pulls, wallet checks), composition, self-review, and optional refinement.
+- **Outputs** — The handler streams both the verse text and a structured JSON payload with strategy metadata, list of resources used, and any generated image payloads (tagged as `{ kind: 'store-image' }` for the frontend hydrator).
+
+```ts
+// dapp/app/lib/mcp/tools/agent-rap-verse/index.ts
+const tool: Tool<AgentParams> = {
+  name: 'generate_rap_verse',
+  description: 'AI agent that ... composes original verses',
+  inputSchema: InputSchema,
+  async handler(params: AgentParams) {
+    const output = await runAgent(params);
+    const text = textResult(output.verse);
+    const json = jsonResult({
+      verse: output.verse,
+      round: params.roundNumber || 1,
+      strategy: output.metadata.strategy,
+      resourcesUsed: output.metadata.resourcesUsed,
+      refinementCount: output.metadata.refinementCount,
+      review: output.metadata.reviewResults,
+      generatedAt: output.metadata.generatedAt,
+    });
+    const imageJsonParts = output.imagePayloads.map(payload => ({
+      type: 'json' as const,
+      data: payload,
+    }));
+    return { content: [...text.content, ...json.content, ...imageJsonParts] };
+  },
+};
+```
+
+## Presenter Signals
+
+`dapp/components/chatBot/ToolActivity/catalog/presenters/agent_rap_verse.presenter.ts` keeps chips tied to the round structure:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Label</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>pending</td>
+      <td>`Cooking Verse N/3`</td>
+      <td>Derives the round from `chip.input.roundNumber`.</td>
+    </tr>
+    <tr>
+      <td>success</td>
+      <td>`Verse N/3 Ready`</td>
+      <td>Reads the `round` field from the JSON payload; text is fixed to "🔥 Bars dropped".</td>
+    </tr>
+    <tr>
+      <td>error</td>
+      <td>`Verse N/3 Failed`</td>
+      <td>Falls back to "Agent choked on the mic" when no explicit error text is provided.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Playground Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--generate-rap-verse-interactive&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Generate Rap Verse (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Why it Matters
+
+<Callout type="info">
+The tool is scoped to the `agentBattle` mode only—rap battles stick to inline prompting so they can enforce the one-balance-check rule. Because `generate_rap_verse` can emit generated images and meme references, it acts as the hub that calls other MCP tools internally whenever the agent mode is active.
+</Callout>
+
+- **Images** travel with `{ kind: 'store-image' }` payloads, enabling the inline `<img src="store://...">` renderer documented on the Chat Experience page.
+- **Quota Safety** is maintained by the chat handler, but the agent itself still tracks its refinement count so you can tweak limits later without editing the orchestrator.

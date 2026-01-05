@@ -1,0 +1,14 @@
+.stack {
+  display: flex;
+  flex-direction: column;   /* vertical */
+  align-items: center;      /* center children horizontally */
+  width: 100%;
+  gap: 12px;                /* space between chat and bar */
+}
+
+/* optional: if your ChatContainer already handles its own width, you can omit the below */
+.fullWidthRow {
+  width: 100%;
+  display: flex;
+  justify-content: center;  /* centers ChatContainer */
+}

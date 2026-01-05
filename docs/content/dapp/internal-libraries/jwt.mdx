@@ -1,0 +1,67 @@
+---
+title: "JWT Access Tokens"
+description: "Typed JWT tooling used by the gate-access workflow and future token-gated APIs."
+---
+
+import { FileTree, Callout } from 'nextra/components'
+
+# JWT Access Tokens
+
+The `@lib/jwt` package handles minting and verifying short-lived access tokens. `/api/gate-access` mints a token whenever a user completes SIWE or legacy authentication; subsequent calls can attach that token as `Authorization: Bearer <token>` to skip signature prompts.
+
+## Components
+
+- `claims.ts` – builds strongly typed payloads using Zod (`AccessTokenPayloadSchema`). It stores a SIWE projection, the original message hash (`siwe_hash`), scopes, tokenId, and standard JWT claims (`iss`, `aud`, `exp`, etc.).
+- `server.ts` – wraps `jose` to sign/verify tokens using the configured algorithm (`HS256`, `EdDSA`, or `ES256`). Secrets are loaded from `dapp/app/config/jwt.server.ts`.
+- `client.ts` – safe decode helpers for browsers (localStorage storage, expiration checks, scope helpers).
+
+## Configuration (`dapp/app/config/jwt.server.ts`)
+
+```bash
+JWT_ALG=EdDSA
+JWT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..."
+JWT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----..."
+JWT_ISS=https://ritoswap.com
+JWT_AUD=ritoswap.app,api.ritoswap.app
+JWT_ACCESS_TTL=900          # seconds
+JWT_CLOCK_TOLERANCE=5       # seconds
+```
+
+The config exports a frozen `jwtServerConfig` object consumed by `lib/jwt/server.ts`.
+
+<Callout type="warning">
+Never import `jwt.server.ts` (or any server-only config) into client bundles. The module is marked `server-only` for Next.js and will throw if it ends up in client code.
+</Callout>
+
+## Usage
+
+```ts
+const claims = buildAccessClaims({
+  auth: 'siwe',
+  siweParsed,
+  originalSiweMessage,
+  issuer: jwtServerConfig.issuer,
+  audiences: jwtServerConfig.audiences,
+  accessTtlSec: jwtServerConfig.accessTtlSec,
+  scopes: ['gate:read'],
+  tokenId,
+});
+const token = await signAccessToken(claims);
+```
+
+Routes that accept Bearer tokens call `verifyAccessToken(token)` and rehydrate the Zod-validated payload. Because the payload includes `siwe_hash`, the server can detect tampering even if someone manages to mutate the raw SIWE text.
+
+## File Tree
+
+<FileTree>
+  <FileTree.Folder name="app/lib/jwt" defaultOpen>
+    <FileTree.File name="claims.ts" />
+    <FileTree.File name="server.ts" />
+    <FileTree.File name="client.ts" />
+    <FileTree.File name="index.ts" />
+    <FileTree.File name="__tests__/claims.test.ts" />
+  </FileTree.Folder>
+  <FileTree.Folder name="app/config">
+    <FileTree.File name="jwt.server.ts" />
+  </FileTree.Folder>
+</FileTree>

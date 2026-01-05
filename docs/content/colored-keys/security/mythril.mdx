@@ -1,0 +1,28 @@
+# Mythril Analysis
+
+*Version 1.0.0*
+
+## Introduction to Mythril
+
+Mythril is a static-analysis tool employing symbolic execution and taint analysis on compiled Solidity bytecode to uncover complex vulnerabilities and logical errors. It systematically explores all feasible execution paths to detect issues such as reentrancy, integer overflows, and transaction-order dependencies, thus enhancing smart contract security assurance.
+
+## Mythril Configuration (mythril-config.json)  
+The `mythril-config.json` file defines compiler and import settings:  
+- **`remappings`**: path aliases for contract imports (e.g., OpenZeppelin).  
+- **`optimizer`**: Solidity optimizer settings (`enabled`: true, `runs`: 200).
+
+## Docker-Based Invocation Script (`run-docker.ts`)  
+The Node.js script (`run-docker.ts`) automates Docker-based Mythril execution:  
+1. Parses optional contract path argument (defaults to `contracts/OnePerWalletKeyToken.sol`).  
+2. Prepares a temporary workspace (`.mythril-temp`), copying contracts, configuration, and OpenZeppelin sources.  
+3. Executes Mythril in an isolated container:  
+   ```docker run --rm -it -v $(pwd)/.mythril-temp:/src -w /src mythril/myth:latest myth -v 5 analyze <contract> --solc-json mythril-config.json```  
+4. Cleans up the temporary directory on completion or error.
+
+## Available NPM/PNPM Script  
+- `pnpm run mythril`: Executes the Docker wrapper, analyzing `contracts/OnePerWalletKeyToken.sol` by default.  
+- ``pnpm run mythril -- contracts/ColorGenerator.sol``: Analyzes a specified contract.  
+- ``pnpm run mythril -- --solc-json mythril-config.json``: Applies the local compiler configuration file.
+
+## Summary of Analysis Results  
+The Mythril analysis produced no medium-, high-, or critical-severity findings. Two low-severity warnings were reported regarding the use of `block.timestamp` for cosmetic randomness in `ColorGenerator.sol`. These warnings carry no financial or security impact, as timestamp-based color selection affects only the NFT’s appearance. Core security checks—including reentrancy defense, access control, arithmetic safety, and fund management—passed without issue, demonstrating robust contract design and secure dependency usage.

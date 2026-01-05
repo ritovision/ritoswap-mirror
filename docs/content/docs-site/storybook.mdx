@@ -1,0 +1,69 @@
+---
+title: Storybook Playgrounds
+description: How Storybook is built and embedded into the docs site.
+---
+
+import { Callout, FileTree, Steps } from 'nextra/components'
+
+# Storybook Playgrounds
+
+Storybook is the **interactive UI playground** for docs. We build a static Storybook bundle and embed stories directly in MDX pages.
+
+## Where Storybook lives
+
+Storybook lives in the <code>dapp</code> workspace. The docs site consumes its built output for embeds.
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name=".storybook" defaultOpen>
+      <FileTree.File name="main.ts" />
+      <FileTree.File name="preview.tsx" />
+    </FileTree.Folder>
+    <FileTree.Folder name="app" />
+    <FileTree.Folder name="components" />
+  </FileTree.Folder>
+</FileTree>
+
+## Build pipeline
+
+<Steps>
+### Step 1: Build Storybook for docs
+<code>pnpm --filter ritoswap run build-sb:docs</code> writes to <code>docs/public/storybook-static</code>.
+
+### Step 2: Docs build
+The docs site pulls Storybook from <code>/storybook-static</code> during build and runtime.
+</Steps>
+
+<Callout type="info">
+  The docs workspace runs Storybook automatically via <code>pnpm prebuild</code>.
+</Callout>
+
+<Callout type="warning">
+Keep the build output folder named <code>storybook-static</code>. The embed URLs and the Storybook asset prefix expect <code>/storybook-static</code>, so renaming the folder will break assets unless you update those references too.
+</Callout>
+
+## Embedding stories
+
+Use <code>docs/app/components/StorybookEmbed.tsx</code> to generate consistent Storybook iframe URLs:
+
+```tsx
+import { StorybookEmbed } from '@components/StorybookEmbed'
+
+<StorybookEmbed title="Mint/ButtonSection" story="Playground" />
+```
+
+If you need a custom iframe, you can also embed Storybook directly:
+
+```tsx
+<iframe
+  src="/storybook-static/iframe.html?id=mint-buttonsection--playground"
+  width="100%"
+  height="600"
+  style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+/>
+```
+
+## References
+
+- Storybook overview: <code>/dapp/storybook</code>
+- Example embeds: <code>docs/content/dapp/smart-contract-ui/button-section.mdx</code> and <code>docs/content/dapp/smart-contract-ui/nftscreen.mdx</code>

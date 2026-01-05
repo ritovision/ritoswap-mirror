@@ -1,0 +1,272 @@
+---
+title: "Overview"
+description: "Real-time blockchain data management for Colored Key NFTs in RitoSwap"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout, Cards } from 'nextra/components'
+
+# Smart Contract Data System
+
+The smart contract data system forms the blockchain interaction layer of RitoSwap, managing real-time synchronization between on-chain NFT state and the user interface. It combines contract configuration, a read-side data pipeline (`useNFTData` + the NFT store), and a write-side transaction orchestrator (`useMintBurn`) to deliver responsive, accurate token data across the application.
+
+## System Overview
+
+RitoSwap's architecture requires seamless integration between smart contracts deployed across multiple networks and the React-based user interface. The smart contract data system accomplishes this through a carefully orchestrated stack of technologies that work together to provide real-time updates, efficient request handling, and consistent state management.
+
+### Core Architecture Components
+
+The system consists of four primary modules that work in harmony:
+
+1. **Contract Configuration** – Centralizes addresses and ABIs for all supported networks and exposes `KEY_TOKEN_ADDRESS` / `fullKeyTokenAbi`. See [`Contract Configuration`](/dapp/smart-contract-data/contract-config).
+2. **NFT Store** – A Zustand store that holds derived NFT UI state, account-switching flags, and selective persistence (token-gate usage). See [`NFT Store`](/dapp/smart-contract-data/nft-store).
+3. **useNFTData (read-side data hook)** – Orchestrates wagmi reads, Token Status API calls via TanStack Query, and writes the resulting snapshot into the NFT store. See [`useNFTData Hook`](/dapp/smart-contract-data/nft-data-hook).
+4. **useMintBurn (write-side transaction hook)** – Coordinates mint/burn transactions, mobile wallet nudges via `openWalletDeeplink`, notifications, and success callbacks. See [`useMintBurn Hook`](/dapp/smart-contract-data/use-mint-burn).
+
+At a high level, `useNFTData` and the NFT store form the **read-side data pipeline**, while `useMintBurn` provides the **write-side transaction pipeline** that feeds back into the read side via success callbacks and `forceRefresh`.
+
+View-chain selection lives outside this data layer in `DappChainProvider`. Write flows reset the view chain to the active contract chain before requesting signatures or transactions. See [Dapp Chain State](/dapp/connectivity/dapp-chain-state) for details.
+
+#### Documentation Map
+
+<FileTree>
+  <FileTree.Folder name="smart-contract-data" defaultOpen>
+    <FileTree.File name="index.mdx" />
+    <FileTree.File name="contract-config.mdx" />
+    <FileTree.File name="nft-store.mdx" />
+    <FileTree.File name="nft-data-hook.mdx" />
+    <FileTree.File name="use-mint-burn.mdx" />
+  </FileTree.Folder>
+</FileTree>
+
+### Data Flow Architecture
+
+Understanding how data flows through the system is crucial for effective development:
+
+<Steps>
+### Step 1: Contract address resolution
+The system determines which contract address to use based on environment configuration, selecting between local RitoNet, Sepolia testnet, or Ethereum mainnet via the contract configuration module.
+
+### Step 2: Blockchain queries
+On the read side, <code>useNFTData</code> uses wagmi hooks to query the active smart contract for token ownership and metadata. On the write side, <code>useMintBurn</code> uses wagmi write and receipt hooks to send mint/burn transactions and track confirmations.
+
+### Step 3: Data synchronization
+TanStack Query manages token-usage API requests (Token Status API), providing request deduplication and controlled freshness. Caching is deliberately minimal for token-usage data so that account switches and recent mints/burns always see up-to-date usage.
+
+### Step 4: State updates
+The NFT store receives updates from the data layer (via <code>useNFTData</code>) and propagates changes to subscribed React components. Successful writes from <code>useMintBurn</code> typically call back into <code>useNFTData.forceRefresh</code> to re-sync on-chain and usage data.
+
+### Step 5: UI rendering
+Components reflect the current state, showing token ownership, colors, and usage status in real time. Write-focused components (like <code>ButtonSection</code>) consume <code>useMintBurn</code> and the store to render mint/burn flows with accurate progress and status.
+</Steps>
+
+## Integration with Broader Ecosystem
+
+The smart contract data system doesn't operate in isolation. It forms critical connections with other parts of the RitoSwap architecture.
+
+### Smart Contract Deployment
+
+Contract addresses are automatically managed through the monorepo's deployment system. When contracts are deployed via the [colored-keys workspace](/colored-keys), addresses are saved to JSON files stored in the monorepo root (one folder level above `dapp` or `colored-keys`) that the dApp references:
+
+<FileTree>
+  <FileTree.Folder name="ContractAddresses" defaultOpen>
+    <FileTree.File name="local_blockchain.json" />
+    <FileTree.File name="hardhat.json" />
+    <FileTree.File name="mainnet.json" />
+    <FileTree.File name="sepolia.json" />
+  </FileTree.Folder>
+</FileTree>
+
+This automation ensures contract addresses remain synchronized between deployment and application configuration.
+
+### API Integration
+
+The smart contract data system works closely with RitoSwap's API endpoints to maintain consistency between on-chain and off-chain state:
+
+- **Token Status API** – Synchronizes on-chain existence with database records.
+- **Gate Access API** – Verifies ownership before granting access to gated content.
+- **Verify Token Gate API** – Updates usage records after successful verification.
+
+These endpoints reuse the same contract configuration and query patterns as the dApp, ensuring data consistency across the stack.
+
+### Database Synchronization
+
+While smart contracts maintain the authoritative state for token ownership, the [Prisma database layer](/dapp/internal-libraries/prisma) tracks additional metadata like usage status. The smart contract data system bridges these two sources of truth, ensuring they remain synchronized through a combination of automatic effects (`useNFTData`) and explicit refresh flows (`forceRefresh` after transactions).
+
+## Key Technologies
+
+### Wagmi
+
+Wagmi provides type-safe React hooks for Ethereum interactions. The system uses several key wagmi hooks:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Hook</th>
+      <th>Purpose</th>
+      <th>Usage in RitoSwap</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>useAccount</code></td>
+      <td>Manages wallet connection state</td>
+      <td>Determines if the user is connected and provides their address to both read and write hooks</td>
+    </tr>
+    <tr>
+      <td><code>useReadContract</code></td>
+      <td>Reads data from smart contracts</td>
+      <td>Used by <code>useNFTData</code> to fetch token ownership and color metadata</td>
+    </tr>
+    <tr>
+      <td><code>useWriteContract</code></td>
+      <td>Sends transactions to contracts</td>
+      <td>Wrapped inside <code>useMintBurn</code> to handle minting/burning plus mobile wallet nudges</td>
+    </tr>
+    <tr>
+      <td><code>useWaitForTransactionReceipt</code></td>
+      <td>Monitors transaction confirmations</td>
+      <td>Used by <code>useMintBurn</code> to drive confirmation state, success flags, and notifications</td>
+    </tr>
+  </tbody>
+</Table>
+
+### TanStack Query
+
+TanStack Query enhances the blockchain querying experience through intelligent request management and deduplication. In RitoSwap, it specifically manages token-usage status queries for the Token Status API, preventing redundant calls when multiple components request the same data. Caching is tuned for **freshness over staleness** (e.g., `staleTime: 0`, `gcTime: 0`) so that recent mints, burns, and account switches are always reflected promptly.
+
+### Zustand
+
+Zustand provides lightweight state management that bridges the gap between blockchain queries and React components. The NFT store maintains current token state, account-switching flags, loading/error helpers, and selectively persisted token-gate usage. Components subscribe to the specific slices they need, while `useNFTData` and transaction flows (`useMintBurn` success callbacks) coordinate updates.
+
+## Component Architecture
+
+The smart contract data system supports two primary interaction patterns.
+
+### Read operations
+
+Components like `NFTScreen` display token state without modifying it. These components subscribe to the NFT store and react to state changes, showing appropriate UI based on token ownership, colors, and usage status. The `useNFTData` hook typically runs at the route/container level (e.g., `MintPageWrapper`), keeping the store synchronized in the background.
+
+### Write operations
+
+Write-oriented components, such as [`ButtonSection`](/dapp/smart-contract-ui/button-section), enable users to mint and burn tokens. Rather than interacting with wagmi directly, they consume the `useMintBurn` hook:
+
+- `useMintBurn` handles transaction initiation, mobile wallet nudges via `openWalletDeeplink`, confirmation tracking, success/error notifications, and reset helpers.
+- Components layer UX concerns on top: button labels, disabled/aria states, modal visibility, and when to call `onRefresh` (typically wired to `useNFTData.forceRefresh`).
+
+This separation keeps transaction logic centralized and testable, while allowing multiple UIs to share the same mint/burn behavior.
+
+## Performance Considerations
+
+The system implements several strategies to ensure optimal performance:
+
+- **Intelligent polling** – `useNFTData` adjusts polling frequency based on account-switching state and the `disablePolling` flag (e.g., faster during switches, optional `disablePolling` for static views).
+- **Request deduplication** – TanStack Query automatically deduplicates simultaneous token-status requests for the same key, reducing unnecessary API calls.
+- **Selective re-rendering** – Components subscribe only to specific store slices, preventing unnecessary re-renders when unrelated state changes.
+- **Atomic updates** – Store helpers like `setTokenData` update several fields together, preventing intermediate states that could cause UI flicker.
+
+## Development Workflow
+
+When working with the smart contract data system, follow these patterns for consistency.
+
+### Reading contract data
+
+```ts
+// Run the read-side pipeline at the route or container level
+const { forceRefresh, isLoading } = useNFTData();
+
+// Consume derived state where needed using selectors
+const hasNFT = useNFTStore((state) => state.hasNFT);
+const { tokenId, backgroundColor, keyColor } = useNFTStore((state) => ({
+  tokenId: state.tokenId,
+  backgroundColor: state.backgroundColor,
+  keyColor: state.keyColor,
+}));
+````
+
+### Writing contract data
+
+For user-facing flows, prefer the `useMintBurn` hook rather than calling wagmi write hooks directly:
+
+```tsx
+import { useMintBurn } from '@/app/hooks/useMintBurn';
+import { useNFTData } from '@/app/hooks/useNFTData';
+
+function MintPageWrapper() {
+  const { forceRefresh } = useNFTData();
+
+  return (
+    <>
+      {/* Status + visualization components that read from the NFT store */}
+      <ButtonSection onRefresh={forceRefresh} />
+    </>
+  );
+}
+
+function ButtonSection({ onRefresh }: { onRefresh?: () => Promise<void> | void }) {
+  const { mint, burn, isProcessing } = useMintBurn({
+    onMintSuccess: async () => {
+      await onRefresh?.();
+    },
+    onBurnSuccess: async () => {
+      await onRefresh?.();
+    },
+  });
+
+  return (
+    <>
+      <button onClick={mint} disabled={isProcessing} aria-busy={isProcessing}>
+        {isProcessing ? 'Processing…' : 'Mint NFT'}
+      </button>
+      {/* Burn button would call burn(tokenId) when appropriate */}
+    </>
+  );
+}
+```
+
+Lower-level libraries (such as internal utilities or tests) can still use `useWriteContract` directly, but route-level and UI components should treat `useMintBurn` as the canonical write interface for Colored Key NFTs.
+
+### Handling state updates
+
+Whether writes come from `useMintBurn` or other flows, the goal is to funnel post-transaction state changes through `useNFTData`:
+
+```ts
+// In most cases, success callbacks passed to useMintBurn
+// are responsible for triggering a refresh:
+const { forceRefresh } = useNFTData();
+
+const { mint } = useMintBurn({
+  onMintSuccess: async () => {
+    await forceRefresh(); // Re-sync ownership, colors, and usage
+  },
+});
+```
+
+This keeps the data pipeline centralized and avoids scattered, ad-hoc store updates after transactions.
+
+## Error Handling and Recovery
+
+The system implements robust error handling at multiple levels:
+
+* **Contract errors** – Wagmi errors are formatted by helpers like `formatMintError`/`formatBurnError` and surfaced through the centralized notifications layer (see [`Notifications`](/dapp/notifications)). Components typically do **not** raise their own toasts for mint/burn flows, avoiding duplicate messaging.
+* **Network mismatches** – There is no built-in guard in `useMintBurn`; wallet/wagmi errors surface when users are on the wrong chain. If your flow requires strict validation, add a page-level guard.
+* **Account switching** – The NFT store’s `isSwitchingAccount` and `previousData` fields, together with `useNFTData`’s cache-clearing and accelerated polling, provide a controlled transition when wallets change. The default UX is a clean reset followed by fresh data, while more advanced components can opt into using `previousData` for richer transitions.
+* **Fallback rendering** – Components implement loading and error states to maintain usability even when blockchain queries or APIs are temporarily unavailable.
+
+## Testing Considerations
+
+<Callout type="info">
+Because the system coordinates wagmi, TanStack Query, and Zustand, effective tests rely on mocks and controlled environments rather than live blockchain state.
+</Callout>
+
+Key testing strategies include:
+
+* Mocking wagmi providers to simulate various ownership, color, and transaction states.
+* Using TanStack Query's test utilities (or explicit `queryClient` setup) to control token-status cache behavior.
+* Testing NFT store transitions (including account-switch flows) independently of the hooks.
+* Exercising `useMintBurn` in isolation with mocked mobile detection, `openWalletDeeplink`, and notifications to validate mint/burn lifecycles, deduplication, and error handling (see `useMintBurn.test.tsx`).
+
+## Summary
+
+The smart contract data system represents a sophisticated integration of modern Web3 technologies, delivering real-time blockchain data to React components through carefully orchestrated layers of configuration, data fetching, transaction orchestration, and state management. Contract configuration, `useNFTData`, the NFT store, and `useMintBurn` work together to bridge the gap between smart contracts and user interfaces.
+
+By centralizing read logic, write logic, and state synchronization, the system prioritizes developer experience (type safety, predictable updates, clear success/error pathways) while maintaining the performance and reliability required for production blockchain applications.

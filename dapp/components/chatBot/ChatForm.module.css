@@ -1,0 +1,136 @@
+.inputForm {
+  display: flex;
+  gap: 10px;
+  padding: 20px 10px;
+  background: transparent;
+  align-items: flex-end;
+}
+
+.input {
+  /* Auto-expand behavior expects border-box */
+  box-sizing: border-box;
+
+  flex: 1;
+  padding: 10px 16px;
+  border: var(--default-border);
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  color: white;
+  outline: none;
+  transition: all 0.3s ease;
+
+  /* ChatGPT-like sizing */
+  height: auto;              /* JS will control height */
+  min-height: 40px;          /* one line */
+  /* Use a CSS var so JS can read it (changes at breakpoints) */
+  --textarea-max-height: 240px;
+  max-height: var(--textarea-max-height);
+
+  background: rgba(0, 0, 0, 0.5);
+  resize: none;              /* user can't manually resize */
+  overflow-y: hidden;        /* hidden until we exceed max-height */
+  line-height: 1.4;
+}
+
+@media (max-width: 729px) {
+  .input {
+    --textarea-max-height: 180px; /* smaller on mobile */
+  }
+}
+
+.input::placeholder {
+  color: #999;
+}
+
+.input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Scrollbar only shows when we switch overflow-y to auto in JS */
+.input::-webkit-scrollbar {
+  width: 6px;
+}
+
+.input::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.input::-webkit-scrollbar-thumb {
+  background: var(--secondary-color);
+  border-radius: 3px;
+}
+
+/* === Icon buttons (Send / Trash) ====================================== */
+.iconButton {
+  /* square button: same visual style, no border changes */
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+
+  background: rgba(0, 0, 0, 0.7);
+  color: white; /* overridden by .trashButton below */
+  border: var(--default-border);
+  border-radius: 12px;
+
+  font-weight: 600;
+  font-family: var(--font-primary);
+  cursor: pointer;
+  transition: background 1s ease, box-shadow 1s ease, opacity 0.2s ease;
+  font-size: 14px;
+  margin-bottom: auto;
+}
+
+.iconButton svg {
+  width: 1.1rem;
+  height: 1.1rem;
+  display: block;
+}
+
+/* Send button: hover/active behaviors preserved */
+.sendButton:hover:not(:disabled) {
+  background: var(--secondary-color);
+  animation: blueGlowPulse 2s ease-in-out infinite;
+}
+
+@keyframes blueGlowPulse {
+  0%, 100% { box-shadow: none; }
+  50% { box-shadow: 6px 6px 25px rgba(3, 62, 101, 0.25); }
+}
+
+.iconButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Trash button: uses accent color via currentColor */
+.trashButton {
+  color: var(--accent-color, #FC1819); /* uses global var, falls back to requested hex */
+}
+
+/* === Stop button (unchanged) ========================================== */
+.stopButton {
+  padding: 12px 24px;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-weight: 600;
+  font-family: var(--font-primary);
+  cursor: pointer;
+  transition: background 1s ease, box-shadow 1s ease;
+  font-size: 14px;
+}
+
+.stopButton:hover {
+  background: var(--secondary-color);
+  animation: blueGlowPulse 2s ease-in-out infinite;
+}

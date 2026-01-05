@@ -1,0 +1,79 @@
+---
+title: MCP Tool · key_nft_read
+description: Multi-action reader for the Colored Key NFT collection.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# `key_nft_read`
+
+`dapp/app/lib/mcp/tools/keynft-read/index.ts` consolidates the historical reader tools into one RPC surface. The `action` field selects which helper under `actions/*` executes.
+
+## Supported Actions
+
+| Action | Purpose | Handler |
+| --- | --- | --- |
+| `get_key_nft_collection_info` | Static contract metadata | `actions/collection-info.ts` |
+| `get_key_nft_total_supply` | Total minted keys | `actions/total-supply.ts` |
+| `get_key_nft_balance` | Count of keys owned by an address | `actions/balance.ts` |
+| `get_key_nft_tokens_of_owner` | Full list of token IDs for an owner | `actions/owner-tokens.ts` |
+| `get_key_nft_token_of_owner` | Single token lookup with boolean `hasToken` | `actions/owner-single.ts` |
+| `get_key_nft_token_metadata` | Colors + URI for a token ID | `actions/token-metadata.ts` |
+| `get_key_nft_holders` | Aggregate view of holders | `actions/holders.ts` |
+| `get_key_nft_summary_for_owner` | Combined balance + palette summary | `actions/owner-summary.ts` |
+
+## Handler Skeleton
+
+```ts
+// dapp/app/lib/mcp/tools/keynft-read/index.ts
+const tool: Tool<Params> = {
+  name: 'key_nft_read',
+  description: 'Consolidated Key NFT read functions...',
+  inputSchema: InputSchema,
+  async handler(input: Params) {
+    switch (input.action) {
+      case 'get_key_nft_collection_info': return handleCollectionInfo();
+      case 'get_key_nft_total_supply': return handleTotalSupply();
+      case 'get_key_nft_balance': return handleBalance(input);
+      case 'get_key_nft_tokens_of_owner': return handleOwnerTokens(input);
+      case 'get_key_nft_token_of_owner': return handleOwnerSingle(input);
+      case 'get_key_nft_token_metadata': return handleTokenMetadata(input);
+      case 'get_key_nft_holders': return handleHolders(input);
+      case 'get_key_nft_summary_for_owner': return handleOwnerSummary(input);
+      default: fail('Unknown action for key_nft_read');
+    }
+  },
+};
+```
+
+Each action pushes both text and JSON shapes so screens and LLM prompts can stay synchronized (e.g., the metadata action returns token colors, while the owner-summary includes palette plus count).
+
+## Presenter Coverage
+
+`dapp/components/chatBot/ToolActivity/catalog/presenters/keynft_read.presenter.ts` is one of the largest presenters because it mirrors the action list. Highlights:
+
+- **Pending copy** switches on `action` (e.g., `Listing Owner Tokens…`, `Fetching Token Metadata…`).
+- **Success copy** formats counts, token IDs, palettes, and network names (using `public.env.ts` to label RitoNet).
+- **Error copy** detects wallet/auth failures and prompts the user to reconnect when necessary.
+
+## Playground Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--key-nft-read-interactive&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Key NFT Read (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Tips
+
+<Callout type="info">
+Since `key_nft_read` is read-only, it does not require JWTs. However, owners looking up their own tokens often call it right before `manage_key_nft` or `mark_key_used`, so the presenter deliberately mirrors wallet-focused phrasing to reinforce that flow.
+</Callout>

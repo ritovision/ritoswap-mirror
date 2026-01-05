@@ -1,0 +1,380 @@
+---
+title: API Route Testing
+description: How RitoSwap tests Next.js API routes with Vitest, NextRequest, dependency mocks, and rate-limiting scenarios.
+---
+
+import { Callout, Tabs, Steps, FileTree, Table } from 'nextra/components'
+
+# API Route Testing
+
+This page documents how the dapp's **Next.js API routes** are tested using Vitest. It focuses on:
+
+- How route tests are structured.
+- What is mocked vs. what is exercised for real.
+- How error, auth, and rate-limit paths are covered.
+
+It uses two core endpoints as running examples:
+
+- `/api/gate-access` – token-gated access and SIWE/JWT flows.
+- `/api/token-status/[tokenId]` – token status and usage checks.
+
+<Callout>
+  This page assumes familiarity with Next.js route handlers and Vitest basics.
+  It focuses on **project-specific design**: how the routes are tested in this codebase.
+</Callout>
+
+<Tabs
+  items={['Overview', 'Gate-access POST', 'Token-status GET', 'Patterns & recipes']}
+  defaultIndex={0}
+  storageKey="api-route-testing-tabs"
+>
+  <Tabs.Tab>
+## Overview
+
+API route tests live alongside the route handlers under `app/api`:
+
+<FileTree>
+  <FileTree.Folder name="app" defaultOpen>
+    <FileTree.Folder name="api" defaultOpen>
+      <FileTree.Folder name="gate-access">
+        <FileTree.Folder name="__tests__" defaultOpen>
+          <FileTree.File name="gate-access.test.ts" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+      <FileTree.Folder name="token-status">
+        <FileTree.Folder name="__tests__" defaultOpen>
+          <FileTree.File name="token-status.test.ts" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+      <FileTree.Folder name="__contract__">
+        <FileTree.File name="contract.test.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+At this layer, tests:
+
+- Import route handlers (`GET`, `POST`, etc.) directly from `../route`.
+- Construct `NextRequest` instances with realistic URLs, methods, headers, and JSON bodies.
+- Mock:
+  - **viem** clients and chain definitions.
+  - **Prisma** access (`getTokenModel`, `getChainConfig`, etc.).
+  - **Rate limiting** helpers.
+  - **JWT** helpers and SIWE helpers.
+  - **HTTP utilities** for CORS, problem responses, and validation.
+- Assert on:
+  - HTTP **status codes**.
+  - **Response JSON** (problem+json shape, domain-specific fields).
+  - Important **headers** (rate limit metadata, `Retry-After`).
+
+The priority is to cover **behavioural branches**: validation, authentication paths, on-chain vs DB decisions, and error handling.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+## POST /api/gate-access
+
+The `gate-access` route is responsible for token-gated access and supports multiple authentication flows:
+
+- Legacy body signature flow.
+- SIWE (Sign-In With Ethereum).
+- JWT-based access tokens with rotation behaviour.
+
+The test suite (`app/api/gate-access/__tests__/gate-access.test.ts`) is structured around **behavioural domains**:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Describe block</th>
+      <th>What it covers</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>Input validation</code></td>
+      <td>Malformed JSON, missing fields, invalid types, legacy timestamp checks.</td>
+    </tr>
+    <tr>
+      <td>Top-level <code>it</code> for 429</td>
+      <td>Rate limit failures using mocked <code>checkRateLimitWithNonce</code>.</td>
+    </tr>
+    <tr>
+      <td><code>JWT path</code></td>
+      <td>Happy-path JWT auth, tokenId mismatches, and fallback to body auth.</td>
+    </tr>
+    <tr>
+      <td><code>SIWE flow</code></td>
+      <td>SIWE-enabled paths: nonce verification and SIWE message validation.</td>
+    </tr>
+    <tr>
+      <td><code>Legacy flow</code></td>
+      <td>Signature-based auth via <code>assertLegacyAuth</code>.</td>
+    </tr>
+    <tr>
+      <td><code>Token verification</code></td>
+      <td>On-chain ownership, DB presence, and used/unused token cases.</td>
+    </tr>
+    <tr>
+      <td><code>Content generation</code></td>
+      <td>Resilience when gated content generation partially or totally fails.</td>
+    </tr>
+    <tr>
+      <td><code>Unexpected errors</code></td>
+      <td>Uncaught errors from DB calls, ensuring failures propagate.</td>
+    </tr>
+  </tbody>
+</Table>
+
+### Mock strategy
+
+Before tests run, the module mocks:
+
+- `server-only` – stubbed to avoid Next.js server-only checks.
+- JWT server config – via a mocked `jwtServerConfig` to avoid real env validators.
+- `viem` – `verifyMessage`, `recoverMessageAddress`, `createPublicClient`, `defineChain`, `http`.
+- `viem/chains` – simple `mainnet` and `sepolia` definitions.
+- `public.env` – fixed values for `NEXT_PUBLIC_DOMAIN` and SIWE flags.
+- Chain config (`@/app/config/chain`) – `CHAIN_IDS` and `getChainConfig` used by non-SIWE auth.
+- SIWE server helpers – `isSiweEnabled`, `verifyNonce`, `verifySiweMessage`, `getDomain`.
+- Rate limiter – `checkRateLimitWithNonce`, `getIdentifier`.
+- Prisma network utils – `getTokenModel`, `getChainConfig` for DB and chain access.
+- Gated content – `getGatedContent` to simulate dynamic content generation.
+- Contracts config – ABI + `KEY_TOKEN_ADDRESS`.
+- Legacy auth helpers – `assertLegacyAuth` and helpers like `getRequestHost`.
+- JWT server helpers – `readBearerFromRequest`, `verifyAccessToken`, `signAccessToken` via spies.
+
+Within `beforeEach`, the test sets up default "happy path" mocks:
+
+- `createPublicClient` returns a mock client with a `readContract` spy.
+- `getTokenModel` returns an object with `findUnique` and other methods.
+- `getChainConfig` returns a sepolia-like config.
+- `getGatedContent` resolves with valid content data.
+- `checkRateLimitWithNonce` resolves with `success: true`.
+
+### Behaviour covered
+
+<Steps>
+
+### 1. Validation
+
+Tests ensure the route returns `400` with a problem+json payload when:
+
+- The body is not valid JSON.
+- Required fields (address, signature, tokenId) are missing.
+- Fields have invalid types.
+- Legacy requests omit the `timestamp` in non-SIWE mode.
+
+### 2. Rate limiting
+
+When `checkRateLimitWithNonce` returns `success: false`, the route responds with `429` and rate limit headers:
+
+- `X-RateLimit-Limit`
+- `X-RateLimit-Remaining`
+- `Retry-After`
+
+### 3. JWT authentication
+
+- Happy path where `verifyAccessToken` resolves with a payload containing `tokenId`.
+- Mismatch between JWT tokenId and body tokenId → `401 Authentication failed`.
+- Failure of `verifyAccessToken` triggers fallback to legacy body auth.
+
+### 4. SIWE & legacy flows
+
+- SIWE enabled: `verifyNonce` must pass; `verifySiweMessage` must succeed.
+- SIWE disabled: legacy `assertLegacyAuth` must return success and carries the expected message structure.
+
+### 5. Token ownership & DB state
+
+- On-chain ownership is checked via `readContract`.
+- DB record is retrieved from `getTokenModel().findUnique`.
+- Cases for:
+  - Not owner → `403 You do not own this token`.
+  - No DB record → `404 Token not found in database`.
+  - Already used → `403 This token has already been used`.
+
+### 6. Content generation & error handling
+
+- When `getGatedContent` throws, the route still returns `200` with `success: true` but falls back to an error-tolerant content payload.
+- An explicit test asserts that a DB failure (rejected `findUnique`) bubbles up as an uncaught error.
+
+</Steps>
+
+This suite is the **most complete picture** of how API route tests should be structured for complex, security-sensitive endpoints.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+## GET /api/token-status/[tokenId]
+
+The `token-status` route exposes token existence and usage data, with light on-chain reads and DB lookups.
+
+Its test suite follows a similar pattern but with a simpler domain:
+
+- Tests are organized under `describe('GET /api/token-status/[tokenId]')`.
+- A helper `makeRequest(tokenId)` constructs a `NextRequest` and calls `GET(req, { params: { tokenId } })`.
+
+### Mock strategy
+
+Top-level mocks replace:
+
+- `viem` – `createPublicClient`, `http`, `defineChain`.
+- `viem/chains` – minimal `mainnet` and `sepolia` IDs.
+- Prisma network utils – `getTokenModel`, `getChainConfig`, and a bare `prisma` object.
+- Rate limiter – `checkRateLimitWithNonce`.
+- Contract config – `fullKeyTokenAbi` and `KEY_TOKEN_ADDRESS`.
+- Logger – `createLogger` returning spies for `debug/info/warn/error`.
+- HTTP helpers – `withCors`, `handleCors`, `problemResponse`, `rateLimitResponse`, `validateResponse`.
+- DTO schema – `parseTokenIdParam`, `createTokenStatusResponse`, and a stub for `TokenStatusResponseSchema`.
+
+In `beforeAll` and `beforeEach`, tests:
+
+- Configure `createPublicClient` to return a `mockClient` with a `readContract` spy.
+- Recreate a `tokenModel` object with `findUnique`, `findMany`, and `upsert` spies and wire it into `getTokenModel`.
+- Provide a fully-populated chain config from `getChainConfig`.
+- Default rate limit to success with a full quota.
+
+### Behaviour covered
+
+<Steps>
+
+### 1. Validation & rate limiting
+
+- Invalid token IDs (`'foo'`, `'-1'`, `''`) → `400` with problem+json `title: 'Invalid token ID'`.
+- Rate limit exceeded → `429` with headers:
+  - `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and computed `Retry-After` from the reset timestamp.
+- Fallback when no `reset` is provided → default `Retry-After: 60`.
+
+### 2. DB-first behaviour
+
+- When `findUnique` returns a record, the route returns it without hitting the chain:
+  - Both unused and used cases are covered.
+- Tests assert:
+  - `findUnique` was called with the expected tokenId.
+  - `readContract`, `findMany`, and `upsert` were not used in the DB-hit path.
+
+### 3. On-chain fallback
+
+- When the DB has no record, the route:
+  - Calls `readContract` for `tokenURI` with `KEY_TOKEN_ADDRESS` and ABI.
+  - Upserts a new unused record.
+- The test asserts the exact contract call structure and the `upsert` arguments.
+
+### 4. Not found
+
+- If both DB and on-chain lookup fail, the route responds with a standard "not found" structure:
+  - `{ count: 0, exists: false, used: false, usedBy: null, usedAt: null }`.
+
+### 5. Unexpected errors
+
+- If `getTokenModel` throws (e.g. DB connection issue), the route responds with `500` and a problem+json payload with `title: 'Failed to check token status'`.
+
+</Steps>
+
+This suite illustrates a **DB-first, chain-second** testing pattern that can be reused for other read-heavy endpoints.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+## Patterns & recipes
+
+This section captures general patterns for writing or extending API route tests in this repo.
+
+### 1. Where to put tests
+
+Place route tests in a sibling `__tests__` directory next to the route file:
+
+```txt
+app/api/my-route/route.ts
+app/api/my-route/__tests__/my-route.test.ts
+```
+
+Keep **contract tests** separate in `app/api/__contract__/` so they can focus purely on OpenAPI/docs alignment.
+
+### 2. Typical test structure
+
+<Steps>
+
+### 1. Define constants & helpers
+
+Reusable addresses, signatures, nonces, and helper functions (e.g. building SIWE messages).
+
+### 2. Hoisted mocks
+
+- All `vi.mock()` calls must appear before the route is imported.
+- Stub external services, env-based configs, and any module that would touch network or disk.
+
+### 3. Import route and typed helpers
+
+Import `NextRequest`, route handler (`GET` / `POST`), and any types or helper functions you intend to assert on.
+
+### 4. beforeEach defaults
+
+Set up default mock behaviour inside `beforeEach` so individual tests only override what they care about.
+
+### 5. Behavioural describe blocks
+
+Group tests by behaviour instead of HTTP method alone: validation, auth, rate limiting, business logic, content generation, unexpected errors.
+
+### 6. Assertions
+
+- Always assert on status code, key fields in the JSON body, and important headers.
+- Where meaningful, also assert which mocks were called (and with what arguments).
+
+</Steps>
+
+### 3. Choosing what to mock vs. test
+
+In general:
+
+**Mock:**
+
+- External chains (viem clients, RPC URLs).
+- Databases (Prisma models).
+- Rate-limit backends (Upstash or equivalent).
+- Email/R2/storage services.
+- Environment-specific configuration modules.
+
+**Test for real:**
+
+- Validation helper behaviour when it is local and cheap.
+- Route branching and decision logic.
+- Construction of problem+json responses and rate limit headers.
+
+### 4. Adding a new route test
+
+When adding a new route under `app/api`:
+
+1. **Create the test file:**
+
+```txt
+app/api/my-route/route.ts
+app/api/my-route/__tests__/my-route.test.ts
+```
+
+2. **Identify dependencies:**
+
+List the modules that perform network, DB, or external calls. Add hoisted `vi.mock()` calls for each.
+
+3. **Cover the following cases:**
+
+- Happy path (`2xx`).
+- Validation failures (`400` range).
+- Auth failures (`401/403`), if applicable.
+- Not found (`404`), if applicable.
+- Rate limiting (`429`), if the route is protected.
+- At least one unexpected error scenario.
+
+4. **Align with contract tests:**
+
+If the route is part of the public API, ensure the OpenAPI spec and contract tests are updated as well.
+
+These patterns keep route tests **focused, fast, and realistic**, giving confidence that high-value API behaviour won't regress.
+  </Tabs.Tab>
+</Tabs>
+
+## Summary
+
+- API route tests import route handlers directly and exercise them via `NextRequest` instances.
+- External dependencies (viem, Prisma, rate limiting, SIWE, JWT, content generation) are fully mocked to keep tests deterministic.
+- Suites are structured by **behavioural domains**: validation, auth, rate limits, DB/chain decisions, and error handling.
+- The `gate-access` and `token-status` suites are reference implementations for testing new routes in this repo.
+
+For OpenAPI contract-level guarantees, see the **API Contract & OpenAPI Testing** page.

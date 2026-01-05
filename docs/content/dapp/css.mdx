@@ -1,0 +1,393 @@
+---
+title: CSS Architecture
+description: Understanding RitoSwap's modular CSS system and design patterns
+---
+
+import { FileTree, Callout, Cards, Table } from 'nextra/components'
+
+# CSS Architecture
+
+RitoSwap's CSS architecture represents a deliberate departure from utility-first frameworks in favor of a component-scoped, modular approach. Built entirely with CSS modules and custom properties, the system provides complete visual control while maintaining strict style isolation. This isn't about following trends—it's about creating a maintainable, performant styling system that scales with the application's complexity.
+
+## System Overview
+
+At its foundation, the CSS architecture divides styling responsibilities into two distinct categories: global design tokens that establish the visual language, and locally scoped modules that implement component-specific styles. This separation ensures that while every component shares the same design vocabulary, their implementations remain completely isolated from one another.
+
+The decision to avoid Tailwind and similar utility frameworks stems from the need for precise control over RitoSwap's distinctive aesthetic. Every gradient, every shadow, and every animation is crafted to support the Blade Runner-inspired atmosphere that defines the RitoVision brand. This level of visual precision demands custom CSS that can evolve with the design vision rather than being constrained by predefined utility classes.
+
+### Global Foundation
+
+Only two files in the entire system apply styles globally, and their responsibilities are clearly delineated:
+
+<FileTree>
+  <FileTree.Folder name="styles" defaultOpen>
+    <FileTree.File name="globals.css" />
+    <FileTree.File name="wallet-variants.css" />
+  </FileTree.Folder>
+</FileTree>
+
+The `globals.css` file serves as the single source of truth for design tokens, typography, and foundational styles. It imports `wallet-variants.css` and establishes the CSS custom properties that flow through every component. Meanwhile, `wallet-variants.css` handles a specific responsive behavior pattern for navigation components, controlling their visibility across breakpoints.
+
+<Cards.Card
+  title="Navigation System Architecture"
+  href="/dapp/navbars"
+  arrow
+>
+  Learn how wallet-variants.css controls responsive navigation behavior
+</Cards.Card>
+
+### Component-Level Isolation
+
+Beyond these two global files, every style in RitoSwap lives within CSS modules, ensuring complete encapsulation. Each component maintains its styles in a companion `.module.css` file that lives alongside the component itself:
+
+<FileTree>
+  <FileTree.Folder name="NFTScreen" defaultOpen>
+    <FileTree.File name="NFTScreen.tsx" />
+    <FileTree.File name="NFTScreen.module.css" />
+  </FileTree.Folder>
+</FileTree>
+
+This co-location pattern extends throughout the entire codebase. Pages maintain their styles in `page.module.css` files, while components carry their `.module.css` companions regardless of their directory depth. The result is a file system where styles and logic travel together, making components truly self-contained and portable.
+
+## Design Tokens & Custom Properties
+
+The heart of RitoSwap's visual consistency lies in its carefully curated design tokens, implemented as CSS custom properties in `globals.css`:
+
+```css
+:root {
+  /* Core Color Palette */
+  --primary-color: #012035;      /* Deep space blue */
+  --secondary-color: #04426C;     /* Hologram blue */
+  --accent-color: #FC1819;        /* Neon red primary */
+  --accent-color-2: #f47838;      /* Warm orange accent */
+  --background-white: #e9f9f9;    /* Soft cyan white */
+  --secondary-red: #CE161B;       /* Deep crimson */
+  --utility-green: #11C045;       /* Success/confirmation green */
+  
+  /* Computed Values */
+  --background: var(--primary-color);
+  --foreground: #ffffff;
+  
+  /* Typography Systems */
+  --font-primary: "AgencyB", sans-serif;
+  --font-body: "Michroma", sans-serif;
+  
+  /* Consistent Borders */
+  --default-border: 2px solid var(--secondary-color);
+}
+```
+
+### Color System Usage Patterns
+
+The `--primary-color` and `--secondary-color` form the foundation of RitoSwap's visual identity and are used throughout the entire application:
+
+- **Primary Color (#012035)**: Functions as the default background color across all pages and major containers, creating the deep space atmosphere
+- **Secondary Color (#04426C)**: This hologram blue provides a smooth, subtle yet distinctive contrast against the primary color. It creates the effect of a holographic neon projection—less jarring than white but distinct enough to clearly define interactive elements. Powers nearly all borders and button hover states throughout the interface.
+
+<Callout type="info">
+**Theming Tip**: Want to completely transform RitoSwap's appearance? These two variables are your primary control points. Changing `--primary-color` and `--secondary-color` will cascade through the entire design system, affecting backgrounds, borders, and interactions at scale.
+</Callout>
+
+Text throughout the interface defaults to white (`--foreground`), maintaining high contrast against the dark backgrounds. The `--accent-color` serves as a highlight mechanism, drawing attention to important text elements and specific UI components like [notification toasts](/dapp/notifications).
+
+The `--default-border` property appears ubiquitously across the component library. From modals to containers to form inputs, this standardized border creates visual consistency throughout the interface. Notable exceptions include buttons, which often employ custom border radius values for distinct interaction states.
+
+<div style={{
+  backgroundColor: '#012035',
+  border: '2px solid #04426C',
+  borderRadius: '10px',
+  padding: '2rem',
+  marginTop: '1.5rem',
+  marginBottom: '1.5rem',
+  color: 'white',
+  fontFamily: 'var(--font-body)',
+  textAlign: 'center'
+}}>
+  This is what var(--default-border) looks like
+</div>
+
+Strategic use of the glow utility classes (`.darkglow`, `.blueglow`, `.redglow`) can amplify the atmospheric effect, creating depth and emphasis that reinforces the cyberpunk aesthetic.
+
+## Typography System
+
+RitoSwap's typography leverages three distinct typefaces, each serving specific hierarchical purposes:
+
+### Font Loading Strategy
+
+```css
+/* AgencyB for primary headings (H1-H5) */
+@font-face {
+  font-family: "AgencyB";
+  src: url("/fonts/AGENCYB.woff") format("woff"),
+       url("/fonts/AGENCYB.TTF") format("truetype");
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* YoungAgency for H6 elements */
+@font-face {
+  font-family: "YoungAgency";
+  src: url("/fonts/YoungAgency-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+
+/* Michroma for body text */
+@font-face {
+  font-family: "Michroma";
+  src: url("/fonts/Michroma-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+}
+```
+
+### Typography Defaults
+
+The system establishes clear typographic defaults for all HTML elements:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Element</th>
+      <th>Font Family</th>
+      <th>Font Weight</th>
+      <th>Size</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>H1</td>
+      <td>AgencyB</td>
+      <td>1</td>
+      <td>2.5rem</td>
+      <td rowSpan={5}>Weight deliberately set to 1 to prevent blur at higher values</td>
+    </tr>
+    <tr>
+      <td>H2</td>
+      <td>AgencyB</td>
+      <td>1</td>
+      <td>2rem</td>
+    </tr>
+    <tr>
+      <td>H3</td>
+      <td>AgencyB</td>
+      <td>1</td>
+      <td>1.75rem</td>
+    </tr>
+    <tr>
+      <td>H4</td>
+      <td>AgencyB</td>
+      <td>1</td>
+      <td>1.5rem</td>
+    </tr>
+    <tr>
+      <td>H5</td>
+      <td>AgencyB</td>
+      <td>1</td>
+      <td>1.25rem</td>
+    </tr>
+    <tr>
+      <td>H6</td>
+      <td>YoungAgency</td>
+      <td>400</td>
+      <td>1rem</td>
+      <td>Distinct font for smallest heading</td>
+    </tr>
+    <tr>
+      <td>P</td>
+      <td>Michroma</td>
+      <td>400</td>
+      <td>1rem</td>
+      <td>Letter-spacing: 0.10em for enhanced readability</td>
+    </tr>
+  </tbody>
+</Table>
+
+<Callout type="warning">
+**Critical Typography Note**: AgencyB (also known as Agency FB) becomes extremely blurry at font weights above 1. This is a deliberate constraint—the font is already visually bold at weight 1, and increasing the weight degrades readability significantly. All heading elements explicitly set `font-weight: 1` to ensure consistent rendering across browsers.
+</Callout>
+
+## Utility Classes
+
+While RitoSwap avoids utility-first frameworks, it provides a small set of purpose-built utility classes for common patterns:
+
+### Layout Utilities
+
+```css
+.defaulttopspace {
+  margin-top: 8%;
+}
+
+.defaultbottomspace {
+  margin-bottom: 8%;
+}
+
+.margincenter {
+  margin-left: auto;
+  margin-right: auto;
+}
+```
+
+These spacing utilities adapt responsively, expanding to 20% margins on mobile devices (below 730px) to accommodate smaller viewports.
+
+### Visual Effects
+
+```css
+.darkglow {
+  box-shadow: 6px 6px 25px rgba(0, 0, 0, 0.25);
+}
+
+.blueglow {
+  box-shadow: 6px 6px 25px rgba(3, 62, 101, 0.25);
+}
+
+.redglow {
+  box-shadow: 0 10px 20px rgba(252, 24, 25, 0.3);
+}
+```
+
+These glow effects support the cyberpunk aesthetic by adding atmospheric lighting to key interface elements.
+
+### Typography Utilities
+
+```css
+.headingLarge {
+  font-size: 3rem;
+  text-align: center;
+}
+
+.redText {
+  color: var(--accent-color);
+}
+```
+
+## Accessibility Features
+
+The CSS system includes built-in accessibility support through carefully considered patterns:
+
+### Screen Reader Support
+
+```css
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0,0,0,0);
+  white-space: nowrap;
+  border: 0;
+}
+```
+
+This utility class enables developers to include screen reader-only content in any component, ensuring information accessibility without affecting visual design.
+
+### Focus States
+
+All interactive elements inherit a consistent white outline focus state, making keyboard navigation clearly visible against RitoSwap's dark backgrounds. This ensures users can tab through the interface with clear visual feedback at every step.
+
+## Custom Scrollbar Styling
+
+RitoSwap implements custom scrollbar styling to maintain visual consistency with the overall design:
+
+```css
+/* WebKit browsers (Chrome, Edge, Safari) */
+::-webkit-scrollbar {
+  width: 15px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgb(90, 86, 86);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-color);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #01182a;
+}
+```
+
+<Callout type="info">
+Firefox users will see default scrollbars as Firefox's implementation would override other critical styles. The WebKit approach ensures the best experience for the majority of users while maintaining functionality for all.
+</Callout>
+
+## Form Input Styling
+
+The system includes specific handling for autofilled form inputs to maintain visual consistency:
+
+```css
+input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px transparent inset !important;
+  -webkit-text-fill-color: var(--foreground) !important;
+  transition: background-color 9999s ease-in-out 0s;
+}
+```
+
+This prevents the browser's default yellow autofill background from disrupting the dark theme aesthetic.
+
+## Component Module Patterns
+
+When creating component-specific styles, CSS modules provide complete isolation while maintaining access to global design tokens. Here's a typical pattern from the NFTScreen component:
+
+```css
+/* NFTScreen.module.css */
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  min-height: 550px;
+  opacity: 1;
+  transform: scale(1);
+  transition: all 0.5s ease-in-out;
+}
+
+.container {
+  border: var(--default-border);  /* Using global token */
+  border-radius: 10px;
+  background-color: transparent;
+  /* Component-specific styles */
+}
+```
+
+Components can reference global custom properties while keeping their specific implementations completely isolated. This pattern scales infinitely—each new component adds zero global styles while inheriting the established design language.
+
+## Best Practices
+
+When working with RitoSwap's CSS architecture, follow these guidelines:
+
+1. **Use CSS modules** for component styles to maintain isolation
+2. **Reference design tokens** through custom properties rather than hardcoding values
+3. **Co-locate styles** with their components in `.module.css` files
+4. **Respect the font-weight constraint** for AgencyB—always use weight 1
+5. **Include `.sr-only` content** where necessary for accessibility
+6. **Test focus states** to ensure keyboard navigation remains visible
+
+This architecture ensures that as RitoSwap grows, its styling remains maintainable, performant, and true to the RitoVision aesthetic vision.
+
+## Explore UI Implementation
+
+To see these CSS patterns in action across RitoSwap's interface components:
+
+<Cards num={2}>
+  <Cards.Card title="Smart Contract UI" href="/dapp/smart-contract-ui">
+    Interactive components for blockchain transactions and contract interactions
+  </Cards.Card>
+  <Cards.Card title="Wallet Interface" href="/dapp/wallet-ui">
+    Custom wallet connection and state management components
+  </Cards.Card>
+</Cards>
+
+<Cards num={2}>
+  <Cards.Card title="Navigation System" href="/dapp/navbars">
+    Responsive navigation architecture with breakpoint-aware mounting strategies
+  </Cards.Card>
+  <Cards.Card title="Portfolio Viewer" href="/dapp/portfolio-ui">
+    Multi-chain asset visualization with animated transitions and loading states
+  </Cards.Card>
+</Cards>

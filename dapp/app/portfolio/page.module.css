@@ -1,0 +1,30 @@
+/* app/portfolio/page.module.css */
+
+.AccountContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 2rem 2rem 1rem 2rem;
+}
+
+.SelectionContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 1rem 2rem 2rem 2rem;
+  gap: 1rem;
+}
+
+@media (min-width: 730px) {
+  .SelectionContainer {
+    flex-direction: row;
+    align-items: flex-start; /* align to top */
+    justify-content: center; /* center the pair */
+    gap: 2rem;
+  }
+}
+
+.ChainContainer {
+  /* Add any specific styling for ChainContainer if needed */
+}

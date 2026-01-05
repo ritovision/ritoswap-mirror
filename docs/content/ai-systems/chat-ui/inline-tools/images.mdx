@@ -1,0 +1,105 @@
+---
+title: Images, SVGs & KeyNFT
+description: Rendering static images, inline SVGs, and the user's personalized KeyNFT.
+---
+
+import { Callout, Cards } from 'nextra/components'
+import { StorybookEmbed } from '@components/StorybookEmbed'
+
+# Images & SVGs
+
+RapBotRito supports a rich multi-modal experience by rendering static images, raw SVGs, and personalized NFT assets directly in the chat stream.
+
+## Image Renderer
+**File:** `dapp/components/chatBot/ChatMessages/renderers/ImageRenderer.tsx`
+
+The `<img />` tag is the workhorse for static visual content. It is powered by a robust renderer that handles:
+
+- **Shimmer Loading:** A smooth gradient pulse (`Shimmer.tsx`) while the image fetches.
+- **Local Store Hydration:** Support for `store://` URIs (used for user uploads) via `@store/toolImageStore`.
+- **Fallback:** A data-URI SVG placeholder if the image fails to load.
+- **Responsive Sizing:** Respects `width`/`height` attributes but ensures the image never overflows the chat bubble.
+
+```html
+<!-- Standard usage -->
+<img src="https://example.com/chart.png" alt="Price Chart" width="400" />
+
+<!-- User upload (internal usage) -->
+<img src="store://upload-123" alt="My Screenshot" />
+```
+
+### Helper: `imageHelpers.ts`
+Extracts attributes (`src`, `alt`, `width`, `height`) from raw HTML strings so the renderer receives clean props. Note that this helper **only** parses the string; the actual hydration of `store://` URIs happens inside `ImageRenderer` (via `useLocalImageStore`).
+
+## SVG Renderer
+**File:** `dapp/components/chatBot/ChatMessages/renderers/SvgRenderer.tsx`
+
+For vector graphics, the bot can emit raw `<svg>` markup. This is particularly useful for generated diagrams, icons, or on-chain art.
+
+### Sanitization & Safety
+Because SVGs can contain scripts, `SvgRenderer` wraps the content in **DOMPurify** to strip malicious code (XSS protection) before rendering.
+
+It also uses `svgHelpers.ts` to "fix" common issues before sanitization:
+- **Namespace:** Adds `xmlns="http://www.w3.org/2000/svg"` if missing.
+- **ViewBox:** Infers a `viewBox` from `width`/`height` if missing, ensuring the SVG scales correctly.
+- **Defaults:** Enforces a default size (300x300) if no dimensions are provided, preventing invisible 0x0 renders.
+
+```html
+<!-- The bot can emit raw SVG -->
+<svg viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="40" fill="red" />
+</svg>
+```
+
+## KeyNFT Support
+**File:** `dapp/components/chatBot/ChatMessages/utils/parseContentWithMedia.ts`
+
+The `<key-nft />` tag is a specialized tool for displaying the user's "Colored Keys" NFT.
+
+- **Purpose:** Personalization. The bot knows the user's key colors from the system prompt and can visualize their specific asset.
+- **Implementation:** The parser converts the `<key-nft>` tag **directly into an inline SVG string** via the `buildKeyNftSvg` helper.
+- **Rendering:** The resulting segment is treated exactly like any other SVG segment, flowing through the standard `SvgRenderer` pipeline (sanitization + layout).
+
+<Callout type="info">
+  **Note:** The file `KeyNFT.tsx` exists in the codebase but serves primarily as a test target and reusable template. The live chat pipeline relies on the parser's inline generation logic.
+</Callout>
+
+```html
+<!-- Visualizes a specific key configuration -->
+<key-nft bgColor="#222" keyColor="#ffd700" width="200" />
+```
+
+## Interactive Demos
+
+Submit a message to see the inline tool generated.
+
+### Image
+
+<StorybookEmbed title="ChatBot/InlineTools" story="ImageSeeded" height="640px" />
+
+### SVG
+
+<StorybookEmbed title="ChatBot/InlineTools" story="SvgSeeded" height="640px" />
+
+### Key NFT
+
+<StorybookEmbed title="ChatBot/InlineTools" story="KeyNftSeeded" height="640px" />
+
+## Semantic Image Search
+
+The system includes a semantic database (`rito-pics.json`) indexed in Pinecone, allowing the bot to find relevant images based on context rather than exact filenames.
+
+See the [Pinecone database](/ai-systems/pinecone) page for index setup and seeding workflows.
+
+<Callout type="info">
+  **Context Management:** In certain modes, the system prompt is pre-loaded with fragments describing available images, allowing the bot to "know" what visuals are in its library without needing an external tool call.
+</Callout>
+
+<Cards num={2}>
+  <Cards.Card title="Chain Logos" href="/ai-systems/chat-ui/inline-tools/chain-logo" icon="🪙" arrow>
+    For crypto logos, use the specialized ChainLogo renderer instead of generic images.
+  </Cards.Card>
+  <Cards.Card title="GIFs" href="/ai-systems/chat-ui/inline-tools/gifs" icon="🎞️" arrow>
+    Animated content uses the GifRenderer, which wraps the ImageRenderer logic.
+  </Cards.Card>
+</Cards>

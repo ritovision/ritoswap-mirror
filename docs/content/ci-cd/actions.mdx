@@ -1,0 +1,117 @@
+---
+title: Composite Actions
+description: Shared CI building blocks reused across workflows.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# Composite Actions
+
+The workflows are built on a set of reusable composite actions under <code>.github/actions</code>. These actions keep the pipelines consistent and reduce duplication.
+
+## Build and setup
+
+<Table>
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>Purpose</th>
+      <th>Key inputs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>setup-node-pnpm</td>
+      <td>Install Node.js and pnpm with caching</td>
+      <td><code>node-version</code>, <code>pnpm-version</code>, <code>working-directory</code></td>
+    </tr>
+    <tr>
+      <td>install-deps</td>
+      <td>Run <code>pnpm install</code> with optional workspace filter</td>
+      <td><code>filter</code>, <code>working-directory</code>, <code>frozen-lockfile</code></td>
+    </tr>
+  </tbody>
+</Table>
+
+## Mirror dispatch wrappers
+
+The mirror repo uses <code>actions/github-script@v7</code> to dispatch workflows in the private
+repo and wait for completion. These wrappers live in
+<code>ritovision/ritoswap-mirror</code> and target <code>ritovision/ritoswap</code> using a PAT
+stored in the <code>ci-dispatch</code> environment.
+
+## Lint and tests
+
+<Table>
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>Purpose</th>
+      <th>Key inputs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>run-eslint</td>
+      <td>Run ESLint with optional strict mode</td>
+      <td><code>working-directory</code>, <code>strict</code></td>
+    </tr>
+    <tr>
+      <td>run-vitest-tests</td>
+      <td>Run Vitest coverage and optionally upload to Codecov</td>
+      <td><code>working-directory</code>, <code>upload-coverage</code>, <code>codecov-flags</code>, <code>codecov-token</code>, <code>database-url</code></td>
+    </tr>
+    <tr>
+      <td>run-hardhat-tests</td>
+      <td>Compile and test smart contracts</td>
+      <td><code>working-directory</code></td>
+    </tr>
+    <tr>
+      <td>run-predeploy-e2e</td>
+      <td>Prisma migrate + optional seed, build, Playwright smoke tests</td>
+      <td><code>working-directory</code>, <code>database-url</code></td>
+    </tr>
+    <tr>
+      <td>run-smoke-e2e</td>
+      <td>Playwright smoke tests against a live site</td>
+      <td><code>base-url</code>, <code>private-key</code>, <code>test-pattern</code>, <code>project</code>, <code>workers</code></td>
+    </tr>
+    <tr>
+      <td>run-smoke-api</td>
+      <td>Supertest API smoke tests against a live site</td>
+      <td><code>base-url</code>, <code>private-key</code>, <code>token-id</code>, <code>chain-id</code>, <code>enable-state-worker</code>, <code>ai-chat-requires-jwt</code></td>
+    </tr>
+  </tbody>
+</Table>
+
+<Callout type="info">
+  The predeploy E2E action assumes a Postgres service is available in the workflow. It sets a
+  test-focused environment for the build and smoke tests, and installs Playwright browsers.
+</Callout>
+
+## Deploy and rollback
+
+<Table>
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>Purpose</th>
+      <th>Key inputs and outputs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>vercel-deploy</td>
+      <td>Deploy to Vercel in remote or prebuilt mode</td>
+      <td>
+        Inputs: <code>mode</code>, <code>production</code>, <code>vercel-token</code>, <code>vercel-org-id</code>, <code>vercel-project-id</code>, <code>working-directory</code><br />
+        Outputs: <code>previous-url</code>, <code>deployment-url</code>
+      </td>
+    </tr>
+    <tr>
+      <td>vercel-rollback</td>
+      <td>Rollback to a previous production deployment</td>
+      <td>Inputs: <code>deployment-url</code>, <code>vercel-token</code>, <code>vercel-org-id</code>, <code>vercel-project-id</code></td>
+    </tr>
+  </tbody>
+</Table>

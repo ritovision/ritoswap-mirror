@@ -1,0 +1,104 @@
+---
+title: MCP Tool · pinecone_search
+description: Semantic retrieval across memes, rhymes, gifs, and lore.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# `pinecone_search`
+
+Located at `dapp/app/lib/mcp/tools/pinecone-search.ts`, this tool turns user prompts into vector queries and returns a dual output: readable summaries for the LLM and JSON matches for the UI.
+
+## Runtime Traits
+
+- **Dynamic schema** — The input schema is built from `pineconeConfig`, so enum values always match the configured indexes/namespaces.
+- **Embeddings** — Uses Pinecone's hosted `multilingual-e5-large` model for both query and corpus vectors, keeping deployments provider-agnostic.
+- **Namespace safety** — `pineconeConfig.isValidIndexNamespace` guards against malformed requests before hitting the API.
+- **Metadata filters** — Optional `filter` object is passed to Pinecone for metadata filtering.
+- **Result formatting** — JSON includes `matches` with top scores and URLs. When the namespace is `gifs`, the text stream prefixes results with scores and emits `<gif>` tags for the UI renderer.
+
+## Pinecone Configuration
+
+- `dapp/app/config/pinecone.config.ts` validates index names and namespace lists, and exposes helpers (`getIndexNames`, `getNamespacesForIndex`, `isValidIndexNamespace`) so tools can reject invalid queries before hitting the API.
+- CLI utilities in `dapp/pinecone` (`seed.ts`, `clear-namespace.ts`, etc.) ingest JSON datasets such as `gifs.json`, `rito-pics.json`, and `ritorhymes.json`. They use Pinecone’s hosted embedding service (`multilingual-e5-large`) to stay provider-agnostic.
+- MCP tools (`pinecone-search.ts`, `agent-rap-verse/phases/gathering.ts`) rely on the config to know which namespaces exist and to surface helper metadata (URLs, descriptions, meme categories).
+
+See the [Pinecone database](/ai-systems/pinecone) for index creation, seeding workflows, and dataset format.
+
+## Knowledge Hygiene
+
+<Callout type="info">
+  Semantic data is intentionally playful (memes, rhymes, lore) but still token-gated. The agent respects mode rules—for instance, rap battles limit balance lookups and enforce unique insults to avoid repetitive fetches.
+</Callout>
+
+- **Namespace awareness** ensures the model never guesses index names; invalid combinations trigger descriptive errors before reaching Pinecone.
+- **Tool outputs** mix text and JSON so transcripts remain lightweight while presenters and hydration hooks can extract structured information.
+- **JWT context** (chain, token ID, address) is injected server-side for any tool that needs on-chain identity, reducing the risk of prompt spoofing.
+
+```ts
+// dapp/app/lib/mcp/tools/pinecone-search.ts
+const pineconeSearchTool: Tool<PineconeSearchParams> = {
+  name: 'pinecone_search',
+  description: 'Perform semantic vector search in Pinecone indexes.',
+  inputSchema: buildInputSchema(),
+  async handler({ query, index, namespace = '__default__', topK = 5, includeMetadata = true, filter }) {
+    const pc = getPineconeClient();
+    const embeddingResponse = await pc.inference.embed('multilingual-e5-large', [query], { inputType: 'query', truncate: 'END' });
+    const vector = embeddingResponse.data[0].values;
+    const results = await pc.index(index).namespace(namespace).query({ vector, topK, includeMetadata, filter });
+    const matches = Array.isArray(results.matches) ? results.matches : [];
+    const text = textResult(buildSummary(index, namespace, matches));
+    const json = jsonResult({ query, index, namespace, totalMatches: matches.length, topK, matches: normalize(matches) });
+    return { content: [...text.content, ...json.content] };
+  },
+};
+```
+
+## Presenter Notes
+
+`dapp/components/chatBot/ToolActivity/catalog/presenters/pinecone_search.presenter.ts` adds context to the chips:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Behavior</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>pending</td>
+      <td>Label includes `index/namespace`, and the text shows a truncated query.</td>
+    </tr>
+    <tr>
+      <td>success</td>
+      <td>Announces `Found N results in index/namespace` plus the top score and best-match title when present.</td>
+    </tr>
+    <tr>
+      <td>error</td>
+      <td>Normalizes common failures (“API key missing”, “Index not found”, etc.) for quicker debugging.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Playground Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--pinecone-search-interactive&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Pinecone Search (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Usage Tips
+
+<Callout type="info">
+Because `pinecone_search` emits both text and JSON, the LLM can cite top matches inline while the UI renders gifs or images referenced in the metadata—perfect for the stylized rap experience described in the Chat Experience chapter.
+</Callout>

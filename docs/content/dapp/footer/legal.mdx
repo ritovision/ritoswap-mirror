@@ -1,0 +1,396 @@
+---
+title: Legal & Copyright Block
+description: Displays Privacy Policy, Terms of Service links plus copyright and "site built by" credit in the footer.
+---
+
+import Image from 'next/image'
+import { FileTree } from 'nextra/components'
+
+# Legal & Copyright Block
+
+## Understanding the Component's Purpose
+
+Every professional web application needs a place to display essential legal information and attribution. The Legal & Copyright Block serves this critical function by providing a clean, organized way to present privacy policies, terms of service, copyright notices, and technology credits. Think of this component as the legal foundation of your footer—it's not the most exciting part of your site, but it's absolutely necessary for compliance, transparency, and professional credibility.
+
+This component represents more than just a collection of links and text. It's a carefully designed system that balances legal requirements with user experience, ensuring that important information remains accessible without overwhelming the visual design of your footer. The implementation focuses on clear structure, accessible markup, and a layout that works across devices.
+
+## Component File Structure
+
+<FileTree>
+  <FileTree.Folder name="utilities" defaultOpen>
+    <FileTree.Folder name="footerLegal" defaultOpen>
+      <FileTree.File name="FooterLegalServer.tsx" />
+      <FileTree.File name="FooterLegalClient.tsx" />
+      <FileTree.File name="FooterLegal.module.css" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## The Architecture Explained
+
+At first glance, you might wonder why such a simple component needs both server and client versions. This structure follows Next.js best practices for the App Router, preparing your component for future enhancements while maintaining current simplicity.
+
+The server component (`FooterLegalServer.tsx`) currently acts as a pass-through to the client component. While this may look redundant now, it establishes an important architectural pattern. In the future, you might want to:
+
+- Fetch legal document URLs from a CMS
+- Check for region-specific legal requirements
+- Toggle links or disclosures based on feature flags
+
+Having this server component already in place means you can add these features without restructuring your codebase.
+
+```tsx
+// FooterLegalServer.tsx - Simple now, but ready for future enhancements
+import FooterLegalClient from "./FooterLegalClient";
+
+export default function FooterLegalServer() {
+  // Future possibilities:
+  // - Fetch legal URLs from CMS
+  // - Determine region-specific legal requirements
+  // - Pass feature flags into the client component
+
+  return <FooterLegalClient />;
+}
+```
+
+## Understanding the Client Component
+
+The client component is where the actual rendering and layout live. It also handles dynamic values like the current year and the dapp version string.
+
+```tsx
+"use client";
+
+import Link from "next/link";
+import versions from "@lib/versions/versions";
+import styles from "./FooterLegal.module.css";
+
+export default function FooterLegalClient() {
+  const year = new Date().getFullYear();
+
+  return (
+    <footer className={styles.footerLegalContainer} role="contentinfo">
+      {/* Legal links section - Privacy and Terms */}
+      <nav
+        className={styles.legalLinks}
+        aria-label="Legal information"
+        role="navigation"
+      >
+        <Link
+          href="/privacy"
+          className={styles.legalLink}
+          aria-label="Read our Privacy Policy"
+        >
+          Privacy Policy
+        </Link>
+        <Link
+          href="/terms"
+          className={styles.legalLink}
+          aria-label="Read our Terms of Service"
+        >
+          Terms of Service
+        </Link>
+      </nav>
+
+      {/* Versioned copyright notice */}
+      <div
+        className={styles.copyright}
+        role="contentinfo"
+        aria-label="Copyright information"
+      >
+        RitoSwap v{versions.dapp} © {year}
+      </div>
+
+      {/* Technology attribution / builder credit */}
+      <div className={styles.siteBuilt}>
+        <Link
+          href="https://ritovision.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="Built by RitoVision with Next.js (opens in new tab)"
+        >
+          Site Built by RitoVision with Next.js
+        </Link>
+      </div>
+    </footer>
+  );
+}
+```
+
+Notice how the component is structured in three distinct sections, each serving a specific purpose:
+
+1. **Legal links** (Privacy and Terms) live in a dedicated navigation region.
+2. **Copyright and version** communicate ownership and the current deployed dapp version.
+3. **Builder/technology credit** acknowledges who built the site and the core framework powering it.
+
+The legal links come first because they are the most important from a compliance perspective. The copyright block includes both the project name and version (`versions.dapp`), and the builder credit gives transparent attribution without fighting for attention.
+
+## The CSS Architecture: More Than Meets the Eye
+
+<Image
+  src="/images/ui/footerlegal.png"
+  alt="Footer Legal Component showing links"
+  width={600}
+  height={400}
+  style={{ margin: '2rem auto', display: 'block', borderRadius: '10px' }}
+/>
+
+The styling for this component reveals a straightforward but deliberate approach to responsive design and visual hierarchy. The CSS lives in `FooterLegal.module.css`:
+
+```css
+.footerLegalContainer {
+    width: 90%;
+    max-width: 500px;
+    margin: 0 auto;
+    text-align: center;
+    font-family: var(--font-primary), sans-serif;
+    font-size: 1.2rem;
+    color: white;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4vh; /* Uses viewport height for proportional spacing */
+    padding-bottom: 7px;
+    margin-top: 14%; /* Generous top spacing on mobile */
+}
+
+.legalLinks {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+    max-width: 700px;
+}
+
+.siteBuilt {
+    margin-top: auto;
+}
+```
+
+The container uses a flexible width approach—90% ensures good margins on small screens, while `max-width` prevents text from stretching too far on larger displays. The use of viewport height (`vh`) for `gap` gives breathing room that scales with screen height.
+
+The legal links section employs CSS Grid for predictable alignment:
+
+- `grid-template-columns: 1fr 1fr` ensures each link gets equal visual weight.
+- `max-width: 700px` prevents the two-column layout from feeling too stretched on wide screens.
+
+The `.siteBuilt { margin-top: auto; }` rule takes advantage of the flex column layout on the container. It pins the "Site Built by RitoVision with Next.js" credit to the bottom of the block, even if you add more content above it later.
+
+## Responsive Design Strategy
+
+The component implements a simple but effective responsive strategy. On mobile devices (under `730px`), the component uses larger top margins to create breathing room in the footer. On larger screens, the layout tightens slightly:
+
+```css
+/* Desktop adjustments */
+@media (min-width: 730px) {
+    .footerLegalContainer {
+        max-width: 700px;
+        margin-top: 7%; /* Halved from mobile's 14% */
+    }
+
+    .legalLinks {
+        justify-content: space-between;
+    }
+}
+```
+
+This recognizes that mobile users naturally scroll and benefit from generous spacing, while desktop users prefer denser layouts that keep more content within the viewport.
+
+## Interaction Design and Accessibility
+
+Beyond layout, the component makes deliberate choices to support both interaction feedback and accessibility.
+
+### Semantic structure and ARIA
+
+The root element is a `<footer>` with `role="contentinfo"`, which tells assistive technologies that this region contains site-level metadata. Within it, the legal links live inside a dedicated navigation region:
+
+```tsx
+<footer className={styles.footerLegalContainer} role="contentinfo">
+  <nav
+    className={styles.legalLinks}
+    aria-label="Legal information"
+    role="navigation"
+  >
+    {/* Privacy and Terms links */}
+  </nav>
+
+  <div
+    className={styles.copyright}
+    role="contentinfo"
+    aria-label="Copyright information"
+  >
+    RitoSwap v{versions.dapp} © {year}
+  </div>
+</footer>
+```
+
+Each link also includes an `aria-label`:
+
+- Internal links spell out *"Read our Privacy Policy"* and *"Read our Terms of Service"*.
+- The external builder credit link explicitly notes that it *"opens in new tab"* so screen readers are not surprised by the context change.
+
+These additions make the footer legal area easy to discover and understand for users navigating by landmarks or with screen readers.
+
+### Hover and focus feedback
+
+The component implements subtle interaction feedback through opacity changes:
+
+```css
+.legalLink {
+    text-decoration: none;
+    color: white;
+    transition: opacity 0.3s ease-in-out;
+    font-family: var(--font-primary);
+}
+
+.legalLink:hover {
+    opacity: 0.7;
+}
+
+.siteBuilt a {
+    text-decoration: underline;
+    color: white;
+    transition: opacity 0.3s ease-in-out;
+    font-family: var(--font-primary);
+}
+
+.siteBuilt a:hover {
+    opacity: 0.7;
+}
+```
+
+The 0.3-second opacity transition provides clear but understated feedback that the elements are interactive. Because only the opacity changes, legibility remains high during hover.
+
+## Link Strategy and SEO Considerations
+
+The component makes different choices for internal vs external navigation.
+
+- **Internal legal pages** (Privacy Policy and Terms of Service) use Next.js `Link` for client-side navigation and optimal loading characteristics.
+- The **external builder credit** points to RitoVision's site, while the visible text mentions Next.js as the underlying framework:
+
+```tsx
+<Link
+  href="https://ritovision.com"
+  target="_blank"
+  rel="noopener noreferrer"
+  aria-label="Built by RitoVision with Next.js (opens in new tab)"
+>
+  Site Built by RitoVision with Next.js
+</Link>
+```
+
+`target="_blank"` opens the link in a new tab so users don't fully navigate away from the app, and `rel="noopener noreferrer"` protects against the new page accessing the originating window. Including "(opens in new tab)" in the `aria-label` keeps this behavior transparent for assistive tech.
+
+## Customization Patterns
+
+While the component works well out of the box for RitoSwap, you will likely customize it for your own project.
+
+### Updating or expanding legal links
+
+To change or extend the legal links, edit the `href` and link text in `FooterLegalClient`:
+
+```tsx
+<nav
+  className={styles.legalLinks}
+  aria-label="Legal information"
+  role="navigation"
+>
+  <Link href="/privacy" className={styles.legalLink} aria-label="Read our Privacy Policy">
+    Privacy Policy
+  </Link>
+  <Link href="/terms" className={styles.legalLink} aria-label="Read our Terms of Service">
+    Terms of Service
+  </Link>
+  {/* Example: adding more legal pages */}
+  {/*
+  <Link href="/cookies" className={styles.legalLink} aria-label="Read our Cookie Policy">
+    Cookie Policy
+  </Link>
+  <Link href="/gdpr" className={styles.legalLink} aria-label="Read about your GDPR rights">
+    GDPR Rights
+  </Link>
+  */}
+</nav>
+```
+
+Because `.legalLinks` uses a two-column grid, extra links automatically wrap into additional rows while staying aligned.
+
+### Controlling version and year display
+
+By default, the component surfaces both the current dapp version and year:
+
+```tsx
+import versions from "@lib/versions/versions";
+
+const year = new Date().getFullYear();
+
+<div className={styles.copyright}>
+  RitoSwap v{versions.dapp} © {year}
+</div>
+```
+
+If you prefer a different format, you can adjust the text while keeping the same dynamic behavior, for example:
+
+```tsx
+<div className={styles.copyright}>
+  YourProjectName © {year}
+</div>
+```
+
+or move the version into a separate subtext element.
+
+## Integration with the Footer System
+
+The Legal & Copyright Block is designed to drop into both mobile and desktop footers using the same server wrapper. A typical integration looks like this:
+
+```tsx
+import FooterLegalServer from "./utilities/footerLegal/FooterLegalServer";
+
+export function FooterDesktopClient() {
+  return (
+    <footer>
+      {/* Other footer sections */}
+      <FooterLegalServer />
+    </footer>
+  );
+}
+
+export function FooterMobileClient() {
+  return (
+    <footer>
+      {/* Other mobile footer content */}
+      <FooterLegalServer />
+    </footer>
+  );
+}
+```
+
+Rendering the server wrapper rather than the client component directly keeps the pattern consistent with the rest of the app. If you later introduce CMS-driven legal links or region-sensitive logic, that can live in `FooterLegalServer` without changing your footer components.
+
+## Best Practices and Considerations
+
+When working with legal footer content, keep a few key points in mind:
+
+1. **Ensure legal pages exist.** Make sure your Privacy Policy and Terms of Service routes actually resolve and are kept up to date.
+2. **Consider internationalization.** Different regions may require different disclosures (for example, GDPR or cookie notices). The server wrapper gives you a natural place to add region-specific logic in the future.
+3. **Keep legal text readable.** It might be tempting to visually "minimize" legal text, but it still needs to be legible. The current styling uses adequate font size, contrast, and spacing to stay within accessibility expectations.
+4. **Be explicit with external navigation.** Including "opens in new tab" in the `aria-label` for external links helps users who rely on assistive technologies understand what will happen.
+
+## Conclusion
+
+The Legal & Copyright Block might seem like a small piece of the interface, but it reflects careful attention to legal requirements, semantics, and user experience. By understanding its architecture and design decisions—including the server/client split, dynamic version and year display, and accessibility details—you can maintain and extend it confidently as your application and compliance needs evolve.
+
+Legal information in the footer is more than a checkbox: it's a signal of professionalism and transparency. This component provides a solid, extensible foundation for that signal while staying lightweight and easy to integrate.
+
+## Playground
+
+Use the full Storybook UI to explore the legal block and tweak controls in real time.
+
+<div style={{ width: '100%', height: 640, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/footer-utilities-footerlegal--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Footer/Utilities/FooterLegal - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>

@@ -1,0 +1,139 @@
+---
+title: Configuration & Providers
+description: Environment-driven controls for chat, tools, and images
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# Configuration & Providers
+
+The AI stack relies on a consistent split between **public**, **server**, and **runtime** configuration files:
+
+- `dapp/app/config/ai.public.ts` exposes safe toggles (chat path and whether the UI must attach a JWT).
+- `dapp/app/config/public.env.ts` contains broader NEXT\_PUBLIC values, including the state-worker flag and active chain.
+- `dapp/app/config/ai.server.ts` handles provider secrets, model lists, image pipeline settings, crypto quota limits, and backdoor reset secrets.
+- `dapp/app/config/server.env.ts` validates sensitive infrastructure values (Durable Object URL/API key, JWT signing keys).
+
+## Provider Selection
+
+- **Chat Models** — `AI_PROVIDER` selects `openai` or `lmstudio`. Each provider defines up to three models (`AI_OPENAI_MODEL_*` or `AI_LOCAL_MODEL_*`) that can be accessed by `modelIndex`.
+- **Vision + Images** — `AI_OPENAI_VISION_MODEL` / `AI_LOCAL_VISION_MODEL` supply the multimodal companion, while `AI_IMAGE_PROVIDER` switches between OpenAI, Replicate, or HuggingFace for the `generate_image_with_alt` workflow.
+- **Temperature & Limits** — `AI_TEMPERATURE`, `AI_CHAT_MAX_OUTPUT_TOKENS`, and `AI_CHAT_MAX_DURATION` flow directly into `providerRegistry` and `handleChatRequest`.
+
+<Callout type="warning">
+  **JWT gating is enforced twice.** Setting `NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT` makes the client attach a bearer token, and the server-side `aiServerConfig.requiresJwt` ensures both `/api/chat` and `/api/mcp` reject unauthenticated calls.
+</Callout>
+
+## Text-to-Speech (TTS)
+
+RapBotRito's voice clone uses a provider adapter so we can swap vendors later. ElevenLabs powers the current production voice clone.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Location</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>NEXT_PUBLIC_TTS_API_PATH</code></td>
+      <td><code>tts.public.ts</code></td>
+      <td>Client POST path for TTS requests (default: <code>/api/tts</code>).</td>
+    </tr>
+    <tr>
+      <td><code>TTS_PROVIDER</code></td>
+      <td><code>tts.server.ts</code></td>
+      <td>Set to <code>elevenlabs</code> or <code>disabled</code>. When disabled, the API returns 503.</td>
+    </tr>
+    <tr>
+      <td><code>ELEVENLABS_API_KEY</code></td>
+      <td><code>tts.server.ts</code></td>
+      <td>Required when <code>TTS_PROVIDER=elevenlabs</code>.</td>
+    </tr>
+    <tr>
+      <td><code>ELEVENLABS_VOICE_ID</code></td>
+      <td><code>tts.server.ts</code></td>
+      <td>Required ElevenLabs voice id for the Rito Rhymes clone.</td>
+    </tr>
+    <tr>
+      <td><code>ELEVENLABS_MODEL_ID</code></td>
+      <td><code>tts.server.ts</code></td>
+      <td>Optional ElevenLabs model id override.</td>
+    </tr>
+    <tr>
+      <td><code>ELEVENLABS_BASE_URL</code></td>
+      <td><code>tts.server.ts</code></td>
+      <td>Override base URL (normalized to <code>/v1</code>).</td>
+    </tr>
+    <tr>
+      <td><code>ELEVENLABS_OUTPUT_FORMAT</code></td>
+      <td><code>tts.server.ts</code></td>
+      <td>Audio output format (default: <code>mp3_44100_128</code>).</td>
+    </tr>
+    <tr>
+      <td><code>ELEVENLABS_VOICE_STABILITY</code></td>
+      <td><code>tts.server.ts</code></td>
+      <td>Optional voice setting (0.0 - 1.0).</td>
+    </tr>
+    <tr>
+      <td><code>ELEVENLABS_VOICE_SIMILARITY</code></td>
+      <td><code>tts.server.ts</code></td>
+      <td>Optional voice setting (0.0 - 1.0).</td>
+    </tr>
+  </tbody>
+</Table>
+
+The `/api/tts` route uses the same JWT requirement as chat (`NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT` and `aiServerConfig.requiresJwt`), so the client will attach a bearer token whenever chat auth is enabled.
+
+## Feature Flags & Secrets
+
+<Table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Location</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>NEXT_PUBLIC_ENABLE_STATE_WORKER</code></td>
+      <td><code>public.env.ts</code></td>
+      <td>Turns on Durable Object backed quotas; requires <code>STATE_WORKER_URL</code>/<code>STATE_WORKER_API_KEY</code> in <code>server.env.ts</code>.</td>
+    </tr>
+    <tr>
+      <td><code>AI_CRYPTO_QUOTA_* </code></td>
+      <td><code>ai.server.ts</code></td>
+      <td>Configures global/per-user ETH spend limits for the send-crypto tools (`dapp/app/lib/quotas/crypto-quota.ts`).</td>
+    </tr>
+    <tr>
+      <td><code>AI_QUOTA_RESET_SECRET</code></td>
+      <td><code>ai.server.ts</code></td>
+      <td>Enables `/api/quota-reset` so admins can wipe token or crypto windows.</td>
+    </tr>
+    <tr>
+      <td><code>AI_PRIVATE_KEY</code></td>
+      <td><code>ai.server.ts</code></td>
+      <td>Required for `send_crypto_to_signed_in_user`, the agent sender, and Key NFT management tools.</td>
+    </tr>
+    <tr>
+      <td><code>OPENAI_API_KEY</code>/<code>AI_BASE_URL</code></td>
+      <td><code>ai.server.ts</code></td>
+      <td>Supply credentials for OpenAI or point to a local LM Studio endpoint.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Pinecone & Semantics
+
+`dapp/app/config/pinecone.config.ts` parses `PINECONE_INDEX_*` environment variables, exposes helper methods for namespace validation, and is consumed by both the MCP tool (`pinecone-search.ts`) and the agent rap workflow. The seeding scripts under `dapp/pinecone` rely on `PINECONE_API_KEY` plus index/namespace lists.
+
+See the [Pinecone database](/ai-systems/pinecone) page for index layout, seeding workflows, and dataset format.
+
+## Operational Tips
+
+- Keep **public** and **server** env validation errors actionable: both files log issues once per boot via their run-once guards.
+- Because the chat route reads JSON before opening the SSE stream, incorrect payloads fail fast without tying up a connection.
+- When switching to LM Studio, remember to set `AI_BASE_URL` to the server’s `/v1` endpoint—`providerRegistry` normalizes trailing slashes but expects the OpenAI-compatible path.

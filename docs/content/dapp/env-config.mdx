@@ -1,0 +1,302 @@
+---
+title: Environment Configuration
+description: Reference guide for every validated environment variable powering the RitoSwap dapp.
+---
+
+import { Table, Callout } from 'nextra/components'
+
+# Environment Configuration Reference
+
+RitoSwap validates every environment variable as the app boots (see `app/config/public.env.ts` and `app/config/server.env.ts`). Incorrect or incomplete settings throw immediately, and some flags change behavior across the entire stack (state worker enablement, JWT signing, Cloudflare worker routing, etc.). Use this page to understand each flag, its default, and the conditional rules enforced by the validators.
+
+## Public Environment (`NEXT_PUBLIC_*`)
+
+These variables ship to the browser, so the schema (lines 32‑99) enforces strict typing before exporting `publicEnv` and `publicConfig`. Defaults are safe for local development—even if a variable is omitted, the parser fills in deterministic values.
+
+<Callout type="info">
+All public flags run through a custom `BoolEnv` transformer. Strings such as `yes`, `1`, `on`, or `true` become `true`; everything else (including empty strings) becomes `false`.
+</Callout>
+
+<Table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Default</th>
+      <th>Notes / Conditional Rules</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`NEXT_PUBLIC_ENABLE_STATE_WORKER`</td>
+      <td>`false`</td>
+      <td>Master switch for SIWE + rate limiting. When `true`, the server also requires `STATE_WORKER_URL` and `STATE_WORKER_API_KEY` (see server table).</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_ACTIVE_CHAIN`</td>
+      <td>`sepolia`</td>
+      <td>Determines runtime chain selection (`ethereum`, `sepolia`, `ritonet`). If set to `ritonet`, the fields below become mandatory.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_DOMAIN`</td>
+      <td>`localhost:3000`</td>
+      <td>Comma‑delimited host allowlist for SIWE + legacy auth.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_LOCAL_CHAIN_ID`</td>
+      <td>Unset</td>
+      <td>Required when `NEXT_PUBLIC_ACTIVE_CHAIN=ritonet`. Used to derive `CHAIN_IDS.ritonet`.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_LOCAL_BLOCKCHAIN_NAME`</td>
+      <td>`RitoNet`</td>
+      <td>Display name for local network / chain info provider.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_LOCAL_BLOCKCHAIN_RPC`</td>
+      <td>Unset</td>
+      <td>Required when running on RitoNet. Must be a valid URL.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_LOCAL_BLOCKCHAIN_WSS`</td>
+      <td>Unset</td>
+      <td>Required when running on RitoNet. Validated via regex for `ws://` or `wss://`.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_ALCHEMY_API_KEY`</td>
+      <td>Unset</td>
+      <td>Optional. Enables Alchemy RPCs for Ethereum/Sepolia; otherwise the app uses public RPCs.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`</td>
+      <td>Unset</td>
+      <td>Optional. When missing, the server logs a warning because WalletConnect UI is disabled.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_APP_NAME`</td>
+      <td>`App Name`</td>
+      <td>Used by ConnectKit / wallet UI metadata.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_APP_DESCRIPTION`</td>
+      <td>`App Description`</td>
+      <td>Displayed alongside the app name in wallet prompts.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_SW`</td>
+      <td>`false`</td>
+      <td>Enables the service worker / PWA layer. Surfaced via `publicConfig.features.serviceWorker`.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_LOG_LEVEL`</td>
+      <td>`debug` (dev) / `warn` (prod)</td>
+      <td>Optional literal (`debug`, `info`, `warn`, `error`). Falls back to environment‑aware defaults.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_LOCAL_NOTIFICATIONS`</td>
+      <td>`true`</td>
+      <td>Controls browser notification prompts inside the dapp.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_SENTRY_DSN`</td>
+      <td>Unset</td>
+      <td>Optional. Client and edge Sentry DSN; the server falls back to this if `SENTRY_DSN` is not set.</td>
+    </tr>
+  </tbody>
+</Table>
+
+### Derived Helpers
+
+- `publicEnv` – frozen object containing all validated values (lines 148‑150).
+- `publicConfig` – friendly helpers exposed to both server and client (chain, log level, feature flags).
+
+## Server Environment (`serverEnv`)
+
+The server validator (`app/config/server.env.ts`) runs before any server component executes. It throws immediately if a critical variable is missing and emits warnings for optional but recommended values (e.g., R2 config).
+
+<Table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Default / Requirement</th>
+      <th>Notes / Conditional Rules</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`DATABASE_URL`</td>
+      <td>Required</td>
+      <td>App refuses to boot without it.</td>
+    </tr>
+    <tr>
+      <td>`STATE_WORKER_API_KEY`, `STATE_WORKER_URL`</td>
+      <td>Optional unless `NEXT_PUBLIC_ENABLE_STATE_WORKER=true`</td>
+      <td>Both must be present once the public flag is enabled; otherwise validation fails.</td>
+    </tr>
+    <tr>
+      <td>`BREVO_API_KEY`, `SENDER_EMAIL`, `RECEIVER_EMAIL`</td>
+      <td>Optional</td>
+      <td>Without them, the code logs warnings and skips production email delivery.</td>
+    </tr>
+    <tr>
+      <td>`USE_CLOUDFLARE_WORKER`</td>
+      <td>`false`</td>
+      <td>Parser coerces strings/numbers to booleans. If `true`, `CLOUDFLARE_WORKER_URL` must be defined.</td>
+    </tr>
+    <tr>
+      <td>`CLOUDFLARE_WORKER_URL`</td>
+      <td>Optional</td>
+      <td>Required only when `USE_CLOUDFLARE_WORKER` evaluates to `true`.</td>
+    </tr>
+    <tr>
+      <td>`R2_API_*`</td>
+      <td>Optional</td>
+      <td>Missing values trigger warnings because uploads/signing won’t work.</td>
+    </tr>
+    <tr>
+      <td>`SENTRY_DSN`, `SENTRY_ENVIRONMENT`</td>
+      <td>Optional</td>
+      <td>Server-side Sentry overrides. If omitted, DSN falls back to `NEXT_PUBLIC_SENTRY_DSN` and environment defaults to `NEXT_PUBLIC_ACTIVE_CHAIN`.</td>
+    </tr>
+    <tr>
+      <td>`BACKDOOR_TOKEN`</td>
+      <td>`false`</td>
+      <td>If `true`, `TOKEN_ID` must be set. In production, `BACKDOOR_ADDRESS` must also be defined.</td>
+    </tr>
+    <tr>
+      <td>`JWT_ALG`</td>
+      <td>`HS256`</td>
+      <td>Determines which signing material is required (see below).</td>
+    </tr>
+    <tr>
+      <td>`JWT_SECRET`</td>
+      <td>Required when `JWT_ALG=HS256`</td>
+      <td>Validator warns if the secret is shorter than 32 characters.</td>
+    </tr>
+    <tr>
+      <td>`JWT_PRIVATE_KEY`, `JWT_PUBLIC_KEY`</td>
+      <td>Required when `JWT_ALG` is `EdDSA` or `ES256`</td>
+      <td>Validator checks for PEM markers and throws if either key is missing.</td>
+    </tr>
+    <tr>
+      <td>`JWT_ISS`</td>
+      <td>Required (URL)</td>
+      <td>Issuer claim for minted access tokens.</td>
+    </tr>
+    <tr>
+      <td>`JWT_AUD`</td>
+      <td>Required (comma list)</td>
+      <td>Must contain at least one audience; parsed into `serverConfig.jwt.aud`.</td>
+    </tr>
+    <tr>
+      <td>`JWT_ACCESS_TTL`</td>
+      <td>`900` seconds</td>
+      <td>Positive integer TTL for gate access tokens.</td>
+    </tr>
+    <tr>
+      <td>`JWT_CLOCK_TOLERANCE`</td>
+      <td>`5` seconds</td>
+      <td>Allowable clock skew passed to downstream JWT verification.</td>
+    </tr>
+  </tbody>
+</Table>
+
+### serverConfig Helpers
+
+The module exports a frozen `serverConfig` object that downstream code can safely import:
+
+- `serverConfig.email` – indicates whether Brevo credentials exist and whether worker delegation is enabled.
+- `serverConfig.stateService` – exposes `isActive`, `url`, and `apiKey` for the Durable Object client.
+- `serverConfig.jwt` – shares non-secret metadata such as issuer, audiences, TTL, algorithm, and booleans indicating whether signing material is present (without exposing the secret/private key).
+
+## Runtime Validation Workflow
+
+`app/config/validate.ts` ties everything together. Importing the module triggers no work; you must explicitly call `validateEnvironment()` during server startup (for example, in `app/layout.tsx` before rendering the shell).
+
+Key details:
+
+- **Server-only** – the function throws if invoked in the browser.
+- **Run-once guard** – it stores a promise on `globalThis.__ENV_VALIDATION_PROMISE`, preventing duplicate validation/log spam under React Strict Mode.
+- **What it does**:
+  1. Dynamically imports `server.env.ts`, `public.env.ts`, `chain.ts`, and `ai.server.ts`, forcing each file’s zod schema to run.
+  2. Builds a “startup configuration” summary (environment, feature flags, chain RPC metadata, AI quota settings, infra health).
+  3. Logs the summary via `@logger` and emits production-only warnings if something isn’t configured (email missing, Alchemy key absent, backdoor enabled, AI quota misconfigured, etc.).
+  4. Throws if any import fails, ensuring deployment halts before serving traffic.
+
+**Recommended usage:**
+
+```ts
+// app/layout.tsx
+import { validateEnvironment } from '@/app/config/validate'
+
+export default async function RootLayout({ children }) {
+  await validateEnvironment()  // Fail fast if env is misconfigured
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  )
+}
+```
+
+If your deployment uses a custom server entry point, call the validator before bootstrapping the Next handler. This guarantees every environment change gets revalidated on cold start.
+
+## Deployment Checklist
+
+1. Decide on your primary chain. If you stick with the Sepolia default, no extra envs are required. For RitoNet, set every `NEXT_PUBLIC_LOCAL_BLOCKCHAIN_*` field plus matching RPC endpoints in other workspaces.
+2. Enable the state worker by setting `NEXT_PUBLIC_ENABLE_STATE_WORKER=true` **and** providing `STATE_WORKER_URL`/`STATE_WORKER_API_KEY`.
+3. Configure JWT signing material appropriate for your chosen algorithm.
+4. Choose an email delivery mode:
+   - Brevo inline: set `BREVO_API_KEY`, `SENDER_EMAIL`, `RECEIVER_EMAIL`, leave `USE_CLOUDFLARE_WORKER=false`.
+   - Worker delegation: set `USE_CLOUDFLARE_WORKER=true` and provide `CLOUDFLARE_WORKER_URL` (the worker itself needs the Brevo secrets via Wrangler).
+5. (Optional) Wire Cloudflare R2 for gated audio downloads.
+
+Keeping these contracts in sync with their validators ensures your deployment fails fast when configuration drifts, instead of producing subtle runtime bugs.
+
+## Security Schemas (shared Zod helpers)
+
+`app/config/security.public.ts` centralizes the low-level validation used by every API. Refer to these specs when implementing clients or new endpoints.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Helper</th>
+      <th>Definition</th>
+      <th>Usage</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`NONCE_BYTES`, `NONCE_ENCODING`, `NonceSchema`</td>
+      <td>16 bytes, encoded as lowercase hex (32 chars). Regex enforced via `^[0-9a-fA-F]{32}$`.</td>
+      <td>`/api/nonce`, `/api/gate-access` (SIWE flow) – clients must send the exact hex string returned by the nonce endpoint.</td>
+    </tr>
+    <tr>
+      <td>`SignatureSchema`</td>
+      <td>65-byte ECDSA signature (`0x` + 130 hex chars). Compact 64-byte signatures are disabled unless `ALLOW_COMPACT_SIGNATURES` is flipped.</td>
+      <td>Gate access & form-submission requests. Sending a shorter signature triggers a 400 before any cryptographic checks run.</td>
+    </tr>
+    <tr>
+      <td>`AddressSchema`</td>
+      <td>Strict `0x[a-fA-F0-9]{40}` regex with lowercase normalization.</td>
+      <td>All API bodies that accept an address (gate access, form submission, token status) reuse this schema to prevent mixed-case drift.</td>
+    </tr>
+    <tr>
+      <td>`TokenIdInputSchema` / `TokenIdStringSchema`</td>
+      <td>Accepts either a number or numeric string (for JSON bodies) and coerces to `number`. Path params use the string-only variant.</td>
+      <td>Gate access, form submission, token status routes, and any CLI tooling that needs to accept human-friendly inputs.</td>
+    </tr>
+  </tbody>
+</Table>
+
+🥡 **Takeaway:** Instead of duplicating regexes in every route, always import these schemas. That way, updating nonce or signature rules happens in one place and the request DTOs automatically inherit the stricter contract.
+
+## Chain Metadata Helpers
+
+Multi-network UI components reuse the pure TypeScript helpers in `app/schemas/domain/chains.ts`. That file intentionally avoids touching env state so it can be imported by client utilities (Chain Info Provider, ConnectKit config, MCP tools):
+
+- `SupportedChainSchema` – a Zod enum listing every chain the UI can mention (`mainnet`, `sepolia`, `polygon`, `arbitrum`, `avalanche`, `base`, `optimism`, `fantom`, `ritonet`). Use it whenever you accept arbitrary strings from user input or query params.
+- `CHAIN_DISPLAY_NAMES` / `formatChainName()` – canonical casing for badges and dropdowns (“RitoNet”, “Sepolia”, etc.). Keeps marketing copy consistent with the environment selectors described earlier.
+- `CHAIN_NATIVE_SYMBOLS` – lightweight map for showing the correct ticker (`ETH`, `MATIC`, `AVAX`, …) alongside balances.
+- `isSupportedChain()` – type guard you can run before calling more expensive chain-specific logic.
+
+Because the helpers live in `app/schemas/domain`, they can be shared between the docs site, MCP integrations, and the dapp without risking accidental bundling of env-sensitive config.

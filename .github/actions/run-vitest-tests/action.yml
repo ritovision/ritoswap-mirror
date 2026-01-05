@@ -1,0 +1,53 @@
+name: Run Vitest Tests
+description: Runs Vitest unit and integration tests with optional Codecov upload
+
+inputs:
+  working-directory:
+    description: 'Working directory to run tests from'
+    required: false
+    default: './dapp'
+  upload-coverage:
+    description: 'Upload coverage to Codecov'
+    required: false
+    default: 'false'
+  codecov-flags:
+    description: 'Codecov flags'
+    required: false
+    default: 'dapp'
+  codecov-token:
+    description: 'Codecov upload token (required for protected branches)'
+    required: false
+  database-url:
+    description: 'Database URL for tests'
+    required: false
+    default: 'postgresql://test:test@localhost:5432/test'
+
+runs:
+  using: composite
+  steps:
+    - name: Run tests with coverage
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        DATABASE_URL: ${{ inputs.database-url }}
+      run: pnpm test:coverage
+
+    - name: Upload coverage to Codecov
+      if: inputs.upload-coverage == 'true'
+      uses: codecov/codecov-action@v5
+      continue-on-error: true
+      with:
+        directory: ${{ inputs.working-directory }}/coverage
+        flags: ${{ inputs.codecov-flags }}
+        name: ${{ inputs.codecov-flags }}-coverage
+        token: ${{ inputs.codecov-token }}
+        override_branch: main
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: Upload coverage reports as artifact
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: ${{ inputs.working-directory }}/coverage/

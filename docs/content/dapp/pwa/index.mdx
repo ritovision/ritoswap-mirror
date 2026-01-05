@@ -1,0 +1,194 @@
+---
+title: "Overview"
+description: "Progressive Web App implementation for an installable dApp experience with service workers"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+
+# Progressive Web App Integration
+
+RitoSwap implements Progressive Web App (PWA) capabilities to deliver a native application experience that transcends traditional web boundaries. This architectural decision reflects the fundamental nature of decentralized applications—they are applications first, websites second. The PWA implementation ensures users experience the seamless, integrated feel of a native app while maintaining the accessibility and openness of web technologies.
+
+## Architectural Philosophy
+
+The decision to implement RitoSwap as a PWA stems from a fundamental understanding of how users interact with Web3 applications. Unlike traditional websites that users visit occasionally, dApps become integral tools in users' digital asset management workflows. The deep integration between wallet connections, smart contract interactions, and real-time blockchain state demands an application-like experience that persists beyond browser sessions.
+
+### Why PWA for a dApp
+
+Decentralized applications occupy a unique position in the software ecosystem. They require the security and openness of web technologies while demanding the persistence and integration of native applications. RitoSwap's PWA implementation bridges this gap through several key architectural decisions:
+
+**Persistent Wallet Context** - Users maintain their wallet connections and transaction history across sessions, creating continuity in their blockchain interactions. The PWA ensures this context persists even when the browser closes, allowing users to return to their exact state.
+
+**Real-time State Synchronization** - The aggressive polling of RPC endpoints and smart contract states requires an application that can maintain background processes and deliver timely notifications. PWA service workers enable this persistent monitoring even when the app isn't in the foreground.
+
+**Installable App Shell** - Users can add RitoSwap to their home screen or app launcher, gaining a standalone entry point with consistent branding and a focused UI.
+
+**Native-like Notifications** - Transaction confirmations, NFT transfers, and token gate access all benefit from system-level notifications that persist beyond the browser context. The PWA enables these critical alerts to reach users regardless of their current focus.
+
+## Technical Implementation
+
+RitoSwap leverages Next.js with the `next-pwa` plugin to deliver a streamlined PWA experience. The implementation follows established patterns while incorporating specific optimizations for blockchain interactions.
+
+### Core Configuration
+
+The PWA manifest defines the application's identity and behavior when installed:
+
+```json
+{
+  "name": "RitoSwap dApp",
+  "short_name": "RitoSwap",
+  "description": "RitoSwap - NFT Minting and Token Gate",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait"
+}
+```
+
+This configuration ensures the app launches in standalone mode, removing browser chrome and creating an immersive experience that matches RitoSwap's Blade Runner-inspired aesthetic.
+
+### Service Worker Strategy
+
+The `next-pwa` plugin automatically generates optimized service workers that implement intelligent caching strategies. For blockchain applications, this means caching static assets aggressively while ensuring dynamic data always fetches fresh from RPC endpoints.
+
+<Callout type="info">
+For detailed PWA configuration options and service worker customization, refer to the [Next.js PWA documentation](https://github.com/shadowwalker/next-pwa) and [Google's PWA guidelines](https://web.dev/progressive-web-apps/).
+</Callout>
+
+## Notification System Architecture
+
+RitoSwap implements a sophisticated dual-notification system that ensures users never miss critical blockchain events. This system recognizes that blockchain transactions often complete asynchronously, sometimes minutes after initiation, making persistent notifications essential.
+
+### Notification Types and Triggers
+
+The application monitors six key events that warrant user notification:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Event</th>
+      <th>Trigger</th>
+      <th>Notification Content</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>NFT Minted</td>
+      <td>Successful mint transaction confirmation</td>
+      <td>"Your NFT has been successfully minted"</td>
+    </tr>
+    <tr>
+      <td>NFT Burned</td>
+      <td>Successful burn transaction confirmation</td>
+      <td>"Your NFT has been successfully burned"</td>
+    </tr>
+    <tr>
+      <td>NFT Received</td>
+      <td>Incoming transfer event detected</td>
+      <td>"You have received a new NFT"</td>
+    </tr>
+    <tr>
+      <td>NFT Transferred</td>
+      <td>Outgoing transfer confirmation</td>
+      <td>"Your NFT has been successfully transferred"</td>
+    </tr>
+    <tr>
+      <td>Token Gate Unlocked</td>
+      <td>Successful gate verification</td>
+      <td>"Access granted to the token gate"</td>
+    </tr>
+    <tr>
+      <td>Message Recorded</td>
+      <td>Token gate message submission</td>
+      <td>"Your message has been recorded and your key has been used"</td>
+    </tr>
+  </tbody>
+</Table>
+
+### Permission Management
+
+The PWA requests notification permissions intelligently, avoiding aggressive prompts that might alienate users. The system checks for existing permissions on load and only requests when users perform actions that would benefit from notifications:
+
+```typescript
+// Check existing permission state
+if ('Notification' in window && Notification.permission === 'default') {
+  // Request only when user initiates blockchain interaction
+  Notification.requestPermission()
+}
+```
+
+### Fallback Strategy
+
+When native notifications are unavailable or denied, the system seamlessly falls back to the styled toast notification system. This ensures all users receive transaction feedback regardless of their notification preferences or browser capabilities.
+
+## Connectivity Guard (App Shell)
+
+Offline detection and UI blocking are implemented in the app shell, not in the PWA service worker. See [Offline Detection](/dapp/connectivity/offline) for the runtime guard details.
+
+## Installation and Platform Support
+
+The PWA supports installation across all major platforms, adapting its behavior to each environment:
+
+### Desktop Installation
+
+Modern browsers display an install prompt in the address bar when users visit RitoSwap. Once installed, the app appears in the system's application list and launches without browser chrome.
+
+### Mobile Installation
+
+Mobile browsers typically prompt for installation through their share menu or banner prompts. The PWA adapts to each platform's conventions:
+
+- **iOS**: Uses Apple's Web App manifest interpretation with proper status bar styling
+- **Android**: Leverages Chrome's advanced PWA capabilities including background sync
+
+### Platform-Specific Optimizations
+
+The implementation includes platform-specific configurations to ensure optimal experience:
+
+```html
+<!-- iOS-specific optimizations -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+<!-- Android and general PWA -->
+<meta name="mobile-web-app-capable" content="yes" />
+```
+
+## Performance Implications
+
+The PWA implementation introduces several performance considerations that the architecture addresses:
+
+**Service Worker Overhead** - While service workers add initial complexity, they enable offline asset serving and reduce subsequent load times through intelligent caching.
+
+**Notification API Usage** - The notification system implements throttling to prevent overwhelming users during high-activity periods like multiple NFT transfers.
+
+**Background Processing** - The PWA architecture enables more aggressive blockchain state polling without impacting perceived performance, as updates occur in service worker contexts.
+
+## Development Considerations
+
+When extending or modifying the PWA implementation, several patterns ensure consistency:
+
+### Adding New Notifications
+
+New notification types should follow the established pattern in the NFTNotifications object:
+
+```typescript
+newEvent: () => sendNotification('Event Title', {
+  body: 'Descriptive message about the event',
+  tag: 'unique-event-tag', // Prevents duplicate notifications
+})
+```
+
+### Testing PWA Features
+
+PWA features require specific testing approaches:
+
+1. **Installation Testing** - Use Chrome DevTools Application panel to simulate installation flows
+2. **Service Worker Testing** - Verify service worker registration and cache updates in DevTools
+3. **Notification Testing** - Test with various permission states to ensure graceful degradation
+
+## Summary
+
+RitoSwap's PWA implementation transforms a web-based dApp into a persistent, application-like experience that meets users' expectations for modern software. Through careful integration of service workers and comprehensive notification systems, the PWA ensures that blockchain interactions feel as natural and reliable as any native application. This architectural decision reflects a deep understanding of how users engage with decentralized applications—not as websites to visit, but as tools to rely upon in their digital asset journey.
+
+The implementation balances the openness and security of web technologies with the persistence and integration users expect from applications, creating an experience that truly embodies the vision of Web3 as the next evolution of digital interaction.

@@ -1,0 +1,97 @@
+---
+title: GIFs
+description: Rendering animated GIFs and integrating with the semantic meme database.
+---
+
+import { Callout, Cards } from 'nextra/components'
+import { StorybookEmbed } from '@components/StorybookEmbed'
+
+# GIF Renderer
+
+The `<gif>` tag provides a specialized way to render animated content within the chat stream. While it shares the underlying rendering engine with standard images, it adds intelligent path resolution for local assets and defaults optimized for memes and reactions.
+
+## Usage
+
+The parser supports multiple attribute aliases for the source URL (`src`, `url`, `href`) to make it easier for LLMs to generate valid tags.
+
+```html
+<!-- Standard usage -->
+<gif src="wow.gif" />
+
+<!-- With dimensions (defaults to width=300 if omitted) -->
+<gif src="https://example.com/reaction.gif" width="400" />
+
+<!-- LLM-friendly aliases -->
+<gif url="confused.gif" alt="Confused Travolta" />
+```
+
+### Attribute Aliases & Defaults
+The parser (`parseContentWithMedia.ts`) includes several quality-of-life aliases to make tag generation robust:
+
+| Attribute | Aliases | Default |
+| :--- | :--- | :--- |
+| `src` | `url`, `href` | **Required** |
+| `width` | `w` | `300` (enforced by renderer if omitted) |
+| `height` | `h` | `undefined` (preserves aspect ratio) |
+| `alt` | — | `"GIF"` |
+
+## Interactive Demos
+
+Submit a message to see the inline tool generated.
+
+### GIF Demo
+
+Submit a message to see a gif rendered inline as a response.
+
+<StorybookEmbed title="ChatBot/InlineTools" story="GifSeeded" height="640px" />
+
+## Path Resolution Logic
+**File:** `dapp/components/chatBot/ChatMessages/utils/gifHelpers.ts`
+
+The renderer includes a helper `resolveGifSrc` that normalizes paths so the bot can be lazy with filenames.
+
+| Input | Resolved Path | Logic |
+| :--- | :--- | :--- |
+| `https://...` | `https://...` | Absolute URLs are preserved. |
+| `/gifs/wow.gif` | `/gifs/wow.gif` | Absolute local paths are preserved. |
+| `wow.gif` | `/gifs/wow.gif` | **Auto-prefix:** Assumes the `public/gifs` directory. |
+| `gifs/wow.gif` | `/gifs/wow.gif` | Normalizes relative paths. |
+| `foo\bar.gif` | `/gifs/foo/bar.gif` | Normalizes Windows backslashes. |
+
+## Architecture
+
+### The Renderer Wrapper
+**File:** `dapp/components/chatBot/ChatMessages/renderers/GifRenderer.tsx`
+
+`GifRenderer` is a lightweight wrapper around the standard `ImageRenderer`.
+
+1. **Defaults:** It enforces a default `width` of `300px` if none is provided, ensuring GIFs don't explode to their full intrinsic size (which is often too large for chat bubbles).
+2. **Reusability:** By delegating to `ImageRenderer`, GIFs inherit:
+   - **Shimmer Loading:** A skeleton pulse while the heavy GIF downloads.
+   - **Error Handling:** Graceful failure if the asset is missing.
+   - **Lazy Loading:** Browser-native `loading="lazy"` behavior.
+
+### Semantic GIF Search (MCP)
+
+The chat system is backed by a semantic search tool that allows the AI to find relevant GIFs based on "vibes" rather than exact filenames.
+
+<Callout type="info">
+  **Pinecone Integration:** We maintain a vector database of GIF metadata (descriptions, emotions, text overlays) indexed in Pinecone. The `pinecone-search` MCP tool queries this index to retrieve the most relevant filename for a given context.
+</Callout>
+
+<Cards num={2}>
+  <Cards.Card title="Pinecone Search Tool" href="/ai-systems/mcp-stack/pinecone-search" icon="🔍" arrow>
+    How the MCP tool turns queries into vector lookups and UI-friendly output.
+  </Cards.Card>
+  <Cards.Card title="Pinecone Database" href="/ai-systems/pinecone" icon="DB" arrow>
+    Index configuration, seeding workflow, and dataset format.
+  </Cards.Card>
+</Cards>
+
+## Helper Reference
+
+### `resolveGifSrc(input: string)`
+Located in `gifHelpers.ts`. This function is the single source of truth for GIF path normalization. It is used by both the parser (to prepare the segment) and the renderer (as a fallback).
+
+### `extractGifAttrs(tag: string)`
+A regex-based utility to parse attributes from raw strings. Note that the main message parser (`parseContentWithMedia.ts`) has its own attribute reader, but this helper is exposed for edge cases or testing where you might need to parse a standalone tag.

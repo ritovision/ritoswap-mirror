@@ -1,0 +1,109 @@
+---
+title: Overview
+description: Overview of Local Blockchain and Blockscout Workspace
+---
+import versions from '@lib/versions';
+
+# Local Blockchain
+**Version: {versions['local-blockchain']}**
+
+## Overview
+
+The Local Blockchain workspace provides a complete Hyperledger Besu QBFT network for local development. This includes:
+
+- **Besu Validator**: Single-validator QBFT network using Hyperledger Besu v25.11.0 with archive data for trace/debug APIs
+- **Blockscout Explorer**: Full-featured blockchain explorer for inspecting transactions, blocks, and contracts (v9.2.2 by default)
+- **Automated Setup**: Scripts to initialize, manage, and clean the validator key, genesis, Besu data dir, and Blockscout checkout
+
+This workspace is designed for testing smart contracts and dApps in a controlled environment with fast block times and predictable behavior.
+
+> **Note**: If you see references to "ritonet" in the codebase, that's just a branded / internal name for this local blockchain setup.
+
+## Prerequisites
+
+- Docker Desktop / Docker Engine with Compose v2
+- Node.js 18+ and pnpm
+- Available ports: 8545 (RPC), 8546 (WebSocket), 4000 (Blockscout proxy)
+
+## Installation and Setup
+
+1. **Install dependencies** (from repo root):
+   ```bash
+   pnpm install
+   ```
+
+2. **Bootstrap the workspace**:
+   ```bash
+   pnpm --filter local-blockchain run setup
+   ```
+
+   The setup script:
+   - Creates `.env` from `.env.example` (if missing)
+   - Generates/syncs the validator private key in `.env` and `config/keys/validator.key`
+   - Produces a Besu-compatible QBFT `config/genesis.json`
+   - Initializes `data/besu`
+   - Clones Blockscout at `BLOCKSCOUT_TAG`
+
+3. **Start the network**:
+   ```bash
+   # Besu + Blockscout stack
+   pnpm --filter local-blockchain run start
+
+   # Besu only
+   pnpm --filter local-blockchain run start:node
+   ```
+
+## Configuration
+
+The network is configured via `.env` file with these key settings:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `LOCAL_CHAIN_ID` | 90999999 | Chain ID for RitoSwap Localnet |
+| `BLOCK_TIME` | 5 | Seconds between Besu blocks |
+| `RPC_PORT` | 8545 | HTTP JSON-RPC port |
+| `RPC_WS_PORT` | 8546 | WebSocket RPC port |
+| `P2P_PORT` | 30303 | Besu discovery/peering port |
+| `BLOCKSCOUT_PORT` | 4000 | Nginx proxy → Blockscout frontend |
+| `BLOCKSCOUT_PUBLIC_HOST` | localhost | Hostname/IP injected into Blockscout frontend for mobile/LAN |
+| `BLOCKSCOUT_TAG` | v9.2.2 | Blockscout release cloned at setup |
+| `TEST_ACCOUNT` | 0xee1520... | Additional prefunded test account |
+| `TEST_ACCOUNT_BALANCE` | 10000000000000000000000 | Wei allocation for `TEST_ACCOUNT` |
+
+### Validator & Prefunded Accounts
+
+The setup script manages your validator credentials automatically:
+
+- `VALIDATOR_PRIVATE_KEY` / `VALIDATOR_ADDRESS` are written to `.env`
+- The same key (without `0x`) is stored at `config/keys/validator.key`
+- `VALIDATOR_ACCOUNT_BALANCE` lets you override the validator's genesis prefund (defaults to 50,000 ETH)
+
+You can set `TEST_ACCOUNT`, `TEST_ACCOUNT_PRIVATE_KEY`, and `TEST_ACCOUNT_BALANCE` prior to running setup to pre-fund your own wallet. Any change to validator or chain ID requires re-running `pnpm --filter local-blockchain run clean` followed by setup to regenerate the genesis.
+
+### Blockscout Host Access
+
+`BLOCKSCOUT_PUBLIC_HOST` is injected into Blockscout's Next.js frontend so phones/tablets on the same LAN can resolve API/asset URLs. Set it to your computer's LAN IP (e.g., `192.168.1.42`) before starting the stack if you want to browse from other devices. The nginx proxy still binds to `BLOCKSCOUT_PORT` (default `4000`) on the host.
+
+### Manual Genesis Generation
+
+Need to regenerate `config/genesis.json` after tweaking `.env`? Run:
+
+```bash
+pnpm --filter local-blockchain run generate:genesis
+```
+
+This keeps your existing validator key but rewrites the QBFT genesis file.
+
+### Besu Version Pin
+
+Besu defaults to `BESU_VERSION=25.11.0`. Override this env var when building the Docker image if you need a different release, but stay aligned with Blockscout requirements (trace APIs must remain enabled).
+
+### Docker Container Conflicts
+
+If older containers are hanging around, tear the stack down:
+
+```bash
+docker compose down -v
+# or from the workspace
+pnpm --filter local-blockchain run clean
+```

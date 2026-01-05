@@ -1,0 +1,71 @@
+---
+title: MCP Tool · manage_key_nft
+description: Mint, burn, or inspect the chatbot signer’s Key NFT.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# `manage_key_nft`
+
+The management tool (`dapp/app/lib/mcp/tools/keynft-manage.ts`) uses the AI signer (configured via `AI_PRIVATE_KEY`) to interact with the OnePerWalletKeyToken contract.
+
+## Capabilities
+
+- **query** — Re-queries the signer address, returning whether a token exists plus its color palette.
+- **burn** — Destroys the existing token if present.
+- **mint** — Burns any existing token, then mints a fresh one and returns the new token/colors.
+
+Underlying helpers:
+
+- `getOwnedToken` — Calls `getTokenOfOwner` (or the legacy `tokensOfOwner`) to fetch the current token.
+- `getTokenColors` — Reads palette metadata.
+- `buildExplorerUrl` — Uses `getChainConfig()` explorer URLs for user-friendly links in the JSON payload.
+- `getSignerClients` — Creates viem wallet/public clients pointed at whichever chain the dapp is running on.
+
+```ts
+// dapp/app/lib/mcp/tools/keynft-manage.ts
+const tool: Tool<Params> = {
+  name: 'manage_key_nft',
+  requiresJwt: true,
+  inputSchema: InputSchema,
+  async handler({ action }) {
+    const { account, walletClient, publicClient } = await getSignerClients();
+    const timeline: TimelineEvent[] = [];
+    const ownership = await getOwnedToken(account.address);
+    if (action === 'query') return formatQuery(ownership, timeline);
+    if (action === 'burn') return ownership.hasToken ? burnToken(ownership.tokenId!, timeline, walletClient, publicClient) : noTokenResponse();
+    if (action === 'mint') return mintNewToken(ownership, timeline, walletClient, publicClient);
+    fail('Unsupported action');
+  },
+};
+```
+
+## Presenter Summary
+
+`dapp/components/chatBot/ToolActivity/catalog/presenters/keynft_manage.presenter.ts` keeps the chip narrative in sync with the timeline:
+
+- Pending labels distinguish `Querying`, `Burning`, or `Minting`.
+- Success chips reuse the tool’s own text stream when present, otherwise they construct a short sentence (e.g., “Minted #123 (bg #112233, key #ffee00)”).
+- Timeline events are compressed into a `message → message → message` summary so the user sees progress without exposing tx hashes.
+
+## Playground Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--key-nft-manage-interactive&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Manage Key NFT (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Notes
+
+<Callout type="warning">
+Like the send-crypto tools, `manage_key_nft` is JWT-gated. If the AI private key is missing, the handler calls `fail('... AI_PRIVATE_KEY not configured.')`, so deployments must set that secret even on local RitoNet if they want to demo burning/minting.
+</Callout>

@@ -1,0 +1,314 @@
+---
+title: "Chat"
+description: "Streaming AI chat endpoint with optional JWT auth and token-based quota tracking"
+---
+
+import { FileTree, Steps, Table, Tabs } from 'nextra/components'
+
+
+# Chat API
+
+The Chat API streams AI-generated responses for the RitoSwap chat interface. It supports multiple model providers (OpenAI, Cloudflare Workers AI, and local LM Studio via OpenAI-compatible API), optional JWT-based access control, and per-token usage quotas.
+
+## Overview
+
+This endpoint accepts prior conversation messages and returns a streamed response that renders progressively in the UI. When enabled, JWT authentication associates usage with a specific token and activates quota controls that track total tokens consumed across a time window.
+
+Key capabilities:
+
+- Provider selection via server configuration (OpenAI / Cloudflare / LM Studio)
+- Optional JWT gate (header, body, cookie, or query parameter)
+- Token-based quota with pre-check and streamed usage accounting
+- Robust error handling and structured server logging
+
+## Endpoint Details
+
+<Table>
+  <thead>
+    <tr>
+      <th>Property</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>URL</td>
+      <td>`/api/chat`</td>
+    </tr>
+    <tr>
+      <td>Method</td>
+      <td>`POST`</td>
+    </tr>
+    <tr>
+      <td>Content-Type</td>
+      <td>`application/json`</td>
+    </tr>
+    <tr>
+      <td>Authentication</td>
+      <td>JWT (configurable; default off in public config)</td>
+    </tr>
+    <tr>
+      <td>Response</td>
+      <td>Streamed text suitable for chat UI rendering</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Request Format
+
+The request body must include a `messages` array. The server accepts the standard Vercel AI message shape (CoreMessage); the simplest variant is a list of `{ role, content }` strings as shown below.
+
+```typescript
+// Minimal message type
+type Role = 'system' | 'user' | 'assistant'
+
+interface ChatMessage {
+  role: Role
+  content: string
+}
+
+interface ChatRequestBody {
+  messages: ChatMessage[]
+
+  // Optional JWT placements supported by the server:
+  // Prefer the Authorization header. The fields below are convenience fallbacks.
+  jwt?: string
+  data?: { jwt?: string }
+}
+```
+
+### Authentication Options
+
+When `NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT` is true, include a valid JWT using one of the supported locations:
+
+- Header: `Authorization: Bearer <token>` (recommended)
+- Body: `{"jwt": "<token>"}` or `{"data": {"jwt": "<token>"}}`
+- Cookie: `access_token` or `jwt`
+- Query string: `?jwt=<token>` (use sparingly; avoid logging/leaks)
+
+### Example Requests
+
+```bash
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT" \
+  -d '{
+        "messages": [
+          { "role": "user", "content": "Drop a degen rhyme about Ethereum." }
+        ]
+      }' \
+  /api/chat
+```
+
+```javascript
+// Streaming with fetch (browser)
+const res = await fetch('/api/chat', {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    // Include when JWT is required/enabled
+    ...(jwt ? { Authorization: `Bearer ${jwt}` } : {}),
+  },
+  body: JSON.stringify({
+    messages: [{ role: 'user', content: 'Rap about cross-chain swaps.' }],
+  }),
+});
+
+const reader = res.body?.getReader();
+const decoder = new TextDecoder();
+let text = '';
+while (reader) {
+  const { value, done } = await reader.read();
+  if (done) break;
+  text += decoder.decode(value, { stream: true });
+  // Render incrementally from `text` as it grows
+}
+```
+
+## Response Behavior
+
+The endpoint returns a streaming response that accumulates into the assistant’s reply. The stream is designed to integrate cleanly with a chat UI that renders tokens as they arrive. When the stream finishes, any active quota accounting is finalized server-side.
+
+## Persona & Inline Visuals
+
+The system prompt configures a rap persona named "RapBotRito" and supports inline visual tags rendered by the chat UI:
+
+- `<chain-logo chainName="Ethereum" size="200" />` – display chain logos during relevant mentions (max 2 per response)
+- `<key-icon bgColor="#000000" keyColor="#FF00FF" />` – display the user’s NFT key icon when contextually appropriate
+
+Place tags inline where visuals should appear. The UI renderer interprets them into components. The parser is forgiving and also accepts `name` instead of `chainName`, and `width` instead of `size`.
+
+Note: The “chainName required” and “max 2 logos” are system‑prompt rules for content generation, not server‑side validation.
+
+## Error Responses
+
+```json
+{
+  "error": "Missing \"messages\" array"
+}
+```
+**HTTP Status Code:** `400 Bad Request`
+
+```json
+{
+  "error": "Unauthorized: missing JWT"
+}
+```
+**HTTP Status Code:** `401 Unauthorized`
+
+```json
+{
+  "error": "Unauthorized: invalid JWT"
+}
+```
+**HTTP Status Code:** `401 Unauthorized`
+
+```json
+{
+  "error": "Quota exceeded",
+  "remaining": 0,
+  "resetAt": "2025-09-03T07:00:00.000Z"
+}
+```
+**HTTP Status Code:** `429 Too Many Requests`
+
+```json
+{
+  "error": "OpenAI API request failed",
+  "details": "..."
+}
+```
+```json
+{
+  "error": "Cloudflare Workers AI request failed",
+  "details": "..."
+}
+```
+```json
+{
+  "error": "LM Studio connection failed. Ensure it's running at https://localhost:1234/v1",
+  "details": "..."
+}
+```
+**HTTP Status Code:** `500 Internal Server Error`
+
+```json
+{
+  "error": "Chat request failed"
+}
+```
+**HTTP Status Code:** `500 Internal Server Error`
+
+## Quota & Usage Tracking
+
+When quota is active, the server performs a pre-check before invoking the model and returns `429` if the window is exhausted. During streaming, a heuristic token counter tracks output; on stream close, total estimated tokens are recorded against the authenticated token.
+
+Configuration knobs:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Setting</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`AI_CHAT_QUOTA_ENABLED`</td>
+      <td>Enable/disable quota accounting</td>
+      <td>`true`</td>
+    </tr>
+    <tr>
+      <td>`AI_CHAT_QUOTA_TOKENS`</td>
+      <td>Max tokens per window (estimated)</td>
+      <td>`20000`</td>
+    </tr>
+    <tr>
+      <td>`AI_CHAT_QUOTA_WINDOW_SEC`</td>
+      <td>Window size in seconds</td>
+      <td>`86400`</td>
+    </tr>
+  </tbody>
+</Table>
+
+Activation condition:
+
+`quota.active === true` only when all are true:
+
+- `NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT` (public flag)
+- Redis is active in server config
+- `AI_CHAT_QUOTA_ENABLED=true`
+
+## Provider Configuration
+
+The system supports multiple LLM providers, configured via environment variables. The `ProviderRegistry` (`dapp/app/lib/llm/providers/registry.ts`) abstracts the specific client creation.
+
+| Provider | Env Var (`AI_PROVIDER`) | Description |
+| :--- | :--- | :--- |
+| **OpenAI** | `openai` | Standard OpenAI API (GPT-4o, etc.). Requires `OPENAI_API_KEY`. |
+| **LM Studio** | `lmstudio` | Local inference for testing. Requires `AI_BASE_URL` (e.g., `http://localhost:1234/v1`). |
+
+### Stack & Implementation
+
+The Chat API is built on a robust stack designed for control and observability:
+
+*   **Orchestration**: **LangChain** (`@langchain/core`, `@langchain/openai`) manages the core chat loop, message history, and tool binding.
+*   **Streaming**: A **Custom SSE Handler** (`sse-stream.ts`) replaces the standard AI SDK stream. This allows us to "tee" the stream, sending text to the LLM while simultaneously streaming full JSON tool outputs to the client.
+*   **Validation**: Tools use **Raw JSON Schema** for precise definition of inputs, ensuring the LLM adheres strictly to the required format.
+
+Additional limits:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`AI_CHAT_MAX_OUTPUT_TOKENS`</td>
+      <td>Maximum tokens in a single response</td>
+      <td>`2000`</td>
+    </tr>
+    <tr>
+      <td>`AI_CHAT_MAX_DURATION`</td>
+      <td>Max server execution time (seconds)</td>
+      <td>`30`</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Client Configuration
+
+Public flags influence the client/UI behavior:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Description</th>
+      <th>Default</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT`</td>
+      <td>If true, the client should attach a Bearer token</td>
+      <td>`false`</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_AI_CHAT_API_PATH`</td>
+      <td>Path to the chat endpoint</td>
+      <td>`/api/chat`</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Security Notes
+
+- Prefer the `Authorization` header for JWTs; avoid long-term tokens in cookies and avoid query strings where possible.
+- Streaming responses should be consumed over HTTPS to prevent token leakage.
+- Quota enforcement requires Redis and proper server configuration; ensure infrastructure is healthy in production.

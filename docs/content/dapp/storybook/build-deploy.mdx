@@ -1,0 +1,95 @@
+---
+title: Build, Embed, Deploy
+description: Storybook build outputs, docs embeds, and Vercel deployment.
+---
+
+import { Callout, FileTree, Table } from 'nextra/components'
+
+# Build, Embed, Deploy
+
+This page covers how Storybook is built, how it is embedded into docs, and how it is deployed to Vercel.
+
+## Scripts
+
+Storybook scripts live in `dapp/package.json`:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Script</th>
+      <th>Command</th>
+      <th>Output</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`sb`</td>
+      <td>`storybook dev -p 6006`</td>
+      <td>Local dev server</td>
+    </tr>
+    <tr>
+      <td>`build-sb`</td>
+      <td>`storybook build`</td>
+      <td>`dapp/storybook-static`</td>
+    </tr>
+    <tr>
+      <td>`build-sb:docs`</td>
+      <td>`storybook build -o ../docs/public/storybook-static`</td>
+      <td>`docs/public/storybook-static`</td>
+    </tr>
+  </tbody>
+</Table>
+
+<Callout type="warning">
+Keep the output folder name as <code>storybook-static</code> for both builds. The asset prefix and embed URLs assume <code>/storybook-static</code>, so changing the folder name will break images/iframes unless you also update the prefix and docs paths.
+</Callout>
+
+## Docs embed pipeline
+
+Docs embed Storybook stories using the `StorybookEmbed` component:
+
+- `docs/app/components/StorybookEmbed.tsx`
+- iframe path: `/storybook-static/iframe.html`
+- built assets location: `docs/public/storybook-static`
+
+Run `pnpm build-sb:docs` to refresh the embed assets.
+
+<Callout type="info">
+Storybook is mocked for docs. `@sentry/nextjs` is aliased to a no-op mock in `dapp/.storybook/main.ts`.
+</Callout>
+
+## Build config notes
+
+`dapp/.storybook/main.ts` also:
+
+- Sets `publicDir` to `dapp/public` for asset loading.
+- Defines `process.env` as an empty object for Vite.
+- Adds TS path support via `vite-tsconfig-paths`.
+
+## Storybook asset prefix helper
+
+Storybook embeds in docs are served under `/storybook-static`, but many components reference assets with absolute paths like `/images/...`, `/gifs/...`, or `/audio/...`. To keep those references working inside the iframe, Storybook sets a global asset prefix and components opt in via a helper:
+
+- Global set in `dapp/.storybook/preview.tsx`: `window.__RITO_ASSET_PREFIX__ = '/storybook-static'`
+- Helper: `applyStorybookAssetPrefix` from `@storybook-utils/assetPrefix`
+- Helper file: `dapp/app/lib/storybook/assetPrefix.ts`
+
+When you render a static asset from the dapp public folder, wrap it:
+
+```tsx
+import { applyStorybookAssetPrefix } from '@storybook-utils/assetPrefix';
+
+<img src={applyStorybookAssetPrefix('/images/rito/rito-thinker.jpg')} alt="Rito" />
+```
+
+## Vercel deployment
+
+The workflow in `.github/workflows/deploy-storybook.yml` builds Storybook and deploys it as a static Vercel site. The hosted Storybook is served at `ui.ritoswap.com`.
+
+<FileTree>
+  <FileTree.Folder name=".github" defaultOpen>
+    <FileTree.Folder name="workflows" defaultOpen>
+      <FileTree.File name="deploy-storybook.yml" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>

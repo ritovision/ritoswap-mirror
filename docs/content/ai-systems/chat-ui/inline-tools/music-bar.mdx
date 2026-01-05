@@ -1,0 +1,114 @@
+---
+title: Music Bar & Commands
+description: Controlling the persistent audio player via inline chat commands.
+---
+
+import { Callout } from 'nextra/components'
+import { StorybookEmbed } from '@components/StorybookEmbed'
+
+# Music Bar & Commands
+
+RapBotRito features a persistent, global audio player called the **Music Bar**. This tool allows the bot to drop beats or play full tracks from the **Rito Rhymes Catalogue**, creating a multi-modal experience where users can vibe to crypto-themed anthems while chatting.
+
+## Purpose & "Rito Mode"
+
+The Music Bar is not just a background player; it is a direct reflection of **Rito Rhymes' personality**. In reality, Rito is known for bursting into rap mid-conversation, mid-interview, or mid-presentation. RapBotRito mimics this behavior by seizing control of the audio experience to underscore a point or just to vibe.
+
+- **Chatbot Control:** While users can pause/resume via the UI, **only the chatbot** can load songs, skip tracks, or scrub the timeline. The user must ask RapBotRito to navigate the catalogue.
+- **Hidden by Default:** The Music Bar remains invisible until the bot issues its first command, ensuring the music feels like a spontaneous part of the conversation.
+- **Crypto Anthems:** The player is primarily populated with Rito Rhymes' original discography, giving users direct access to the artist's work within the dApp.
+
+## Usage
+
+The `<music>` tag is an **imperative command**. When it renders in the chat stream, it executes an action against the global music state.
+
+```html
+<!-- Load "Altcoin Love" (Dr. Dre style remix) and play immediately -->
+<music song="Altcoin_Love" />
+
+<!-- Load "A-Trillie" but wait for user to play -->
+<music song="A-Trillie" autoplay="false" />
+
+<!-- Scrub to 1:14 (74 seconds) -->
+<music timeline="1:14" />
+
+<!-- Play/Pause controls -->
+<music action="pause" />
+<music action="resume" />
+```
+
+## Interactive Demos
+
+Submit a message to see the inline tool generated.
+
+### Music Controls
+
+<StorybookEmbed title="ChatBot/Music" story="RandomControls" height="640px" />
+
+## Architecture
+
+The system is split into three parts: the **State Provider**, the **UI Component**, and the **Chat Bridge**.
+
+### 1. The State Provider (`MusicProvider.tsx`)
+**File:** `dapp/components/chatBot/MusicPlayer/MusicProvider.tsx`
+
+This context holds the singleton audio state for the entire application. It manages the `AudioContext`, buffers, and playback status.
+
+- **Global State:** `isPlaying`, `currentSongName`, `currentTime`, `duration`.
+- **API:** Exposes methods like `loadSong`, `seek`, `play`, `pause`, `reset`, plus `loadArrayBuffer` for in-memory audio (used by the voice clone pipeline).
+- **Persistence:** Because it wraps the application root (or chat layout), audio continues playing even if the user navigates between chat tabs or closes the modal.
+
+### 2. The UI Component (`MusicBar.tsx`)
+**File:** `dapp/components/chatBot/MusicPlayer/MusicBar.tsx`
+
+The visual player that appears at the bottom of the screen.
+
+- **Visibility:** It is hidden by default (`height: 0`) until a song is loaded.
+- **Interactivity:** Users can manually scrub, play/pause, or close the player (which calls `reset()`).
+
+### 3. The Chat Bridge (`MusicCommandRenderer.tsx`)
+**File:** `dapp/components/chatBot/ChatMessages/renderers/MusicCommandRenderer.tsx`
+
+This is the "renderer" for the `<music>` tag. Unlike other renderers that just display content, this component **executes side effects**.
+
+- **Execution:** Inside a `useEffect`, it calls `useMusic()` to trigger the requested action (load, seek, etc.).
+- **Idempotency:** It uses a `useRef` to ensure the command runs **exactly once** per mount, preventing stuttering if React re-renders the message.
+- **Visuals:** It renders a small interactive "pill" in the chat (e.g., "▶ Now Playing: Demo"). Clicking this pill scrolls the view to the Music Bar.
+
+## Command Reference
+
+The parser (`parseContentWithMedia.ts`) extracts these attributes:
+
+| Attribute | Type | Description |
+| :--- | :--- | :--- |
+| `song` | `string` | Filename in `public/audio/` (no extension needed) OR full URL. |
+| `ext` | `string` | File extension (default: `mp3`). |
+| `timeline` | `string` | Timestamp to seek to. Supports `MM:SS` (e.g. `1:30`) or raw seconds (`90`). |
+| `action` | `string` | `play`, `pause`, or `toggle`. |
+| `autoplay` | `boolean` | Whether to start playing immediately. Defaults to `true` for song loads and seeks. |
+
+### Complex Workflows
+
+The renderer handles complex combinations intelligently:
+
+**"Load 'Hodeler' and jump straight to the chorus"**
+```html
+<music song="Hodeler" timeline="0:45" />
+```
+*Logic:*
+1. Calls `loadSong("Hodeler", { autoplay: false })`
+2. Awaits load.
+3. Calls `seek(45, { autoplay: true })`
+
+## System Prompt Integration
+
+To make this work, RapBotRito is pre-loaded with context about the available music:
+
+- **Catalogue:** `RitoRhymesCatalogue.ts` provides the list of available songs (filenames and metadata).
+- **Instructions:** `musicTool.ts` teaches the LLM how to use the `<music>` tag to control the player effectively.
+
+This allows the bot to "know" the discography and intelligently recommend or play tracks that match the current conversation's vibe.
+
+<Callout type="info">
+  **Browser Policy:** Modern browsers block autoplay until the user has interacted with the page. The `MusicProvider` handles this by waiting for an "unlock" gesture (first click/tap) before resuming the `AudioContext`.
+</Callout>

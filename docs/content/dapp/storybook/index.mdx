@@ -1,0 +1,56 @@
+---
+title: Storybook Overview
+description: How Storybook is structured, what it is used for, and where it ships.
+---
+
+import { Callout, FileTree } from 'nextra/components'
+
+# Storybook Overview
+
+Storybook is used as a **visual source of truth** for UI states, not as a testing framework. Stories document component states and provide reusable UI references for docs embeds. There is no component-test harness wired to Storybook today.
+
+<Callout type="info">
+Storybook is mocked by design. The goal is stable UI reference states, not live blockchain data.
+</Callout>
+
+## Structure
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name=".storybook" defaultOpen>
+      <FileTree.File name="main.ts" />
+      <FileTree.File name="preview.tsx" />
+      <FileTree.File name="RitoTheme.ts" />
+      <FileTree.File name="fonts.css" />
+      <FileTree.File name="storybook-overrides.css" />
+      <FileTree.Folder name="decorators" />
+      <FileTree.Folder name="harnesses" />
+      <FileTree.Folder name="mocks" />
+      <FileTree.Folder name="stories" />
+    </FileTree.Folder>
+    <FileTree.Folder name="app" />
+    <FileTree.Folder name="components" />
+  </FileTree.Folder>
+</FileTree>
+
+Storybook loads stories from:
+
+- `dapp/.storybook/stories/**/*.stories.@(ts|tsx|mdx)`
+- `dapp/app/**/*.stories.@(ts|tsx|mdx)`
+- `dapp/components/**/*.stories.@(ts|tsx|mdx)`
+
+These globs are defined in `dapp/.storybook/main.ts`.
+
+## Local commands
+
+- `pnpm sb` runs the Storybook dev server at port 6006.
+- `pnpm build-sb` builds a standalone Storybook to `dapp/storybook-static`.
+- `pnpm build-sb:docs` builds Storybook directly into `docs/public/storybook-static` for inline doc embeds.
+
+## Docs embedding
+
+The docs site uses `docs/app/components/StorybookEmbed.tsx`, which renders an iframe pointing at `/storybook-static/iframe.html`. This works because `pnpm build-sb:docs` writes Storybook into `docs/public/storybook-static`.
+
+## Deployment
+
+Storybook is deployed separately from the docs site. The GitHub workflow in `.github/workflows/deploy-storybook.yml` builds `dapp/storybook-static` and deploys it via Vercel. The hosted Storybook is served at `ui.ritoswap.com` (Vercel project domain).

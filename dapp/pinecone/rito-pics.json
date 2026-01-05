@@ -1,0 +1,178 @@
+[
+  {
+    "id": "pic_0001",
+    "text": "Close-up portrait of Rito with nerdy taped sunglasses and beard, bright yellow background and red shirt; stylish cool look to camera.",
+    "metadata": {
+      "url": "/images/chatbot/closeup-of-rito-glasses.jpg",
+      "source": "local",
+      "tags": ["rito","closeup","portrait","taped sunglasses","beard","yellow background","red shirt","stylish","cool"],
+      "mood": "stylish",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0002",
+    "text": "Rito wears taped sunglasses holding a mic close to his lips; reflection of the mic visible in the shades; intimate performance vibe.",
+    "metadata": {
+      "url": "/images/chatbot/closeup-with-mic-and-shades.jpg",
+      "source": "local",
+      "tags": ["rito","microphone","reflection","sunglasses","taped sunglasses","closeup","performance","portrait"],
+      "mood": "intense",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0003",
+    "text": "Rito in a suit riding shotgun while the Doge meme dog drives with paws on the wheel; surreal collab road scene.",
+    "metadata": {
+      "url": "/images/chatbot/doge-driving-with-rito.png",
+      "source": "local",
+      "tags": ["rito","doge","driving","car","paws on wheel","suit","meme","duo","surreal"],
+      "mood": "playful",
+      "characters": ["Rito","Doge"]
+    }
+  },
+  {
+    "id": "pic_0004",
+    "text": "Rito dangling a microphone upside down with two fingers, about to drop it; taped sunglasses; iconic mic drop moment.",
+    "metadata": {
+      "url": "/images/chatbot/mic-dropping.jpg",
+      "source": "local",
+      "tags": ["rito","mic drop","microphone","gesture","sunglasses","taped sunglasses","performance","attitude"],
+      "mood": "bold",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0005",
+    "text": "Rito in a red shirt holding a mic, performing on stage with the mic to his mouth; live rap energy.",
+    "metadata": {
+      "url": "/images/chatbot/performing.jpg",
+      "source": "local",
+      "tags": ["rito","performance","stage","rap","red shirt","microphone","live","music"],
+      "mood": "energetic",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0006",
+    "text": "Rito in a cool puffy jacket with a gold Bitcoin pendant necklace, lowering sunglasses to look over the frames; confident flex.",
+    "metadata": {
+      "url": "/images/chatbot/puffy-jacket.jpg",
+      "source": "local",
+      "tags": ["rito","puffy jacket","bitcoin pendant","necklace","sunglasses","pose","fashion","crypto"],
+      "mood": "confident",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0007",
+    "text": "Blade Runner–esque neon-lit lab scene: Rito in a red suit surrounded by robots; cinematic cyberpunk future vibe.",
+    "metadata": {
+      "url": "/images/chatbot/rito-from-the-future.jpg",
+      "source": "local",
+      "tags": ["rito","robots","lab","neon","cyberpunk","red suit","sci-fi","future","cinematic"],
+      "mood": "futuristic",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0008",
+    "text": "Rito with taped sunglasses and hand on chin, looking downward in contemplation; moody shadows over a dark yellowed background.",
+    "metadata": {
+      "url": "/images/chatbot/rito-hand-on-chin-mysterious.jpg",
+      "source": "local",
+      "tags": ["rito","hand on chin","contemplation","shadows","taped sunglasses","portrait","moody"],
+      "mood": "thoughtful",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0009",
+    "text": "Rito in a blue suit with taped sunglasses holding a golden Bitcoin coin close-up; crisp crypto portrait.",
+    "metadata": {
+      "url": "/images/chatbot/rito-holding-bitcoin-blue.jpg",
+      "source": "local",
+      "tags": ["rito","bitcoin","btc","coin","blue suit","closeup","crypto","portrait"],
+      "mood": "proud",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0010",
+    "text": "Rito in a red shirt with taped sunglasses holding a golden Bitcoin coin close-up; bold color contrast.",
+    "metadata": {
+      "url": "/images/chatbot/rito-holding-bitcoin-red.jpg",
+      "source": "local",
+      "tags": ["rito","bitcoin","btc","coin","red shirt","closeup","crypto","portrait"],
+      "mood": "proud",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0011",
+    "text": "Close-up of Rito wearing taped sunglasses with the mic held backwards in his fist up to his chin; intense pose.",
+    "metadata": {
+      "url": "/images/chatbot/Rito-holding-mic.jpg",
+      "source": "local",
+      "tags": ["rito","microphone","closeup","taped sunglasses","pose","intense"],
+      "mood": "intense",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0012",
+    "text": "Rito without sunglasses points his index finger at the camera; direct callout poster pose.",
+    "metadata": {
+      "url": "/images/chatbot/rito-pointing.jpg",
+      "source": "local",
+      "tags": ["rito","pointing","gesture","index finger","direct","poster pose","callout"],
+      "mood": "assertive",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0013",
+    "text": "Rito in the ocean smiling at the camera, giving a thumbs up while holding a small live shark to his body.",
+    "metadata": {
+      "url": "/images/chatbot/rito-riding-a-shark.png",
+      "source": "local",
+      "tags": ["rito","shark","ocean","thumbs up","smile","adventure","wild"],
+      "mood": "adventurous",
+      "characters": ["Rito"]
+    }
+  },
+  {
+    "id": "pic_0014",
+    "text": "Rito with taped sunglasses screams and runs toward the camera with a pack of Shiba Inus chasing behind.",
+    "metadata": {
+      "url": "/images/chatbot/Rito-running-from-Shiba-Inus.png",
+      "source": "local",
+      "tags": ["rito","shiba inu","running","chase","action","dogs","meme vibe"],
+      "mood": "chaotic",
+      "characters": ["Rito","Shiba Inu"]
+    }
+  },
+  {
+    "id": "pic_0015",
+    "text": "Rito in a suit shakes hands with a dark, faceless robot; solemn, serious human–machine truce moment.",
+    "metadata": {
+      "url": "/images/chatbot/rito-shaking-hands-with-robot.png",
+      "source": "local",
+      "tags": ["rito","robot","handshake","suit","solemn","serious","ai","alliance"],
+      "mood": "serious",
+      "characters": ["Rito","Robot"]
+    }
+  },
+  {
+    "id": "pic_0016",
+    "text": "Rito as an old-school scribe with a giant open book; small mallet-like tool and fine wooden or powdery flecks on the parchment—crafty manuscript vibe.",
+    "metadata": {
+      "url": "/images/chatbot/rito-the-scribe.jpg",
+      "source": "local",
+      "tags": ["rito","scribe","manuscript","book","parchment","craft","mallet-like tool","old-school","history vibe"],
+      "mood": "reflective",
+      "characters": ["Rito"]
+    }
+  }
+]

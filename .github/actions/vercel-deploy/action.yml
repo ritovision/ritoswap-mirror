@@ -1,0 +1,97 @@
+name: Vercel Deploy
+description: Deploys to Vercel using CLI - supports both remote and prebuilt modes
+
+inputs:
+  mode:
+    description: 'Deployment mode: "remote" (Vercel builds) or "prebuilt" (CI builds locally)'
+    required: false
+    default: 'remote'
+  production:
+    description: 'Deploy to production'
+    required: false
+    default: 'true'
+  vercel-token:
+    description: 'Vercel API token'
+    required: true
+  vercel-org-id:
+    description: 'Vercel organization ID'
+    required: true
+  vercel-project-id:
+    description: 'Vercel project ID'
+    required: true
+  working-directory:
+    description: 'Working directory'
+    required: false
+    default: '.'
+
+outputs:
+  previous-url:
+    description: 'The production deployment URL before this deploy (for rollback)'
+    value: ${{ steps.capture-previous.outputs.previous-url }}
+  deployment-url:
+    description: 'The new deployment URL'
+    value: ${{ steps.deploy.outputs.deployment-url }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Vercel CLI
+      shell: bash
+      run: npm i -g vercel@latest
+
+    - name: Pull Vercel environment
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+      run: |
+        vercel pull --yes \
+          --environment=${{ inputs.production == 'true' && 'production' || 'preview' }} \
+          --token=${{ inputs.vercel-token }}
+
+    - name: Capture current production URL
+      id: capture-previous
+      if: inputs.production == 'true'
+      shell: bash
+      env:
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+      run: |
+        # Get the current production deployment URL for potential rollback
+        PREVIOUS_URL=$(vercel ls --prod --token=${{ inputs.vercel-token }} 2>/dev/null | grep -E '^https://' | head -1 || echo "")
+        echo "previous-url=$PREVIOUS_URL" >> $GITHUB_OUTPUT
+        if [ -n "$PREVIOUS_URL" ]; then
+          echo "Captured previous production URL: $PREVIOUS_URL"
+        else
+          echo "No previous production deployment found"
+        fi
+
+    - name: Build locally (prebuilt mode only)
+      if: inputs.mode == 'prebuilt'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+      run: vercel build ${{ inputs.production == 'true' && '--prod' || '' }}
+
+    - name: Deploy to Vercel
+      id: deploy
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        VERCEL_ORG_ID: ${{ inputs.vercel-org-id }}
+        VERCEL_PROJECT_ID: ${{ inputs.vercel-project-id }}
+      run: |
+        if [ "${{ inputs.mode }}" == "prebuilt" ]; then
+          DEPLOYMENT_URL=$(vercel deploy --prebuilt \
+            ${{ inputs.production == 'true' && '--prod' || '' }} \
+            --token=${{ inputs.vercel-token }})
+        else
+          DEPLOYMENT_URL=$(vercel deploy \
+            ${{ inputs.production == 'true' && '--prod' || '' }} \
+            --token=${{ inputs.vercel-token }})
+        fi
+        echo "deployment-url=$DEPLOYMENT_URL" >> $GITHUB_OUTPUT
+        echo "Deployed to: $DEPLOYMENT_URL"

@@ -1,0 +1,90 @@
+import { Callout, Steps, Table, Tabs } from 'nextra/components'
+
+# Custom Wallet Harness
+
+The dapp never talks to a real browser wallet during tests. Instead, `dapp/e2e/playwright/wallet` injects a purpose-built provider that can:
+
+- Mimic EIP-1193 behaviour (connect, switch chains, send transactions, emit events).
+- Persist the connection across reloads or reset it between specs.
+- Bridge to Node-side `viem` clients for true Sepolia transactions when a private key is present.
+
+## Key files
+
+| File | Purpose |
+| --- | --- |
+| `wallet/test-setup.ts` | Main helper that specs call. Clears storage, configures persistence, exposes signing RPC bridges, and injects the provider bundle before the app boots. |
+| `wallet/provider.ts` | Wraps Playwright’s `page.addInitScript` to seed `window.__TEST_WALLET_CONFIG` and load the bundled provider. |
+| `wallet/injected/provider.ts` | Browser-side provider implementation: request handler, connection state, pending tx tracking, event emitters, synthetic receipts (mock mode), and EIP-6963 announcements. |
+| `wallet/build-helper.ts` | Runs an esbuild bundle when needed (`injected/provider.ts → injected-provider.js`). Automatically invoked by `setupTest`. |
+| `utils/wallet.utils.ts` | High-level utilities that flows/tests use to click connect buttons, assert connection state, preview WalletConnect QR codes, etc. |
+
+## `setupTest()` lifecycle
+
+<Steps>
+  {<h3>1. Storage strategy</h3>}
+  Clears wagmi/localStorage keys unless `persistConnection` is enabled. When persistence is on, the script only wipes non-test wallet keys the first time to simulate how users stay connected after reloads.
+
+  {<h3>2. Bridge wiring</h3>}
+  If `walletConfig.privateKey` exists, `setupTest` creates <code>publicClient</code> and <code>walletClient</code> via `viem`, then exposes <code>__testwallet_rpc</code>, <code>__testwallet_sendTransaction</code>, <code>__testwallet_signMessage</code>, and <code>__testwallet_signTypedData</code> to the page. Otherwise, mock mode is used.
+
+  {<h3>3. Provider injection</h3>}
+  `ensureInjectedBuilt()` compiles `wallet/injected/provider.ts` (when stale) and `injectWallet()` seeds the runtime config + bundle before any app script evaluates. This guarantees that wagmi detects the provider on first render.
+
+  {<h3>4. Diagnostics helpers</h3>}
+  The helper subscribes to `page.on('console')` and `page.on('pageerror')`, printing anything that contains `[Test Wallet]`, `[REAL]`, `[BRIDGE]`, `wagmi`, or `error`. The returned object exposes `waitForProvider()`, `waitForAccounts()`, `debugWalletState()`, and `disconnectWallet()` so specs can orchestrate complex flows.
+</Steps>
+
+## Provider behaviour
+
+<Tabs items={['Mock mode', 'Real mode']} storageKey="wallet-modes" defaultIndex={0}>
+  <Tabs.Tab>
+    <ul>
+      <li>Transactions are stored in <code>_pendingTxs</code> and mined after <code>txDelay</code>.</li>
+      <li>Mint/Burn detection relies on method selectors (<code>0x1249c58b</code>, <code>0x42966c68</code>) and toggles an in-memory NFT state so the UI can react instantly.</li>
+      <li>Receipts/logs are generated with deterministic hashes, block numbers, and <code>Transfer</code> topics that match ERC-721 expectations.</li>
+      <li><code>personal_sign</code> / <code>eth_signTypedData</code> return zeroed signatures unless you opt into deterministic signing via <code>utils/signing.utils.ts</code>.</li>
+      <li>Persisted connections rely on <code>localStorage['testwallet.connected']</code>. When <code>persistConnection</code> is true, <code>eth_accounts</code> automatically returns the cached address after reloads.</li>
+    </ul>
+  </Tabs.Tab>
+  <Tabs.Tab>
+    <ul>
+      <li>Every JSON-RPC method is forwarded to the Node bridge (`__testwallet_rpc`). No mocks are involved, so you see true network latency and chain reorgs.</li>
+      <li><code>eth_sendTransaction</code> signs and broadcasts with `walletClient.sendTransaction`. You must fund the Sepolia account in advance.</li>
+      <li><code>personal_sign</code> inspects whether the payload is hex/UTF-8 and signs raw bytes when needed (`wallet/test-setup.ts:160-177`).</li>
+      <li>`walletConfig.address` is overwritten with the derived account to avoid mismatches.</li>
+      <li>Use <code>persistConnection: true</code> sparingly—real wallets also cache sessions, so the tests mimic that behaviour.</li>
+    </ul>
+  </Tabs.Tab>
+</Tabs>
+
+## Working with `WalletTestUtils`
+
+`utils/wallet.utils.ts` abstracts the repetitive UI work:
+
+- `connectWallet(walletName?)` finds the connect button (header, hero CTA, or modal) and completes the flow.
+- `openConnectModal()` accounts for already-open dialogs and retries after reload.
+- `waitForQrVisible()` + `previewWalletConnectQr()` exercise the WalletConnect branch.
+- `isMobileWidth()` helps specs skip QR assertions on small viewports.
+- `disconnectWallet()` ensures the UI returns to the “Connect Wallet” state when needed.
+
+Pair these helpers with `setupTest()` for deterministic sequences. Example:
+
+```ts
+const setup = await setupTest(page, {
+  clearStorage: true,
+  injectWallet: true,
+  persistConnection: true,
+  walletConfig: walletConfigFromEnv,
+});
+
+await page.goto('/swap', { waitUntil: 'networkidle' });
+await setup.waitForWagmi();
+const wallet = new WalletTestUtils(page);
+await wallet.connectWallet('Test Wallet');
+```
+
+<Callout type="warning" emoji="⚠️">
+Never re-use a private key from mainnet. Real-mode specs mint and burn NFTs on Sepolia, and failures will leave the mock wallet in an inconsistent state if the account lacks gas.
+</Callout>
+
+With the wallet harness understood, continue to the mocks page to learn how AI and portfolio data are intercepted during tests.

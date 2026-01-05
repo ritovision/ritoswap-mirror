@@ -1,0 +1,93 @@
+---
+title: Chat Experience
+description: How the RapBotRito frontend orchestrates modes, modals, music, and inline tools
+---
+
+import { Steps, Callout } from 'nextra/components'
+
+# Chat Experience
+
+The UI in `dapp/components/chatBot` is built for the agentic features exposed by the backend. It layers **mode selection**, **context forms**, **tool chips**, and a **music player** on top of the standard chat transcript—while leaning into Rito’s neon, crypto-rap personality.
+
+## Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--generate-rap-verse-interactive&nav=0&panel=none&addons=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Generate Rap Verse (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Rito’s Signature Flow
+
+- **Branding & layout** — `ChatContainer`, `ChatHeader`, and `ChatWithPlayer.module.css` give the interface its Blade Runner-inspired gradients, chunky type, and stacked layout that keeps the music bar anchored under the conversation.
+- **Mode prompts** — When a user picks a mode, `composeSystemPrompt` and `composeWelcomeMessage` (from `dapp/app/lib/llm/modes`) inject Blade Runner-grade instructions plus the battle-form background so the very first assistant message sounds like Rito.
+- **Music cues** — The `MusicBar` powered by `MusicPlayer/MusicProvider.tsx` lets verses trigger `<music>` tags, so each rap session can bring in Rito’s catalog without leaving the chat.
+- **Voice clone playback** — Assistant messages include a "Play Audio" button that calls `/api/tts`, caches the returned audio, and routes playback through the Music Bar.
+
+## Stores & Modals
+
+- **Mode selection** — `useChatModeStore` tracks the active mode, whether it was locked by props, and the rap-battle form data. When the app loads, `ChatBot` opens `ModeSelectModal` until a mode is chosen.
+- **Battle form** — `BattleFormModal.tsx` lets users describe themselves and RapBotRito. The inputs are persisted in the store so `composeWelcomeMessage` can stitch the background section into the initial assistant message.
+- **General modal state** — `useModalStore` centralizes the mode picker, error modal, confirm-reset dialog, and the battle form. This makes it trivial to gate input: `ChatForm` simply checks `open !== 'none'` before allowing submissions.
+
+## Streaming UI & Inline Tools
+
+<Steps>
+  {<h3>1. Render guards</h3>}
+  `ChatMessages.tsx` splits message parts at the anchor stored in `useToolActivityStore`, so chips appear inline at the exact character offset where the tool was triggered.
+
+  {<h3>2. Tool chips</h3>}
+  `ToolActivityRow` pulls grouped chips for the current assistant message. Each chip delegates to a presenter (`dapp/components/chatBot/ToolActivity/catalog`) to render pending/success/error labels that match the tool’s personality.
+
+  {<h3>3. Rich content</h3>}
+  `parseContentWithMedia.ts` understands the inline tags the LLM emits:
+  - `<key-nft bgColor="#101820" keyColor="#FFCF00" />` renders the signature colored key SVG.
+  - `<chain-logo name="Ethereum" size="32" />` drops in a network badge.
+  - `<gif url="..." />`, `<img src="store://..." />`, and `<music song="Rito - Burn the Gate" />` map to media renderers and the music controller.
+  - `<goodbye />` injects the refresh animation that resets the gate after a battle.
+</Steps>
+
+Behind the scenes, `useHydrateToolImages.ts` streams base64 payloads from `generate_image_with_alt` into `useLocalImageStore`, while `pinecone_search` feeds meme/rhyme datasets so Rito’s toolkit always has fresh crypto references to drop mid-verse.
+
+## Music & Atmosphere
+
+The `MusicProvider` (`dapp/components/chatBot/MusicPlayer/MusicProvider.tsx`) exposes a Web Audio API controller so rap prompts can trigger `<music>` tags. The provider only unlocks audio after the first user interaction (to satisfy browser policies) and streams metadata to the `MusicBar`.
+
+## Voice Clone Playback
+
+RapBotRito plays the rap out loud in spoken-word using the Rito Rhymes voice clone. Tap "Play Audio" to generate the clip, then the Music Bar plays it immediately so you hear the verse. Tap again to replay from the start. If the message changes, it regenerates and plays the new take.
+
+For the provider adapter and API details, see [Voice Clone](/ai-systems/chat-ui/voice-clone).
+
+<div style={{ width: '100%', height: 640, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-tts--tts-playback&nav=0&panel=none&addons=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/TTS - Playback"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Hydrating Images
+
+When a tool emits `{ kind: 'store-image' }` JSON, `useHydrateToolImages.ts` writes the base64 payload into `useLocalImageStore`. `parseContentWithMedia.ts` then converts `<img src="store://image/foo.png" />` into an inline `<img>` tag that reads from the hydrated store rather than fetching from the network.
+
+## Reset & State Hygiene
+
+- **Conversation reset** — The trash button in `ChatForm` clears `useChat` messages, wipes the tool activity store, resets the music player, and, if the mode is not locked, brings the user back to the mode picker.
+- **Goodbye handling** — When the transcript includes `<goodbye />`, the UI stores a session flag (`ritoGoodbyeHardReloadAt`) so a hard refresh is triggered even if the user navigates away and returns later. This honors the rap battle rule that the page must refresh after the post-battle goodbye.
+
+<Callout type="info">
+  The interface is opinionated on purpose: every UX detail (modals, chips, inline SVGs, music cues) mirrors a constraint enforced in the chat modes or MCP stack, so developers can reason about behavior from either side. The new MCP tool pages show how each backend action drives the chips referenced here.
+</Callout>

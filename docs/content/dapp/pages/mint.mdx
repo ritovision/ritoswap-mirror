@@ -1,0 +1,72 @@
+---
+title: "Mint / Burn"
+description: "Interface for minting, token-gating, and burning Colored Key NFTs"
+---
+
+import { FileTree, Cards, Tabs } from 'nextra/components'
+import ViewPage from '@components/utilities/viewpage/viewpage'
+
+# Mint / Burn Page
+
+This page is the user's gateway to the Colored Key NFT system. Here you can:
+- **Mint** a new NFT to gain access to the token-gated messaging feature.
+- **Burn** an existing, "used" NFT key (once a message has been recorded) so you can mint again and re-enter the gate.
+
+Everything on this page reacts in real-time to your wallet and NFT state. You'll always see exactly which token you hold, what actions are available, and smoothly animated transitions as you connect, mint, use, and burn.
+
+ <ViewPage
+      mainnetUrl="https://ritoswap.com/mint"
+      testnetUrl="https://testnet.ritoswap.com/mint"
+    />
+
+
+## File Paths
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name="app" defaultOpen>
+      <FileTree.Folder name="mint" defaultOpen>
+        <FileTree.Folder name="components" defaultOpen>
+          <FileTree.Folder name="ButtonSection" />
+          <FileTree.Folder name="Instructions" />
+          <FileTree.Folder name="NFTScreen" />
+          <FileTree.Folder name="RefreshButton" />
+          <FileTree.Folder name="TokenStatus" />
+          <FileTree.Folder name="__tests__" />
+          <FileTree.File name="MintPageWrapper.tsx" />
+          <FileTree.File name="MintPageWrapper.module.css" />
+          <FileTree.File name="Music.tsx" />
+        </FileTree.Folder>
+        <FileTree.Folder name="jsonld" />
+        <FileTree.Folder name="__tests__" />
+        <FileTree.File name="metadata.ts" />
+        <FileTree.File name="page.module.css" />
+        <FileTree.File name="page.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Components of Note
+
+| Component                                                                                                       | Location                                                            | Role in Page                                                                                                 |
+|-----------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------|
+| **[MintPageWrapper](/dapp/smart-contract-ui/mint-wrapper)**                                                     | `app/mint/components/MintPageWrapper.tsx`                          | Top-level orchestrator: wires wallet state, event listeners, and global NFT store together.                   |
+| **[TokenStatus](/dapp/smart-contract-ui/tokenstatus)**                                                           | `app/mint/components/TokenStatus/TokenStatus.tsx`                  | Dynamic status text ("Not signed in," "You have an unused key!", etc.) with smooth fades.                    |
+| **[NFTScreen](/dapp/smart-contract-ui/nftscreen)**                                                               | `app/mint/components/NFTScreen/NFTScreen.tsx`                      | Live preview of your NFT (colors, token ID) rendered as a hard-coded SVG for instant display.                 |
+| **[ButtonSection](/dapp/smart-contract-ui/button-section)**                                                      | `app/mint/components/ButtonSection/ButtonSection.tsx`              | Context-aware action buttons (Connect, Mint, Open Gate, Burn) that adapt to your current state.               |
+| **[ProcessingModal](/dapp/smart-contract-ui/processing-modal)**                                                  | `app/mint/components/ProcessingModal/ProcessingModal.tsx`          | Transaction feedback modal with mobile wallet deep-linking and block explorer integration.                    |
+
+## Smart Contract Integration
+
+<Cards.Card 
+  title="Smart Contract Data System" 
+  href="/dapp/smart-contract-data" 
+  arrow
+>
+  Overview of the blockchain interaction layer that powers real-time NFT state synchronization, wagmi hooks integration, and TanStack Query caching for the mint/burn functionality.
+</Cards.Card>
+
+## Music
+
+The page features **Rito Rhymes'** track **"Blockchain 4 a Gangsta"** (a parody remix of Master P's *Heaven 4 a Gangsta*). The song satirically traces blockchain's evolution from an old-school hacker underworld tool to a modern mechanism for trivial use cases like NFT minting, even shouting out William Entriken, the lead author of ERC-721.

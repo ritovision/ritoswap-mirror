@@ -1,0 +1,145 @@
+---
+title: CI/CD Overview
+description: How GitHub Actions builds, tests, and deploys the four RitoSwap sites.
+---
+
+import { Callout, Cards, Table } from 'nextra/components'
+
+# CI/CD Overview
+
+This section documents the GitHub Actions pipelines, composite actions, and environments that ship the four public sites. The DApp and docs use prebuilt deployments for stability, while remote builds remain available if we need to switch back.
+
+## Websites and environments
+
+<Table>
+  <thead>
+    <tr>
+      <th>Environment</th>
+      <th>Site</th>
+      <th>URL</th>
+      <th>Pipeline</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>mainnet</td>
+      <td>DApp (production)</td>
+      <td><code>https://ritoswap.com</code></td>
+      <td>DApp Pipeline</td>
+    </tr>
+    <tr>
+      <td>testnet</td>
+      <td>DApp (testnet)</td>
+      <td><code>https://testnet.ritoswap.com</code></td>
+      <td>DApp Pipeline</td>
+    </tr>
+    <tr>
+      <td>docs</td>
+      <td>Docs site</td>
+      <td><code>https://docs.ritoswap.com</code></td>
+      <td>Docs and Storybook Pipeline</td>
+    </tr>
+    <tr>
+      <td>storybook</td>
+      <td>UI Storybook</td>
+      <td><code>https://ui.ritoswap.com</code></td>
+      <td>Docs and Storybook Pipeline</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Pipelines at a glance
+
+<Cards>
+  <Cards.Card title="DApp Pipeline" href="/ci-cd/pipelines/dapp" arrow>
+    Tests, predeploy validation, testnet deploy + smoke tests, rollback, mainnet deploy.
+  </Cards.Card>
+  <Cards.Card title="Docs and Storybook Pipeline" href="/ci-cd/pipelines/docs-storybook" arrow>
+    DApp lint/test for Storybook, deploy Storybook, docs lint/test, deploy docs.
+  </Cards.Card>
+  <Cards.Card title="Manual Workflows" href="/ci-cd/manual-workflows" arrow>
+    One-click deploys and test suites for targeted runs.
+  </Cards.Card>
+  <Cards.Card title="Composite Actions" href="/ci-cd/actions" arrow>
+    Reusable building blocks used across workflows.
+  </Cards.Card>
+  <Cards.Card title="Environments and Variables" href="/ci-cd/environments-and-variables" arrow>
+    Environment mapping, secrets, and vars.
+  </Cards.Card>
+</Cards>
+
+## Mirror dispatch wrappers
+
+The public mirror repo (<code>https://github.com/ritovision/ritoswap-mirror</code>) exposes pipeline
+badges and triggers private workflows in <code>ritovision/ritoswap</code>.
+
+- <code>dispatch-dapp.yml</code> -> <code>pipeline-dapp.yml</code>
+- <code>dispatch-docs-storybook.yml</code> -> <code>pipeline-docs-storybook.yml</code>
+
+These wrappers run on push and <code>workflow_dispatch</code>, using the <code>ci-dispatch</code>
+environment and the <code>RITOSWAP_PAT</code> secret in the mirror repo.
+
+## Testing and quality gates
+
+<Table>
+  <thead>
+    <tr>
+      <th>Tool</th>
+      <th>What it covers</th>
+      <th>Where it runs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>ESLint</td>
+      <td>DApp lint and docs lint</td>
+      <td>DApp pipeline, Docs pipeline, Manual ESLint</td>
+    </tr>
+    <tr>
+      <td>Vitest</td>
+      <td>DApp unit and integration tests</td>
+      <td>DApp pipeline (with Codecov), Docs pipeline (no Codecov), Manual unit tests</td>
+    </tr>
+    <tr>
+      <td>Hardhat</td>
+      <td>Smart contract compile + tests</td>
+      <td>DApp pipeline (contracts changes), Manual hardhat tests</td>
+    </tr>
+    <tr>
+      <td>Playwright (predeploy)</td>
+      <td>Local build smoke tests with test DB</td>
+      <td>DApp pipeline, Manual predeploy E2E</td>
+    </tr>
+    <tr>
+      <td>Playwright (post-deploy)</td>
+      <td>Live testnet smoke tests</td>
+      <td>DApp pipeline, Manual smoke E2E</td>
+    </tr>
+    <tr>
+      <td>Supertest</td>
+      <td>Live API smoke tests</td>
+      <td>DApp pipeline, Manual smoke API</td>
+    </tr>
+    <tr>
+      <td>Vitest (docs)</td>
+      <td>Docs workspace tests</td>
+      <td>Docs pipeline</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Coverage policy
+
+- DApp pipeline uploads coverage to Codecov on unit tests.
+- Storybook lint/test uses unit tests without Codecov.
+- Manual unit tests run without Codecov.
+- Coverage reports are still uploaded as GitHub artifacts for each unit-test run.
+
+## Rollback policy
+
+<Callout type="info">
+  Testnet uses post-deploy smoke tests and rolls back when they fail. This is treated as a close
+  approximation of mainnet behavior. Mainnet does not run smoke tests today because it targets the
+  live chain and this is not a commercial product with revenue at stake. The same rollback flow can
+  be added to mainnet if desired.
+</Callout>

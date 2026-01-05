@@ -1,0 +1,106 @@
+---
+title: "Gate"
+description: "Token-gated messaging and exclusive content for Colored Key NFT holders."
+---
+
+import { FileTree, Cards } from 'nextra/components'
+import ViewPage from '@components/utilities/viewpage/viewpage'
+
+# Token Gate Page
+
+The Token Gate page provides on-chain utility to Colored Key NFTs by granting holders exclusive access to messaging and content. It uses secure authentication mechanisms, including Sign-In with Ethereum (SiWE), so connecting your wallet feels like a privilege rather than a routine step. State-based logic guides you to mint if you do not have a key or to burn if you have already used yours, ensuring you always know what to do next. Inside the gate, you can send a message directly to Rito Rhymes and unlock an unreleased track.
+
+<ViewPage
+  mainnetUrl="https://ritoswap.com/gate"
+  testnetUrl="https://testnet.ritoswap.com/gate"
+/>
+
+## File Paths
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name="app" defaultOpen>
+      <FileTree.Folder name="gate" defaultOpen>
+        <FileTree.Folder name="components" defaultOpen>
+          <FileTree.Folder name="Completion" defaultOpen>
+            <FileTree.File name="Completion.tsx" />
+            <FileTree.File name="Completion.module.css" />
+          </FileTree.Folder>
+          <FileTree.Folder name="GatedContentRenderer" defaultOpen>
+            <FileTree.File name="GatedContentRenderer.tsx" />
+            <FileTree.File name="GatedContentRenderer.module.css" />
+          </FileTree.Folder>
+          <FileTree.Folder name="GateModal" defaultOpen>
+            <FileTree.File name="GateModal.tsx" />
+            <FileTree.File name="GateModal.module.css" />
+          </FileTree.Folder>
+          <FileTree.Folder name="GatePageWrapper" defaultOpen>
+            <FileTree.File name="GatePageWrapper.tsx" />
+            <FileTree.File name="GatePageWrapper.module.css" />
+          </FileTree.Folder>
+        </FileTree.Folder>
+        <FileTree.Folder name="jsonld" />
+        <FileTree.File name="page.module.css" />
+        <FileTree.File name="metadata.ts" />
+        <FileTree.File name="page.tsx" />
+        <FileTree.File name="page.unit.test.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+---
+
+## Components of Note
+
+| Component               | Location                                                                | Purpose                                                                                                    |
+|-------------------------|-------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|
+| **Completion**          | `app/gate/components/Completion/Completion.tsx`                    | Shows confirmation once your message is sent and marks your key as used.                                    |
+| **GatedContentRenderer**| `app/gate/components/GatedContentRenderer/GatedContentRenderer.tsx`| Renders the messaging form or exclusive media based on your token state.                                    |
+| **GateModal**           | `app/gate/components/GateModal/GateModal.tsx`                      | Manages wallet connection, SiWE signature flow, and directs you to mint or burn as needed.                 |
+| **GatePageWrapper**     | `app/gate/components/GatePageWrapper.tsx`                          | Orchestrates authentication, state transitions, and mounts the gate modal or gated content.                 |
+| **gatedContent**        | `app/lib/server/gatedContent.ts`                                   | Defines JSON payloads for welcome text, submission form, and exclusive audio data.                          |
+
+## Music
+
+This track is a mystery until you unlock it. Hint: it involves Bitcoin and Britney Spears.
+
+---
+
+<Cards.Card
+  title="Token Gate Structure"
+  href="/dapp/tokengate"
+  arrow
+>
+Detailed technical breakdown of the complex structure of the Token Gate.
+</Cards.Card>
+
+<Cards num={2}>
+  <Cards.Card
+    title="SIWE Library"
+    href="/dapp/internal-libraries/siwe-library"
+  >
+    Secure Sign-In with Ethereum flow using nonces and structured messages.
+  </Cards.Card>
+  <Cards.Card
+    title="Gated Content Library"
+    href="/dapp/internal-libraries/gated-content-library"
+  >
+    Client and server logic for delivering and rendering gated content.
+  </Cards.Card>
+</Cards>
+
+<Cards num={2}>
+  <Cards.Card
+    title="Gate Access API"
+    href="/dapp/api/gate-access"
+  >
+    `/api/gate-access` – Verifies signatures and delivers gated content to authenticated holders.
+  </Cards.Card>
+  <Cards.Card
+    title="Form Submission API"
+    href="/dapp/api/form-submission-gate"
+  >
+    `/api/form-submission-gate` – Records gated messages, sends notifications, and marks tokens as used.
+  </Cards.Card>
+</Cards>

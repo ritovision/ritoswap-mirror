@@ -1,0 +1,205 @@
+/* app/gate/components/GateModal/GateModal.module.css */
+.modal {
+  background: var(--primary-color);
+  border: var(--default-border);
+  border-radius: 10px;
+  padding: 3rem;
+  max-width: 500px;
+  width: 90%;
+  box-shadow: 0 20px 60px rgba(0, 123, 255, 0.3);
+  animation: modalEntry 0.5s ease-out;
+  transition: transform 0.3s ease;
+  position: relative;
+}
+
+/* Remove focus outline from modal container */
+.modal:focus {
+  outline: none;
+}
+
+.modal.animating {
+  transform: scale(0.95);
+}
+
+@keyframes modalEntry {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.content {
+  text-align: center;
+}
+
+.title {
+  font-family: var(--font-primary);
+  font-size: 2rem;
+  color: white;
+  margin: 0 0 2rem 0;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  line-height: 1.4;
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s ease-in-out, transform 0.3s ease-in-out;
+}
+
+.title.transitioning {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+
+.errorMessage {
+  color: #ff6b6b;
+  font-size: 1rem;
+  margin: -1rem 0 1.5rem 0;
+  padding: 0.5rem;
+  background: rgba(255, 107, 107, 0.1);
+  border-radius: 5px;
+  animation: errorShake 0.5s ease-in-out;
+}
+
+@keyframes errorShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.buttonContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 60px;
+  opacity: 1;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.buttonContainer.transitioning {
+  opacity: 0;
+}
+
+.getKeyButton,
+.unlockButton {
+  padding: 1rem 2rem;
+  font-family: var(--font-primary);
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  background: transparent;
+  border: var(--default-border);
+  border-radius: 200px;
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
+}
+
+/* Remove default focus outline */
+.getKeyButton:focus,
+.unlockButton:focus {
+  outline: none;
+}
+
+/* Only show focus outline when using keyboard navigation */
+.getKeyButton:focus-visible,
+.unlockButton:focus-visible {
+  outline: 2px solid white;
+  outline-offset: 3px;
+}
+
+.getKeyButton:hover,
+.unlockButton:hover:not(:disabled) {
+  background: var(--secondary-color);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 123, 255, 0.3);
+}
+
+.unlockButton:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+/* Modal wrapper for ProcessingModal positioning - adjusted to be higher */
+.modalWrapper {
+  position: fixed;
+  top: 40%; /* Changed from 50% to position higher */
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 999;
+}
+
+/* Screen reader only text helper */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+@media (max-width: 768px) {
+  .modal {
+    padding: 2rem;
+    max-width: 90%;
+  }
+  
+  .title {
+    font-size: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+  
+  .errorMessage {
+    font-size: 0.9rem;
+    margin: -0.5rem 0 1rem 0;
+  }
+  
+  .getKeyButton,
+  .unlockButton {
+    font-size: 1rem;
+    padding: 0.8rem 1.5rem;
+  }
+  
+  .modalWrapper {
+    top: 45%;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .getKeyButton:focus-visible,
+  .unlockButton:focus-visible {
+    outline: 3px solid;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .modal {
+    animation: none;
+  }
+  
+  .title,
+  .buttonContainer {
+    transition: none;
+  }
+  
+  .errorMessage {
+    animation: none;
+  }
+  
+  .getKeyButton,
+  .unlockButton {
+    transition: none;
+  }
+}

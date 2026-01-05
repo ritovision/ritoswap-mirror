@@ -1,0 +1,173 @@
+# ───────────────────────────────────────────────────────────
+# Global (root-level) ignores
+# ───────────────────────────────────────────────────────────
+/node_modules
+/.env
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+ChatGPT.txt
+
+# ───────────────────────────────────────────────────────────
+# Colored Keys workspace (Colored-Keys/)
+# ───────────────────────────────────────────────────────────
+/colored-keys/node_modules
+/colored-keys/.env
+
+# Hardhat files
+/colored-keys/cache
+/colored-keys/artifacts
+
+# TypeChain files
+/colored-keys/typechain
+/colored-keys/typechain-types
+
+# Slither files
+colored-keys/slither-output/*
+colored-keys/slither-output/slither-report.md
+
+# solidity-coverage files
+/colored-keys/coverage
+/colored-keys/coverage.json
+
+# Hardhat Ignition default folder for deployments against a local node
+/colored-keys/ignition/deployments/chain-31337
+
+/colored-keys/.venv
+
+/colored-keys/ChatGPT.txt
+
+/colored-keys/echidna-corpus/
+/colored-keys/crytic-export/
+/colored-keys/echidna*.txt
+/colored-keys/echidna.exe
+/colored-keys/flattened/*
+/colored-keys/.venv-mythril/
+
+# ───────────────────────────────────────────────────────────
+# Dapp workspace (dapp/)
+# ───────────────────────────────────────────────────────────
+/dapp/node_modules
+/dapp/.pnp
+/dapp/.pnp.*
+/dapp/.yarn/*
+!/dapp/.yarn/patches
+!/dapp/.yarn/plugins
+!/dapp/.yarn/releases
+!/dapp/.yarn/versions
+
+# testing
+/dapp/coverage
+
+# playwright
+dapp/test-results/.last-run.json
+dapp/playwright-report/index.html
+dapp/e2e/playwright/wallet/injected-provider.js.map
+dapp/e2e/playwright/wallet/injected-provider.js
+
+# storybook
+/dapp/storybook-static/
+
+# next.js
+/dapp/.next/
+/dapp/out/
+
+# production
+/dapp/build
+
+# misc
+/dapp/.DS_Store
+/dapp/*.pem
+/dapp/GPT prompts
+
+# debug
+/dapp/npm-debug.log*
+/dapp/yarn-debug.log*
+/dapp/yarn-error.log*
+/dapp/.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+/dapp/.env
+/dapp/.env.supertest
+/dapp/.env.playwright
+/dapp/.env.postman
+
+# vercel
+/dapp/.vercel
+
+# typescript
+/dapp/*.tsbuildinfo
+/dapp/next-env.d.ts
+
+# prisma
+/dapp/app/generated/prisma
+
+# next-pwa generated service worker files
+/dapp/public/sw.js
+/dapp/public/sw.js.map
+
+# workbox runtime (hashed)
+/dapp/public/workbox-*.js
+/dapp/public/workbox-*.js.map
+
+/dapp/.env.e2e
+
+/dapp/playwright-report/*
+/dapp/.env.test
+
+# logger
+/dapp/app/lib/logger/logs
+/dapp/logs/*
+
+# postman
+/dapp/postman/*
+/dapp/postman/report.html
+/dapp/postman/openapi.*.json
+/dapp/postman/collection.json
+/dapp/postman/local.postman_environment.json
+
+
+/dapp/e2e/node_modules/
+
+# supertest
+dapp/e2e/supertest/node_modules/*
+
+
+# ───────────────────────────────────────────────────────────
+# Local Blockchain workspace (local-blockchain/)
+# ───────────────────────────────────────────────────────────
+local-blockchain/data/
+local-blockchain/config/
+local-blockchain/config/keystore/*.json
+local-blockchain/config/keystore/*
+!local-blockchain/config/keystore/.gitkeep
+local-blockchain/config/password.txt
+local-blockchain/blockscout/
+!local-blockchain/blockscout/.gitkeep
+local-blockchain/.env
+local-blockchain/node_modules
+local-blockchain/logs/*
+
+
+# ───────────────────────────────────────────────────────────
+# Nextra Docs workspace (docs/)
+# ───────────────────────────────────────────────────────────
+docs/node_modules
+docs/.next
+docs/public/_pagefind
+docs/public/sitemap.xml
+.vercel
+docs/tsconfig.tsbuildinfo
+docs/public/storybook-static
+
+.claude/settings.local.json
+
+
+
+
+# ───────────────────────────────────────────────────────────
+# Cloudflare Workers workspace (dapp/cloudflare/)
+# ───────────────────────────────────────────────────────────
+dapp/cloudflare/node_modules

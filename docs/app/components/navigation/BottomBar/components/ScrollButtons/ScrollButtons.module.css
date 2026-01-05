@@ -1,0 +1,76 @@
+/* Scroll Buttons Component Styles */
+
+.scrollButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 35.2px;
+  height: 35.2px;
+  background-color: var(--secondary-color);
+  color: #FFFFFF;
+  border: 2px solid var(--secondary-color);
+  border-radius: 50%;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background-color 0.12s ease,
+    border-color 0.12s ease,
+    transform 0.3s ease,
+    opacity 0.3s ease;
+  opacity: 0;
+  pointer-events: none;
+  padding: 0;
+  transform: translateY(-2px);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.scrollButton svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.scrollButton.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.scrollButton.hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  transform: translateY(-2px) scale(1.1);
+}
+
+.scrollButton.active {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+  transform: translateY(-2px) scale(0.95);
+}
+
+.scrollButton:focus {
+  outline: 3px solid var(--accent-color);
+  outline-offset: 3px;
+}
+
+.scrollButton.persistActive {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+.scrollUp {}
+.scrollDown {}
+
+@media (hover: none) and (pointer: coarse) {
+  .scrollButton.hover {
+    background-color: var(--secondary-color);
+    border-color: var(--secondary-color);
+    transform: translateY(-2px);
+  }
+}

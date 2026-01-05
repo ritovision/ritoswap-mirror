@@ -1,0 +1,2057 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "ritoswap OpenAPI",
+    "version": "0.3.0",
+    "description": "RitoSwap API - Token-gated access and NFT verification endpoints"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Current environment"
+    },
+    {
+      "url": "http://localhost:3000",
+      "description": "Local development"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Authentication",
+      "description": "Auth & SIWE endpoints"
+    },
+    {
+      "name": "Token Gate",
+      "description": "Gated content access flows"
+    },
+    {
+      "name": "NFT",
+      "description": "NFT-related endpoints"
+    },
+    {
+      "name": "Token Status",
+      "description": "Token verification endpoints"
+    },
+    {
+      "name": "Form Submission Gate",
+      "description": "Gated form submissions"
+    }
+  ],
+  "components": {
+    "schemas": {},
+    "parameters": {}
+  },
+  "paths": {
+    "/api/token-status/{tokenId}": {
+      "get": {
+        "summary": "Get token status and usage information",
+        "description": "Checks if a token exists on-chain and whether it has been used for gated access. This endpoint is optimized for polling with light caching.",
+        "tags": [
+          "Token Status",
+          "NFT"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$",
+              "description": "The NFT token ID to check",
+              "example": "123"
+            },
+            "required": true,
+            "description": "The NFT token ID to check",
+            "name": "tokenId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Token status retrieved successfully",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Cache control header for successful responses"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "count",
+                    "exists",
+                    "used",
+                    "usedBy",
+                    "usedAt"
+                  ],
+                  "properties": {
+                    "count": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "Number of tokens found (0 or 1)"
+                    },
+                    "exists": {
+                      "type": "boolean",
+                      "description": "Whether the token exists on-chain"
+                    },
+                    "used": {
+                      "type": "boolean",
+                      "description": "Whether the token has been used for gated access"
+                    },
+                    "usedBy": {
+                      "oneOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "Address that used the token (if used)"
+                    },
+                    "usedAt": {
+                      "oneOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ],
+                      "description": "ISO timestamp when token was used (if used)"
+                    }
+                  }
+                },
+                "examples": {
+                  "exists-used": {
+                    "summary": "Token exists and has been used",
+                    "value": {
+                      "count": 1,
+                      "exists": true,
+                      "used": true,
+                      "usedBy": "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb7",
+                      "usedAt": "2025-01-15T10:30:00.000Z"
+                    }
+                  },
+                  "exists-unused": {
+                    "summary": "Token exists but not used",
+                    "value": {
+                      "count": 1,
+                      "exists": true,
+                      "used": false,
+                      "usedBy": null,
+                      "usedAt": null
+                    }
+                  },
+                  "not-exists": {
+                    "summary": "Token does not exist",
+                    "value": {
+                      "count": 0,
+                      "exists": false,
+                      "used": false,
+                      "usedBy": null,
+                      "usedAt": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid token ID provided",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "enum": [
+                        "https://ritoswap.com/errors/invalid-token-id"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "enum": [
+                        "Invalid token ID"
+                      ]
+                    },
+                    "status": {
+                      "type": "number",
+                      "enum": [
+                        400
+                      ]
+                    },
+                    "detail": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "title",
+                    "status"
+                  ],
+                  "description": "Invalid token ID provided",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/invalid-token-id",
+                    "title": "Invalid token ID",
+                    "status": 400,
+                    "detail": "Token ID must be a non-negative integer"
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "description": "Method not allowed",
+                  "example": {
+                    "error": "Method not allowed"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "schema": {
+                  "type": "string",
+                  "example": "60"
+                },
+                "required": true
+              },
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "string",
+                  "example": "0"
+                },
+                "required": true
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "60"
+                },
+                "required": true
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store, no-cache, must-revalidate, max-age=0, s-maxage=0"
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Rate limit exceeded",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/too-many-requests",
+                    "title": "Too many requests",
+                    "status": 429,
+                    "detail": "Rate limit exceeded for token-status",
+                    "limit": 60,
+                    "remaining": 0,
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Internal server error",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/failed-to-check-token-status",
+                    "title": "Failed to check token status",
+                    "status": 500,
+                    "detail": "An unexpected error occurred while checking token status"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/nonce": {
+      "get": {
+        "summary": "Generate a nonce for SIWE authentication",
+        "description": "Generates a unique nonce value for Sign-In with Ethereum (SIWE) authentication flow. The nonce prevents replay attacks.",
+        "tags": [
+          "Nonce",
+          "Authentication",
+          "SIWE"
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "No-cache header for nonce responses",
+                "example": "no-store, no-cache, must-revalidate, max-age=0, s-maxage=0"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "nonce": {
+                      "type": "string",
+                      "pattern": "^[0-9a-fA-F]{32}$"
+                    }
+                  },
+                  "required": [
+                    "nonce"
+                  ],
+                  "description": "Nonce generated successfully",
+                  "example": {
+                    "nonce": "8f4a2b3c9d1e7a6fb4c8d7e2f9a1c3d5"
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "headers": {
+              "Allow": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Comma-separated list of allowed methods",
+                "example": "GET, OPTIONS"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "description": "Method not allowed",
+                  "example": {
+                    "error": "Method not allowed"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "schema": {
+                  "type": "string",
+                  "example": "10"
+                },
+                "required": true
+              },
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "string",
+                  "example": "0"
+                },
+                "required": true
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "60"
+                },
+                "required": true
+              },
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "example": "no-store, no-cache, must-revalidate, max-age=0, s-maxage=0"
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Rate limit exceeded",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/too-many-requests",
+                    "title": "Too many requests",
+                    "status": 429,
+                    "detail": "Rate limit exceeded for nonce generation",
+                    "limit": 10,
+                    "remaining": 0,
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Internal server error",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/failed-to-generate-nonce",
+                    "title": "Failed to generate nonce",
+                    "status": 500,
+                    "detail": "An unexpected error occurred while generating the nonce"
+                  }
+                }
+              }
+            }
+          },
+          "501": {
+            "description": "Not implemented",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "SIWE not enabled",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/siwe-not-enabled",
+                    "title": "SIWE not enabled",
+                    "status": 501,
+                    "detail": "SIWE authentication is not configured on this server"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gate-access": {
+      "post": {
+        "summary": "Verify token ownership and access gated content",
+        "description": "Authenticates user ownership of an NFT token and provides access to gated content.\n\nSupports three authentication flows:\n1. **JWT (Bearer)** — Provide `Authorization: Bearer <JWT>`. Body may be omitted, or include { tokenId } for server-side binding.\n2. **SIWE** — Provide address/signature + SIWE message + nonce in the body.\n3. **Legacy** — Provide address/signature + timestamp in the body (when SIWE is disabled or legacy path is allowed).\n\nThe server verifies:\n- Signature/JWT validity\n- On-chain token ownership\n- Token usage status in database\n- Rate limits",
+        "tags": [
+          "Token Gate",
+          "Authentication"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "description": "Bearer JWT for session-based access (optional if using SIWE/legacy body auth). Example: Bearer eyJhbGciOi...",
+            "schema": {
+              "type": "string"
+            },
+            "example": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "~standard": {
+                      "vendor": "zod",
+                      "version": 1
+                    },
+                    "def": {
+                      "type": "object",
+                      "shape": {
+                        "address": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "string",
+                            "checks": [
+                              {}
+                            ]
+                          },
+                          "format": "regex",
+                          "minLength": null,
+                          "maxLength": null
+                        },
+                        "signature": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "string",
+                            "checks": [
+                              {}
+                            ]
+                          },
+                          "format": "regex",
+                          "minLength": null,
+                          "maxLength": null
+                        },
+                        "tokenId": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "union",
+                            "options": [
+                              {
+                                "~standard": {
+                                  "vendor": "zod",
+                                  "version": 1
+                                },
+                                "def": {
+                                  "type": "string",
+                                  "checks": [
+                                    {}
+                                  ]
+                                },
+                                "format": "regex",
+                                "minLength": null,
+                                "maxLength": null
+                              },
+                              {
+                                "~standard": {
+                                  "vendor": "zod",
+                                  "version": 1
+                                },
+                                "def": {
+                                  "type": "number",
+                                  "checks": [
+                                    {
+                                      "~standard": {
+                                        "vendor": "zod",
+                                        "version": 1
+                                      },
+                                      "def": {
+                                        "type": "number",
+                                        "check": "number_format",
+                                        "abort": false,
+                                        "format": "safeint"
+                                      },
+                                      "minValue": -9007199254740991,
+                                      "maxValue": 9007199254740991,
+                                      "isInt": true,
+                                      "isFinite": true,
+                                      "format": "safeint"
+                                    },
+                                    {}
+                                  ]
+                                },
+                                "minValue": 0,
+                                "maxValue": 9007199254740991,
+                                "isInt": true,
+                                "isFinite": true,
+                                "format": "safeint"
+                              }
+                            ]
+                          },
+                          "options": [
+                            {
+                              "~standard": {
+                                "vendor": "zod",
+                                "version": 1
+                              },
+                              "def": {
+                                "type": "string",
+                                "checks": [
+                                  {}
+                                ]
+                              },
+                              "format": "regex",
+                              "minLength": null,
+                              "maxLength": null
+                            },
+                            {
+                              "~standard": {
+                                "vendor": "zod",
+                                "version": 1
+                              },
+                              "def": {
+                                "type": "number",
+                                "checks": [
+                                  {
+                                    "~standard": {
+                                      "vendor": "zod",
+                                      "version": 1
+                                    },
+                                    "def": {
+                                      "type": "number",
+                                      "check": "number_format",
+                                      "abort": false,
+                                      "format": "safeint"
+                                    },
+                                    "minValue": -9007199254740991,
+                                    "maxValue": 9007199254740991,
+                                    "isInt": true,
+                                    "isFinite": true,
+                                    "format": "safeint"
+                                  },
+                                  {}
+                                ]
+                              },
+                              "minValue": 0,
+                              "maxValue": 9007199254740991,
+                              "isInt": true,
+                              "isFinite": true,
+                              "format": "safeint"
+                            }
+                          ]
+                        },
+                        "message": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "string",
+                            "checks": [
+                              {}
+                            ]
+                          },
+                          "format": null,
+                          "minLength": 1,
+                          "maxLength": null
+                        },
+                        "nonce": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "string",
+                            "checks": [
+                              {}
+                            ]
+                          },
+                          "format": "regex",
+                          "minLength": null,
+                          "maxLength": null
+                        }
+                      },
+                      "checks": []
+                    }
+                  },
+                  {
+                    "~standard": {
+                      "vendor": "zod",
+                      "version": 1
+                    },
+                    "def": {
+                      "type": "object",
+                      "shape": {
+                        "address": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "string",
+                            "checks": [
+                              {}
+                            ]
+                          },
+                          "format": "regex",
+                          "minLength": null,
+                          "maxLength": null
+                        },
+                        "signature": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "string",
+                            "checks": [
+                              {}
+                            ]
+                          },
+                          "format": "regex",
+                          "minLength": null,
+                          "maxLength": null
+                        },
+                        "tokenId": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "union",
+                            "options": [
+                              {
+                                "~standard": {
+                                  "vendor": "zod",
+                                  "version": 1
+                                },
+                                "def": {
+                                  "type": "string",
+                                  "checks": [
+                                    {}
+                                  ]
+                                },
+                                "format": "regex",
+                                "minLength": null,
+                                "maxLength": null
+                              },
+                              {
+                                "~standard": {
+                                  "vendor": "zod",
+                                  "version": 1
+                                },
+                                "def": {
+                                  "type": "number",
+                                  "checks": [
+                                    {
+                                      "~standard": {
+                                        "vendor": "zod",
+                                        "version": 1
+                                      },
+                                      "def": {
+                                        "type": "number",
+                                        "check": "number_format",
+                                        "abort": false,
+                                        "format": "safeint"
+                                      },
+                                      "minValue": -9007199254740991,
+                                      "maxValue": 9007199254740991,
+                                      "isInt": true,
+                                      "isFinite": true,
+                                      "format": "safeint"
+                                    },
+                                    {}
+                                  ]
+                                },
+                                "minValue": 0,
+                                "maxValue": 9007199254740991,
+                                "isInt": true,
+                                "isFinite": true,
+                                "format": "safeint"
+                              }
+                            ]
+                          },
+                          "options": [
+                            {
+                              "~standard": {
+                                "vendor": "zod",
+                                "version": 1
+                              },
+                              "def": {
+                                "type": "string",
+                                "checks": [
+                                  {}
+                                ]
+                              },
+                              "format": "regex",
+                              "minLength": null,
+                              "maxLength": null
+                            },
+                            {
+                              "~standard": {
+                                "vendor": "zod",
+                                "version": 1
+                              },
+                              "def": {
+                                "type": "number",
+                                "checks": [
+                                  {
+                                    "~standard": {
+                                      "vendor": "zod",
+                                      "version": 1
+                                    },
+                                    "def": {
+                                      "type": "number",
+                                      "check": "number_format",
+                                      "abort": false,
+                                      "format": "safeint"
+                                    },
+                                    "minValue": -9007199254740991,
+                                    "maxValue": 9007199254740991,
+                                    "isInt": true,
+                                    "isFinite": true,
+                                    "format": "safeint"
+                                  },
+                                  {}
+                                ]
+                              },
+                              "minValue": 0,
+                              "maxValue": 9007199254740991,
+                              "isInt": true,
+                              "isFinite": true,
+                              "format": "safeint"
+                            }
+                          ]
+                        },
+                        "timestamp": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "number",
+                            "checks": [
+                              {
+                                "~standard": {
+                                  "vendor": "zod",
+                                  "version": 1
+                                },
+                                "def": {
+                                  "type": "number",
+                                  "check": "number_format",
+                                  "abort": false,
+                                  "format": "safeint"
+                                },
+                                "minValue": -9007199254740991,
+                                "maxValue": 9007199254740991,
+                                "isInt": true,
+                                "isFinite": true,
+                                "format": "safeint"
+                              },
+                              {}
+                            ]
+                          },
+                          "minValue": 0,
+                          "maxValue": 9007199254740991,
+                          "isInt": true,
+                          "isFinite": true,
+                          "format": "safeint"
+                        }
+                      },
+                      "checks": []
+                    }
+                  },
+                  {
+                    "~standard": {
+                      "vendor": "zod",
+                      "version": 1
+                    },
+                    "def": {
+                      "type": "object",
+                      "shape": {
+                        "tokenId": {
+                          "~standard": {
+                            "vendor": "zod",
+                            "version": 1
+                          },
+                          "def": {
+                            "type": "optional",
+                            "innerType": {
+                              "~standard": {
+                                "vendor": "zod",
+                                "version": 1
+                              },
+                              "def": {
+                                "type": "union",
+                                "options": [
+                                  {
+                                    "~standard": {
+                                      "vendor": "zod",
+                                      "version": 1
+                                    },
+                                    "def": {
+                                      "type": "string",
+                                      "checks": [
+                                        {}
+                                      ]
+                                    },
+                                    "format": "regex",
+                                    "minLength": null,
+                                    "maxLength": null
+                                  },
+                                  {
+                                    "~standard": {
+                                      "vendor": "zod",
+                                      "version": 1
+                                    },
+                                    "def": {
+                                      "type": "number",
+                                      "checks": [
+                                        {
+                                          "~standard": {
+                                            "vendor": "zod",
+                                            "version": 1
+                                          },
+                                          "def": {
+                                            "type": "number",
+                                            "check": "number_format",
+                                            "abort": false,
+                                            "format": "safeint"
+                                          },
+                                          "minValue": -9007199254740991,
+                                          "maxValue": 9007199254740991,
+                                          "isInt": true,
+                                          "isFinite": true,
+                                          "format": "safeint"
+                                        },
+                                        {}
+                                      ]
+                                    },
+                                    "minValue": 0,
+                                    "maxValue": 9007199254740991,
+                                    "isInt": true,
+                                    "isFinite": true,
+                                    "format": "safeint"
+                                  }
+                                ]
+                              },
+                              "options": [
+                                {
+                                  "~standard": {
+                                    "vendor": "zod",
+                                    "version": 1
+                                  },
+                                  "def": {
+                                    "type": "string",
+                                    "checks": [
+                                      {}
+                                    ]
+                                  },
+                                  "format": "regex",
+                                  "minLength": null,
+                                  "maxLength": null
+                                },
+                                {
+                                  "~standard": {
+                                    "vendor": "zod",
+                                    "version": 1
+                                  },
+                                  "def": {
+                                    "type": "number",
+                                    "checks": [
+                                      {
+                                        "~standard": {
+                                          "vendor": "zod",
+                                          "version": 1
+                                        },
+                                        "def": {
+                                          "type": "number",
+                                          "check": "number_format",
+                                          "abort": false,
+                                          "format": "safeint"
+                                        },
+                                        "minValue": -9007199254740991,
+                                        "maxValue": 9007199254740991,
+                                        "isInt": true,
+                                        "isFinite": true,
+                                        "format": "safeint"
+                                      },
+                                      {}
+                                    ]
+                                  },
+                                  "minValue": 0,
+                                  "maxValue": 9007199254740991,
+                                  "isInt": true,
+                                  "isFinite": true,
+                                  "format": "safeint"
+                                }
+                              ]
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Access granted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "access": {
+                      "type": "string",
+                      "enum": [
+                        "granted"
+                      ]
+                    },
+                    "content": {
+                      "type": "object",
+                      "properties": {
+                        "welcomeText": {
+                          "type": "string"
+                        },
+                        "textSubmissionAreaHtml": {
+                          "type": "string"
+                        },
+                        "audioData": {
+                          "type": "object",
+                          "properties": {
+                            "headline": {
+                              "type": "string"
+                            },
+                            "imageSrc": {
+                              "type": "string"
+                            },
+                            "imageAlt": {
+                              "type": "string"
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "title": {
+                              "type": "string"
+                            },
+                            "audioSrc": {
+                              "type": "string"
+                            },
+                            "error": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "headline",
+                            "imageSrc",
+                            "imageAlt",
+                            "description",
+                            "title",
+                            "audioSrc"
+                          ]
+                        },
+                        "styles": {
+                          "type": "string"
+                        },
+                        "script": {
+                          "type": "string"
+                        },
+                        "audioError": {
+                          "type": "boolean"
+                        },
+                        "errorMessage": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "welcomeText",
+                        "textSubmissionAreaHtml",
+                        "audioData",
+                        "styles",
+                        "script"
+                      ]
+                    },
+                    "accessToken": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "access",
+                    "content"
+                  ],
+                  "description": "Successful gate access",
+                  "example": {
+                    "success": true,
+                    "access": "granted",
+                    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                    "content": {
+                      "welcomeText": "Welcome, esteemed key holder!",
+                      "textSubmissionAreaHtml": "<div class=\"submission-area\">Submit your exclusive content</div>",
+                      "audioData": {
+                        "headline": "Exclusive Audio",
+                        "imageSrc": "/audio/exclusive-track.jpg",
+                        "imageAlt": "Exclusive audio content",
+                        "description": "Token holder exclusive audio content",
+                        "title": "Token Holder Audio",
+                        "audioSrc": "/audio/exclusive.mp3"
+                      },
+                      "styles": ".submission-area { padding: 20px; background: #f0f0f0; }",
+                      "script": "console.log(\"Gated content loaded\");"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "example": {
+                    "type": "https://ritoswap.com/errors/bad-request",
+                    "title": "Invalid request",
+                    "status": 400,
+                    "detail": "Request body validation failed or tokenId missing"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Authentication failed",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/unauthorized",
+                    "title": "Authentication failed",
+                    "status": 401,
+                    "detail": "The provided signature or credentials are invalid"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Access forbidden",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/forbidden",
+                    "title": "You do not own this token",
+                    "status": 403,
+                    "detail": "Token ownership verification failed or token has already been used"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Token not found",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/not-found",
+                    "title": "Token not found in database",
+                    "status": 404,
+                    "detail": "The specified token does not exist in our records"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "schema": {
+                  "type": "string",
+                  "example": "5"
+                },
+                "required": true
+              },
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "string",
+                  "example": "0"
+                },
+                "required": true
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "60"
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Rate limit exceeded",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/rate-limit",
+                    "title": "Too many requests",
+                    "status": 429,
+                    "detail": "Rate limit exceeded for gate access",
+                    "limit": 5,
+                    "remaining": 0,
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Internal server error",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/internal",
+                    "title": "Internal server error",
+                    "status": 500,
+                    "detail": "An unexpected error occurred while processing your request"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/form-submission-gate": {
+      "post": {
+        "summary": "Submit a gated form (legacy signature auth)",
+        "description": "Accepts a message submission from a wallet address that owns the provided tokenId.\nUses legacy non-SIWE signature binding (domain/path/method/chain/timestamp) and marks the token as used.\nIn production, an email is dispatched (Brevo or Cloudflare Worker).",
+        "tags": [
+          "Form Submission Gate",
+          "NFT",
+          "Authentication"
+        ],
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "tokenId": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "number"
+                      }
+                    ]
+                  },
+                  "message": {
+                    "type": "string",
+                    "maxLength": 10000
+                  },
+                  "signature": {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-fA-F]{130}$"
+                  },
+                  "address": {
+                    "type": "string",
+                    "pattern": "^0x[a-fA-F0-9]{40}$"
+                  },
+                  "timestamp": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "tokenId",
+                  "message",
+                  "signature",
+                  "address",
+                  "timestamp"
+                ],
+                "description": "Form submission with token ownership verification",
+                "example": {
+                  "tokenId": 42,
+                  "message": "Hello from my gated form!",
+                  "signature": "0x...",
+                  "address": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+                  "timestamp": 1712345678901
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Submission accepted and token marked as used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "enum": [
+                        "Access granted"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success",
+                    "message"
+                  ],
+                  "description": "Submission accepted and token marked as used",
+                  "example": {
+                    "success": true,
+                    "message": "Access granted"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input payload",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Invalid input payload",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/invalid-input",
+                    "title": "Invalid input",
+                    "status": 400,
+                    "detail": "Missing tokenId"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Authentication failed",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/authentication-failed",
+                    "title": "Authentication failed",
+                    "status": 401,
+                    "detail": "Invalid signature"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not token owner or token already used",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Not token owner or token already used",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/forbidden",
+                    "title": "Forbidden",
+                    "status": 403,
+                    "detail": "You do not own this token"
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "description": "Method not allowed",
+                  "example": {
+                    "error": "Method not allowed"
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "schema": {
+                  "type": "string",
+                  "example": "3"
+                },
+                "required": true
+              },
+              "X-RateLimit-Remaining": {
+                "schema": {
+                  "type": "string",
+                  "example": "0"
+                },
+                "required": true
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string",
+                  "example": "60"
+                },
+                "required": true
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Rate limit exceeded",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/rate-limit",
+                    "title": "Too many requests",
+                    "status": 429,
+                    "detail": "Rate limit exceeded for form-submission-gate",
+                    "limit": 3,
+                    "remaining": 0,
+                    "retryAfter": 60
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error (DB/email/chain errors)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "integer",
+                      "minimum": 400,
+                      "maximum": 599
+                    },
+                    "detail": {
+                      "type": "string"
+                    },
+                    "instance": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "remaining": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "retryAfter": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "status"
+                  ],
+                  "additionalProperties": true,
+                  "description": "Server error (DB/email/chain errors)",
+                  "example": {
+                    "type": "https://ritoswap.com/errors/internal-error",
+                    "title": "Internal server error",
+                    "status": 500,
+                    "detail": "Failed to verify token ownership"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

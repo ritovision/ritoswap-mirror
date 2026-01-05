@@ -1,0 +1,56 @@
+# Echidna Analysis
+
+*Version 1.0.0*
+
+## Introduction to Echidna  
+Echidna is a property-based fuzzing tool for Ethereum smart contracts. It systematically generates sequences of transactions to validate user‐defined invariants and detect logical errors, state corruption, or security violations under a wide range of inputs.
+
+## New Solidity Test Harness and Flattening  
+A dedicated test harness (`contracts/test/EchidnaOnePerWalletKeyToken.sol`) was created to encode invariants as on-chain assertion functions. Contracts must be flattened into a single file so that Echidna’s analysis engine can process all dependencies, interfaces, and library code in one compilation unit.
+
+## Echidna Configuration (`echidna.yml`)  
+The `echidna.yml` file specifies fuzzing parameters:  
+- **`testMode`**: assertion-based testing.  
+- **`testLimit`**: maximum number of test cases (10 000).  
+- **`timeout`**: overall timeout in seconds (300).  
+- **`prefix`**: invariant function name prefix (`echidna_`).  
+- **`corpusDir`**: directory for saved test inputs and coverage artifacts.  
+- **`coverage`**: coverage reporting enabled.  
+- **`format`**: text output.
+
+## Docker-Based Invocation Script (`run-docker.ts`)  
+The Node.js wrapper performs the following steps:  
+1. Compiles all contracts via Hardhat.  
+2. Flattens the specified test harness into `flattened/EchidnaOnePerWalletKeyToken.sol`.  
+3. Installs and selects the Solidity compiler version 0.8.20.  
+4. Executes Echidna in a Docker container, mounting the project root and corpus directory, and applying the configuration file.  
+5. Cleans up on completion.
+
+## Available PNPM Script  
+- ``pnpm run echidna``  
+  Executes the Docker wrapper to perform all compilation, flattening, and fuzzing steps for the default `EchidnaOnePerWalletKeyToken` contract.
+
+## Instrumented Properties  
+
+### Invariants (`echidna_` prefix)  
+1. **`echidna_one_token_per_wallet`** – Enforces the core restriction by asserting that every tracked address (three fixed actors plus `msg.sender`) owns at most one token.  
+2. **`echidna_token_ownership`** – Walks the first ten token IDs and confirms that every existing token has a non-zero owner whose balance reflects the token count (burned IDs are allowed).
+
+### Scenario Helpers (`*_test` functions)  
+- **`mint_test()`** – Attempts to mint from any fuzzed sender and catches the revert when the wallet already owns a token.  
+- **`transfer_test(address to)`** – Drives safe/unsafe transfers to new recipients while expecting failures if the destination already owns a key.  
+- **`burn_test()`** – Burns the sole token owned by the caller when available, ensuring that the state is released before retrying mint or transfer operations.
+
+These helpers give Echidna more transactional surface area so the invariants see mint/transfer/burn permutations that resemble real-world flows.
+
+## Summary of Latest Run  
+
+Running `pnpm echidna` (which compiles, flattens, and invokes Echidna inside Docker) up to the configured `testLimit: 10000` completes without any failing invariants. Evidence from the repository includes:
+
+- `echidna-corpus/coverage/` currently stores **18** saved transaction sequences—the inputs that expanded code coverage during the most recent run.  
+- `echidna-corpus/reproducers/` is empty, indicating no invariant violations were discovered.  
+- The generated HTML/LCOV files (e.g., `echidna-corpus/covered.*`) provide opcode-level coverage for the flattened contract.
+
+The resulting corpus stresses key behaviors: repeated mint attempts, transfers into wallets that already own tokens, and burn/re-mint loops. Because both invariants return `true` across every fuzzing sequence and no reproducers exist, we have high confidence that the one-token-per-wallet constraint and token ownership bookkeeping remain intact under adversarial ordering.
+
+✅ **All Echidna invariants currently pass.**

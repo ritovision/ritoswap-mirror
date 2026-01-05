@@ -1,0 +1,39 @@
+---
+title: Theme & UI Overrides
+description: How Storybook matches RitoSwap branding and UI styling.
+---
+
+import { FileTree } from 'nextra/components'
+
+# Theme & UI Overrides
+
+Storybook applies the RitoSwap visual system through a custom theme, global fonts, and CSS overrides.
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name=".storybook" defaultOpen>
+      <FileTree.File name="RitoTheme.ts" />
+      <FileTree.File name="manager.ts" />
+      <FileTree.File name="manager-head.html" />
+      <FileTree.File name="preview-head.html" />
+      <FileTree.File name="fonts.css" />
+      <FileTree.File name="storybook-overrides.css" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## RitoTheme
+
+`RitoTheme.ts` defines a dark Storybook theme using RitoSwap brand colors and typography. It is applied in:
+
+- `dapp/.storybook/preview.tsx` (`parameters.docs.theme`)
+- `dapp/.storybook/manager.ts` (Storybook manager UI)
+
+## Fonts and head injection
+
+- `manager-head.html` and `preview-head.html` load custom fonts from `/fonts` and set CSS variables.
+- `fonts.css` sets the `--font-*` variables used throughout the app.
+
+## UI overrides
+
+`storybook-overrides.css` fixes Storybook-specific stacking issues (e.g., the mobile nav overlay) without changing production UI behavior.

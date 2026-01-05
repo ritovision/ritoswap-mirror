@@ -1,0 +1,59 @@
+---
+title: MCP Tool · keynft_used_count
+description: Counts how many Keys have been marked “used” on the active chain.
+---
+
+import { Callout } from 'nextra/components'
+
+# `keynft_used_count`
+
+Simple but essential, this tool lives in `dapp/app/lib/mcp/tools/keynft-used-count.ts`. It queries Prisma to find how many Key NFTs have `used=true` for the current network.
+
+## Implementation
+
+```ts
+// dapp/app/lib/mcp/tools/keynft-used-count.ts
+const tool: Tool<Params> = {
+  name: 'keynft_used_count',
+  description: 'Return only the total number of key NFTs marked as used=true for the active chain.',
+  async handler() {
+    const Token = getTokenModel(prisma);
+    const total = await Token.count({ where: { used: true } });
+    const text = textResult(String(total));
+    const json = jsonResult({ total });
+    return { content: [...text.content, ...json.content] };
+  },
+};
+```
+
+It does not accept any parameters and only returns a text number + JSON `{ total }`, making it safe for dashboards or daily quotas.
+
+## Presenter
+
+`dapp/components/chatBot/ToolActivity/catalog/presenters/keynft_used_count.presenter.ts` adds the network name (derived from `publicConfig.activeChain`):
+
+- Pending — `Counting Used Keys`.
+- Success — `Used Keys Total (Sepolia)` with the numeric value.
+- Error — `Failed to Count Used Keys` plus the raw error message.
+
+## Playground Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--key-nft-used-count-interactive&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Key NFT Used Count (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Notes
+
+<Callout type="info">
+Because this tool is read-only, it does not require JWTs. It still benefits from the state service’s Prisma routing, so the number always reflects whichever chain the dapp is configured to target.
+</Callout>

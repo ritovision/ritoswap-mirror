@@ -1,0 +1,38 @@
+{
+  "name": "local-blockchain",
+  "version": "1.0.0",
+  "description": "RitoSwap local Besu QBFT network with Blockscout",
+  "scripts": {
+    "setup": "ts-node scripts/init-network.ts",
+    "start": "docker compose up -d",
+    "start:node": "docker compose -f docker-compose.besu.yml up -d",
+    "stop": "docker compose down",
+    "stop:node": "docker compose -f docker-compose.besu.yml down",
+    "clean": "ts-node scripts/clean-data.ts",
+    "logs": "docker compose logs -f",
+    "logs:node": "docker compose -f docker-compose.besu.yml logs -f",
+    "logs:blockscout": "docker compose logs -f backend frontend",
+    "status": "docker compose ps",
+    "generate:genesis": "ts-node scripts/generate-genesis.ts",
+    "reveal:key": "ts-node scripts/reveal-key.ts",
+    "reveal:address": "ts-node scripts/reveal-address.ts"
+  },
+  "keywords": ["ethereum", "qbft", "besu", "blockscout", "docker"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/node": "^20.10.0",
+    "@types/prompts": "^2.4.9",
+    "rimraf": "^5.0.5",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.3.0"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "dotenv": "^16.3.1",
+    "ethers": "^6.15.0",
+    "fs-extra": "^11.2.0",
+    "prompts": "^2.4.2"
+  }
+}

@@ -1,0 +1,420 @@
+---
+title: "Database Schema"
+description: "Network-isolated token tracking schema for multichain NFT usage"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+
+# Database Schema
+
+The RitoSwap database schema implements a carefully designed structure for tracking Colored Key NFT usage across multiple blockchain networks. This schema enables efficient token-gated access control while maintaining complete network isolation and supporting high-performance queries through strategic indexing.
+
+## Schema Overview
+
+The database architecture follows a network-isolated design pattern where each supported blockchain network maintains its own dedicated table. This approach prevents cross-network data conflicts while enabling network-specific optimizations and simplified debugging.
+
+### Core Schema Definition
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TokenRitonet {
+  tokenId  Int       @id
+  used     Boolean   @default(false)
+  usedBy   String?   
+  usedAt   DateTime?
+  
+  @@map("token_ritonet")
+}
+
+model TokenSepolia {
+  tokenId  Int       @id
+  used     Boolean   @default(false)
+  usedBy   String?   
+  usedAt   DateTime?
+  
+  @@map("token_sepolia")
+}
+
+model TokenEthereum {
+  tokenId  Int       @id
+  used     Boolean   @default(false)
+  usedBy   String?   
+  usedAt   DateTime?
+  
+  @@map("token_ethereum")
+}
+```
+
+Each model represents an identical structure mapped to network-specific tables, ensuring consistency while maintaining isolation.
+
+## Field Specifications
+
+Understanding the purpose and constraints of each field is crucial for proper integration:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Type</th>
+      <th>Constraints</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`tokenId`</td>
+      <td>Integer</td>
+      <td>Primary Key, Required</td>
+      <td>Unique identifier matching the on-chain NFT token ID</td>
+    </tr>
+    <tr>
+      <td>`used`</td>
+      <td>Boolean</td>
+      <td>Required, Default: false</td>
+      <td>Indicates whether the token has been used to access gated content</td>
+    </tr>
+    <tr>
+      <td>`usedBy`</td>
+      <td>String</td>
+      <td>Optional (nullable)</td>
+      <td>Ethereum address that used the token for gating (42 characters including 0x prefix)</td>
+    </tr>
+    <tr>
+      <td>`usedAt`</td>
+      <td>DateTime</td>
+      <td>Optional (nullable)</td>
+      <td>UTC timestamp recording when the token was used</td>
+    </tr>
+  </tbody>
+</Table>
+
+### Field Design Rationale
+
+**tokenId as Primary Key**  
+Using the token ID as the primary key ensures data integrity and provides optimal query performance. Since each address can only own one token at a time in the smart contract, and tokens are unique per network, this design prevents duplicate entries while enabling efficient lookups.
+
+**Boolean Usage Tracking**  
+The simple boolean `used` field supports the core business requirement of single-use token gating. Once set to `true`, the token cannot be used again for accessing gated content, though it remains transferable on-chain.
+
+**Nullable Usage Details**  
+The `usedBy` and `usedAt` fields are nullable to support two scenarios:
+1. Pre-populating token records before they are used
+2. Recording tokens that exist on-chain but haven't accessed gated content
+
+This design enables proactive database population and comprehensive token tracking.
+
+## Migration History
+
+The schema evolved through strategic migrations to support multichain functionality:
+
+### Initial Migration (June 20, 2025)
+
+The first migration established the basic token tracking structure:
+
+```sql
+-- CreateTable
+CREATE TABLE "Token" (
+    "tokenId" INTEGER NOT NULL,
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "usedBy" TEXT,
+    "usedAt" TIMESTAMP(3),
+    CONSTRAINT "Token_pkey" PRIMARY KEY ("tokenId")
+);
+```
+
+This simple structure proved the concept but lacked network isolation.
+
+### Network Tables Migration (June 21, 2025)
+
+The second migration introduced network-specific tables:
+
+```sql
+-- DropTable
+DROP TABLE "Token";
+
+-- CreateTable
+CREATE TABLE "token_ritonet" (
+    "tokenId" INTEGER NOT NULL,
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "usedBy" TEXT,
+    "usedAt" TIMESTAMP(3),
+    CONSTRAINT "token_ritonet_pkey" PRIMARY KEY ("tokenId")
+);
+
+-- CreateTable
+CREATE TABLE "token_sepolia" (
+    "tokenId" INTEGER NOT NULL,
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "usedBy" TEXT,
+    "usedAt" TIMESTAMP(3),
+    CONSTRAINT "token_sepolia_pkey" PRIMARY KEY ("tokenId")
+);
+
+-- CreateTable
+CREATE TABLE "token_ethereum" (
+    "tokenId" INTEGER NOT NULL,
+    "used" BOOLEAN NOT NULL DEFAULT false,
+    "usedBy" TEXT,
+    "usedAt" TIMESTAMP(3),
+    CONSTRAINT "token_ethereum_pkey" PRIMARY KEY ("tokenId")
+);
+```
+
+This migration established the current architecture with complete network isolation.
+
+## Database Configuration
+
+### PostgreSQL with Prisma Accelerate
+
+RitoSwap uses PostgreSQL as its database engine, chosen for its reliability, performance, and excellent support within the Prisma ecosystem. The integration with Prisma Accelerate provides additional benefits:
+
+**Edge Caching**  
+Frequently accessed token records are cached at global edge locations, reducing database load and improving response times for users worldwide.
+
+**Connection Pooling**  
+Accelerate manages database connections efficiently, preventing connection exhaustion in serverless environments where each function invocation might otherwise create a new connection.
+
+**Query Optimization**  
+Automatic query analysis identifies optimization opportunities, ensuring efficient execution even as data volume grows.
+
+### Connection String Configuration
+
+The database connection uses a single `DATABASE_URL` environment variable that should be configured with your Prisma Accelerate connection string:
+
+```bash
+DATABASE_URL="prisma://accelerate.prisma-data.net/?api_key=YOUR_API_KEY"
+```
+
+<Callout type="warning">
+Never commit database connection strings to version control. Always use environment variables and secure secret management systems.
+</Callout>
+
+## Query Patterns and Performance
+
+The schema design enables several efficient query patterns commonly used throughout RitoSwap:
+
+### Single Token Lookup
+
+The most frequent operation checks a specific token's status:
+
+```typescript
+// Primary key lookup - O(1) complexity
+const token = await prisma.tokenEthereum.findUnique({
+  where: { tokenId: 42 }
+});
+```
+
+With the token ID as the primary key, these lookups achieve constant-time performance regardless of table size.
+
+### Usage Analytics
+
+Aggregate queries for monitoring and analytics remain efficient:
+
+```typescript
+// Count of used tokens per network
+const usageStats = await prisma.tokenEthereum.count({
+  where: { used: true }
+});
+
+// Recent token usage
+const recentlyUsed = await prisma.tokenEthereum.findMany({
+  where: { 
+    used: true,
+    usedAt: {
+      gte: new Date(Date.now() - 24 * 60 * 60 * 1000) // Last 24 hours
+    }
+  },
+  orderBy: { usedAt: 'desc' },
+  take: 10
+});
+```
+
+### Bulk Operations
+
+Administrative tasks benefit from PostgreSQL's efficient bulk operations:
+
+```typescript
+// Pre-populate expected tokens
+const tokenIds = [1, 2, 3, 4, 5];
+await prisma.tokenEthereum.createMany({
+  data: tokenIds.map(id => ({ tokenId: id })),
+  skipDuplicates: true
+});
+```
+
+## Data Integrity Considerations
+
+The schema enforces several integrity constraints to maintain data quality:
+
+### Primary Key Constraint
+
+Each table's primary key on `tokenId` prevents duplicate entries. Attempting to insert a duplicate token ID results in a database error, ensuring each token has at most one usage record.
+
+### Type Safety
+
+Prisma's generated TypeScript client provides compile-time type safety:
+
+```typescript
+// ✅ Type-safe operations
+await prisma.tokenEthereum.create({
+  data: {
+    tokenId: 123,
+    used: true,
+    usedBy: "0x742d35Cc6634C0532925a3b844Bc9e7595f6E123",
+    usedAt: new Date()
+  }
+});
+
+// ❌ TypeScript error - invalid field
+await prisma.tokenEthereum.create({
+  data: {
+    tokenId: 123,
+    invalidField: "error" // TypeScript catches this
+  }
+});
+```
+
+### Referential Integrity
+
+While the schema doesn't enforce foreign key relationships (tokens exist on-chain, not in the database), application logic ensures consistency between on-chain state and database records through careful transaction management.
+
+## Operational Considerations
+
+### Backup Strategy
+
+Regular backups are essential for maintaining token usage history:
+
+<Steps>
+### Step 1: Automated Backups
+Configure your database provider's automated backup system with appropriate retention policies.
+
+### Step 2: Point-in-Time Recovery
+Ensure your backup strategy supports point-in-time recovery for addressing data corruption or accidental deletions.
+
+### Step 3: Cross-Region Replication
+For production deployments, implement cross-region replication to protect against regional outages.
+
+### Step 4: Regular Testing
+Periodically test backup restoration procedures to ensure recovery processes work as expected.
+</Steps>
+
+### Monitoring and Alerting
+
+Key metrics to monitor for database health:
+
+- **Query Performance** - Track slow queries and optimize as needed
+- **Connection Pool Usage** - Monitor for connection exhaustion
+- **Storage Growth** - Plan capacity based on token minting rates
+- **Cache Hit Rates** - Ensure Prisma Accelerate cache is effective
+
+### Index Optimization
+
+While the primary key provides excellent performance for token ID lookups, consider additional indexes for specific query patterns:
+
+```sql
+-- Index for finding recently used tokens
+CREATE INDEX idx_token_ethereum_used_at ON token_ethereum(usedAt DESC) 
+WHERE used = true;
+
+-- Index for finding tokens by user
+CREATE INDEX idx_token_ethereum_used_by ON token_ethereum(usedBy) 
+WHERE usedBy IS NOT NULL;
+```
+
+## Schema Evolution Guidelines
+
+When modifying the schema for new features:
+
+### Adding New Fields
+
+Follow Prisma's migration best practices:
+
+```bash
+# 1. Modify schema.prisma
+# 2. Create migration
+pnpm prisma migrate dev --name add_new_field
+
+# 3. Test thoroughly in development
+# 4. Apply to production
+pnpm prisma migrate deploy
+```
+
+### Adding New Networks
+
+To support additional blockchain networks:
+
+1. Add a new model to `schema.prisma` following the existing pattern
+2. Update `prismaNetworkUtils.ts` to route to the new model
+3. Create and test the migration in development
+4. Deploy to production with appropriate monitoring
+
+### Breaking Changes
+
+Avoid breaking changes when possible. If necessary:
+
+- Plan a migration strategy that maintains backward compatibility
+- Communicate changes to all team members
+- Update all dependent code before removing old fields
+- Consider a phased rollout with feature flags
+
+## Security Considerations
+
+The schema implements several security best practices:
+
+### Minimal Data Storage
+
+The schema stores only essential data, reducing privacy risks and compliance burden. No personal information beyond Ethereum addresses is recorded.
+
+### Address Validation
+
+While not enforced at the database level, application code should validate Ethereum addresses before storage:
+
+```typescript
+import { isAddress } from 'viem';
+
+function validateAndStore(address: string, tokenId: number) {
+  if (!isAddress(address)) {
+    throw new Error('Invalid Ethereum address');
+  }
+  
+  // Safe to store
+  return prisma.tokenEthereum.update({
+    where: { tokenId },
+    data: { 
+      used: true, 
+      usedBy: address.toLowerCase(), // Normalize to lowercase
+      usedAt: new Date() 
+    }
+  });
+}
+```
+
+### Query Injection Prevention
+
+Prisma's query builder prevents SQL injection by design, but always validate and sanitize user input:
+
+```typescript
+// Safe - Prisma handles parameterization
+const tokenId = parseInt(userInput, 10);
+if (isNaN(tokenId) || tokenId < 0) {
+  throw new Error('Invalid token ID');
+}
+
+const token = await prisma.tokenEthereum.findUnique({
+  where: { tokenId }
+});
+```
+
+## Summary
+
+The RitoSwap database schema represents a thoughtful approach to multichain token tracking. Through network isolation, strategic field design, and integration with Prisma Accelerate, it provides a robust foundation for token-gated access control. The schema's simplicity ensures maintainability while its architecture supports the performance and reliability requirements of a production dApp.
+
+By understanding the schema's design decisions and operational characteristics, developers can effectively integrate with the database layer while maintaining the security and performance standards expected in Web3 applications.

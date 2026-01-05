@@ -1,0 +1,16 @@
+// dapp/tsconfig.test.json
+{
+  "extends": "./tsconfig.json",
+
+  "compilerOptions": {
+    // bring in Vitest & Node globals
+    "types": ["vitest", "node"]
+  },
+
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.test.ts",
+    "**/*.test.tsx"
+  ]
+}

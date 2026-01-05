@@ -1,0 +1,364 @@
+---
+title: Chain Info Provider
+description: A comprehensive system for managing blockchain logos, display names, and chain metadata with fallback support
+---
+
+import { Callout, FileTree, Tabs, Steps } from 'nextra/components'
+
+# Chain Info Provider
+
+The Chain Info Provider is a React context system that extends wagmi's chain information with visual assets and display name management. While wagmi provides chain IDs and technical names, it doesn't include logos or handle edge cases in naming conventions across different services.
+
+## What This System Solves
+
+### 🖼️ **Blockchain Logo Management**
+Automatically fetches and manages blockchain logos from TrustWallet's CDN, with intelligent fallback handling when assets are unavailable.
+
+### 🏷️ **Display Name Normalization**
+Transforms technical chain names into user-friendly display names, handling special cases and inconsistencies across different services.
+
+### 🔧 **Custom Chain Support**
+Enables seamless integration of local and custom blockchains with their own assets, perfect for development networks and private chains.
+
+## Architecture Overview
+
+The system consists of two tightly coupled components that work together to provide a complete chain information solution:
+
+<FileTree>
+  <FileTree.Folder name="components" defaultOpen>
+    <FileTree.Folder name="providers" defaultOpen>
+      <FileTree.File name="ChainInfoProvider.tsx" />
+      <FileTree.File name="chainOverrides.ts" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+### How It Extends Wagmi
+
+Wagmi provides essential blockchain connectivity but has limitations when building user interfaces:
+
+| Feature | Wagmi Provides | Chain Info Provider Adds |
+|---------|---------------|-------------------------|
+| Chain IDs | ✅ Yes | ✅ Inherits from wagmi |
+| Chain Names | ✅ Technical names | ✅ Display-friendly names |
+| RPC URLs | ✅ Yes | ✅ Inherits from wagmi |
+| Chain Logos | ❌ No | ✅ CDN URLs + fallbacks |
+| Token Logos | ❌ No | ✅ Token-specific logos |
+| Name Normalization | ❌ No | ✅ Consistent formatting |
+| Custom Chain Assets | ❌ No | ✅ Local file support |
+
+## Core Components
+
+### ChainInfoProvider
+
+The main provider component that creates a React context with chain information utilities.
+
+```tsx
+import { ChainInfoProvider } from '@/components/providers/ChainInfoProvider'
+
+export default function App({ children }) {
+  return (
+    <ChainInfoProvider>
+      {children}
+    </ChainInfoProvider>
+  )
+}
+```
+
+### useChainInfo Hook
+
+Access chain information throughout your application:
+
+```tsx
+import { useChainInfo } from '@/components/providers/ChainInfoProvider'
+
+function MyComponent() {
+  const { 
+    getCurrentChainLogoUrl,
+    getCurrentChainDisplayName 
+  } = useChainInfo()
+  
+  // Use in your UI
+  return (
+    <img src={getCurrentChainLogoUrl()} alt={getCurrentChainDisplayName()} />
+  )
+}
+```
+
+## API Reference
+
+### ChainInfoProvider Props
+
+The `ChainInfoProvider` component accepts the following props:
+
+| Prop | Type | Required | Description |
+|------|------|----------|-------------|
+| `children` | `ReactNode` | Yes | Child components that need access to chain info |
+
+### useChainInfo Hook Return Values
+
+The `useChainInfo` hook provides access to the following methods and properties:
+
+| Property/Method | Type | Description |
+|-----------------|------|-------------|
+| `activeChain` | `Chain \| undefined` | Currently connected chain from wagmi |
+| `getCurrentChainLogoUrl()` | `() => string` | Logo URL for the active chain |
+| `getChainLogoUrl(chainId)` | `(chainId: number) => string` | Logo URL for any chain ID |
+| `getTokenLogoUrl(chainId, address)` | `(chainId: number, address: string) => string` | Token logo URL |
+| `getFallbackLogoUrl()` | `() => string` | Default fallback logo (SVG data URI) |
+| `getChainDisplayName(chainId)` | `(chainId: number) => string` | Human-friendly chain name |
+| `getCurrentChainDisplayName()` | `() => string` | Display name for active chain |
+
+## Chain Overrides Configuration
+
+The `chainOverrides.ts` file allows you to customize chain information for specific networks:
+
+```typescript
+export interface ChainOverride {
+  displayName?: string    // Custom display name
+  walletKey?: string      // TrustWallet CDN key override
+  localLogoUrl?: string   // Local file path for custom logos
+}
+```
+
+### Configuration Examples
+
+<Tabs items={['Standard Chains', 'Custom Local Chain']}>
+  <Tabs.Tab>
+```typescript
+export const CHAIN_OVERRIDES: Record<number, ChainOverride> = {
+  // Optimism: Standard name works fine
+  10: { 
+    displayName: "Optimism", 
+    walletKey: "optimism" 
+  },
+  
+  // Avalanche: TrustWallet uses "avalanchec" not "avalanche"
+  43114: { 
+    displayName: "Avalanche", 
+    walletKey: "avalanchec"  // Special case!
+  },
+}
+```
+  </Tabs.Tab>
+  <Tabs.Tab>
+```typescript
+// Custom local blockchain (e.g., development network)
+[Number(process.env.NEXT_PUBLIC_LOCAL_CHAIN_ID) || 90999999]: {
+  displayName: process.env.NEXT_PUBLIC_LOCAL_BLOCKCHAIN_NAME ?? "RitoNet",
+  walletKey: "ritonet", // Won't exist on CDN
+  localLogoUrl: "/images/blockchainLogos/ritonet.png", // Use local file
+}
+```
+  </Tabs.Tab>
+</Tabs>
+
+### Name Normalization
+
+The provider automatically normalizes chain names for CDN compatibility when no override is specified:
+
+```typescript
+// Input: "Test Chain 2.0!"
+// Output: "test-chain-20"
+
+normalizeKey(name: string) {
+  return name
+    .toLowerCase()              // "test chain 2.0!"
+    .replace(/\s+/g, "-")      // "test-chain-2.0!"
+    .replace(/[^a-z0-9-]/g, "") // "test-chain-20"
+}
+```
+
+This ensures special characters and spaces don't break CDN URL construction.
+
+## Logo Resolution Logic
+
+The provider follows a specific hierarchy when resolving logos:
+
+<Steps>
+### Check for Override
+First checks if a `localLogoUrl` is defined in chain overrides
+
+### Build CDN URL
+If no local override, constructs TrustWallet CDN URL using the chain's normalized name or override `walletKey`
+
+### Apply Fallback
+If CDN fails to load, displays a fallback SVG logo with "?" symbol
+</Steps>
+
+### TrustWallet CDN Structure
+
+The provider constructs URLs following TrustWallet's asset structure:
+
+```
+# Chain logos
+https://cdn.jsdelivr.net/gh/trustwallet/assets@master/blockchains/{key}/info/logo.png
+
+# Token logos
+https://cdn.jsdelivr.net/gh/trustwallet/assets@master/blockchains/{key}/assets/{tokenAddress}/logo.png
+```
+
+<Callout type="warning">
+  Some chains use non-standard keys in TrustWallet's CDN:
+  - Avalanche → `avalanchec` (not `avalanche`)
+  - BNB Smart Chain → `smartchain` (not `bnb` or `bsc`)
+  
+  Always test logo loading and add overrides as needed.
+</Callout>
+
+## Usage Example: NetworkWidget
+
+<img 
+  src="/images/ui/network-widget-high.png" 
+  alt="Network widget component displaying 7,600 Ethereum" 
+  style={{ width: '100%', maxWidth: '200px', display: 'block', margin: '2rem auto' }} 
+/>
+
+Here's how the NetworkWidget component uses the Chain Info Provider:
+
+```tsx
+import { useChainInfo } from "@providers/ChainInfoProvider";
+
+export default function NetworkWidget() {
+  const {
+    activeChain,
+    getCurrentChainLogoUrl,
+    getFallbackLogoUrl,
+  } = useChainInfo();
+  
+  const logoUrl = getCurrentChainLogoUrl();
+  const fallback = getFallbackLogoUrl();
+  
+  return (
+    <img
+      src={logoUrl}
+      alt={`${symbol} logo`}
+      className={styles.logo}
+      onError={(e) => {
+        // Graceful fallback on load error
+        e.currentTarget.onerror = null;
+        e.currentTarget.src = fallback;
+      }}
+    />
+  );
+}
+```
+
+This pattern ensures users always see a logo, even if:
+- The chain isn't supported by TrustWallet
+- The CDN is temporarily unavailable
+- You're using a custom local blockchain
+
+## Error Handling
+
+The provider implements multiple layers of error handling:
+
+### Missing Chain Data
+
+When a requested chain ID isn't found in wagmi's configuration, the system falls back to the currently active chain rather than immediately showing an error:
+
+```typescript
+// If chain 999 doesn't exist but user is on Ethereum (chain 1)
+getChainLogoUrl(999) // Returns Ethereum's logo URL
+```
+
+This ensures users see familiar branding even when querying unknown chains.
+
+### Invalid Token Address
+
+Token logo requests validate the address parameter:
+```typescript
+if (!target || !tokenAddress) return FALLBACK_LOGO;
+```
+
+Token addresses are automatically normalized to lowercase to match CDN conventions:
+```typescript
+const addr = tokenAddress.toLowerCase();
+```
+
+### Fallback Logo Design
+
+The fallback logo is a data URI SVG that displays a blue circle with a white "?" symbol:
+```svg
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+  <circle cx="10" cy="10" r="10" fill="#04426C"/>
+  <text x="10" y="11" text-anchor="middle" dominant-baseline="middle" 
+        fill="white" font-size="16" font-family="Arial, sans-serif">?</text>
+</svg>
+```
+
+This provides a consistent, recognizable indicator when logos can't be loaded.
+
+### Image Load Failures
+
+Components using the provider should implement `onError` handlers:
+```tsx
+<img
+  src={logoUrl}
+  onError={(e) => {
+    e.currentTarget.src = getFallbackLogoUrl();
+  }}
+/>
+```
+
+## Best Practices
+
+<Callout type="default" emoji="✨">
+  **DO:**
+  - Always implement `onError` handlers on logo images
+  - Test logo loading for all supported chains
+  - Add overrides for chains with non-standard CDN keys
+  - Use local logos for development/custom networks
+  
+  **DON'T:**
+  - Assume all chain names match TrustWallet keys
+  - Hardcode logo URLs in components
+  - Skip fallback handling
+</Callout>
+
+## Extending the System
+
+To add support for a new chain:
+
+1. Check if the chain's wagmi name matches TrustWallet's key
+2. If not, add an override in `chainOverrides.ts`:
+
+```typescript
+export const CHAIN_OVERRIDES: Record<number, ChainOverride> = {
+  // ... existing overrides
+  
+  [YOUR_CHAIN_ID]: {
+    displayName: "Your Chain Display Name",
+    walletKey: "trustwallet-key", // If different from chain name
+    localLogoUrl: "/images/your-chain.png" // Optional
+  }
+}
+```
+
+3. For local/custom chains, always provide `localLogoUrl` since they won't exist on the CDN
+
+## Common Issues
+
+### Logo Not Loading
+
+1. **Check the CDN key**: Visit TrustWallet's assets repo to verify the correct blockchain folder name
+2. **Add an override**: If the key differs from the chain name, add it to `chainOverrides.ts`
+3. **Use local fallback**: For custom chains, always provide a `localLogoUrl`
+
+### Display Name Issues
+
+Some wagmi chain names are technical or inconsistent. Override them for better UX:
+
+```typescript
+// Instead of "Arbitrum One" or "arbitrum"
+42161: { displayName: "Arbitrum" }
+```
+
+### Token Logo 404s
+
+Token logos require:
+- Lowercase token address
+- Token must be listed in TrustWallet's assets
+- Correct blockchain key
+
+Not all tokens have logos available. Implement appropriate fallbacks in your UI.

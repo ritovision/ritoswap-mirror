@@ -1,0 +1,72 @@
+---
+title: OpenAPI Playground
+description: Interactive Swagger UI embedded in the docs.
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# OpenAPI Playground
+
+The docs site embeds a Swagger UI playground so developers can explore and try API endpoints without leaving the docs.
+
+## Embedding Swagger UI
+
+The wrapper component lives at <code>docs/app/components/utilities/swaggerdocs/SwaggerDocs.tsx</code> and wires Swagger UI to the docs environment:
+
+```tsx
+import SwaggerDocs from '@components/utilities/swaggerdocs/SwaggerDocs'
+
+<SwaggerDocs tag="Token Status" />
+```
+
+## Tag filtering
+
+Swagger UI can be filtered by tag so each endpoint page only shows its relevant slice of the OpenAPI spec. The tag must match the OpenAPI tag name.
+
+<Callout type="info">
+  Use <code>tag</code> for filtered views, or omit it for the full API surface.
+</Callout>
+
+## Local vs production API host
+
+The Swagger UI base URL switches based on <code>NEXT_PUBLIC_LOCAL_DOCS</code>:
+
+- <code>true</code> → <code>http://localhost:3000</code>
+- default → <code>https://ritoswap.com</code>
+
+This is handled inside <code>SwaggerDocs.tsx</code>, so pages do not need to branch manually.
+
+### Local OpenAPI with the docs running on a different port
+
+When you want the docs to hit a **local dApp API** while the docs site runs on a different port, set up a local env file and use the alternate dev command:
+
+1. Create <code>docs/.env.local</code> with:
+
+```
+NEXT_PUBLIC_LOCAL_DOCS=true
+```
+
+2. Run the docs site on port 3001:
+
+```
+pnpm dev1
+```
+
+This keeps the docs site on <code>http://localhost:3001</code> while Swagger pulls OpenAPI from <code>http://localhost:3000</code>.
+
+## Styling
+
+Swagger UI is themed to match RitoVision in <code>docs/app/components/utilities/swaggerdocs/css-override.css</code>.
+
+<Steps>
+### Step 1: Update or add a new API tag
+Ensure your OpenAPI tag exists and matches the page.
+
+### Step 2: Embed Swagger UI
+Drop <code>&lt;SwaggerDocs tag="Your Tag" /&gt;</code> into the MDX page.
+</Steps>
+
+## References
+
+- API overview: <code>/dapp/api</code>
+- Swagger UI component: <code>docs/app/components/utilities/swaggerdocs/SwaggerDocs.tsx</code>

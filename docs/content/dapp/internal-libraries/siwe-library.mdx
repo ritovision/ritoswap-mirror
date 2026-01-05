@@ -1,0 +1,113 @@
+---
+title: "SIWE Library"
+description: "Sign-In with Ethereum helpers backed by the Cloudflare state worker."
+---
+
+import { FileTree, Steps, Callout } from 'nextra/components'
+
+# SIWE Library
+
+`@lib/siwe` orchestrates the Sign-In with Ethereum (SIWE) flow used by `/api/gate-access`. It handles nonce generation, message validation, and signature verification so routes only need to focus on business logic.
+
+The modern stack pairs SIWE with the Cloudflare Durable Object state service:
+
+- `/api/nonce` → `generateNonce()` → `stateWorker.nonce:set`
+- `/api/gate-access` → `verifyNonce()` + `verifySiweMessage()` → `stateWorker.nonce:consume`
+- `isSiweEnabled()` toggles the entire flow based on `NEXT_PUBLIC_ENABLE_STATE_WORKER` and the worker secrets.
+
+When SIWE is disabled (e.g., purely local dev), routes fall back to the legacy timestamped signature path.
+
+## File Tree
+
+<FileTree>
+  <FileTree.Folder name="app/lib/siwe" defaultOpen>
+    <FileTree.File name="siwe.server.ts" />
+    <FileTree.File name="siwe.client.ts" />
+    <FileTree.File name="__tests__/siwe.server.test.ts" />
+  </FileTree.Folder>
+  <FileTree.Folder name="app/schemas/domain">
+    <FileTree.File name="siwe.domain.ts" />
+    <FileTree.File name="nonce.domain.ts" />
+  </FileTree.Folder>
+</FileTree>
+
+## Configuration Checklist
+
+```bash
+NEXT_PUBLIC_ENABLE_STATE_WORKER=true
+STATE_WORKER_URL=https://ritoswap-state-worker.worker.dev/state
+STATE_WORKER_API_KEY=your_state_api_key
+NEXT_PUBLIC_DOMAIN=ritoswap.com                 # Hosts allowed in SIWE messages
+```
+
+If the flag is `false`, `isSiweEnabled()` short-circuits, `/api/nonce` returns `501`, and `/api/gate-access` enforces the legacy signature flow.
+
+## Server Helpers
+
+### `isSiweEnabled()`
+
+Returns `true` only when:
+
+1. `NEXT_PUBLIC_ENABLE_STATE_WORKER` is set
+2. `serverConfig.stateService.isActive` (URL + API key present)
+3. `isStateServiceEnabled()` confirms the Cloudflare client initialized successfully
+
+### `generateNonce(params)`
+
+```ts
+export async function generateNonce({ identifier, ttlSeconds = 300 }) {
+  const value = randomBytes(NONCE_BYTES).toString(NONCE_ENCODING);
+  if (isSiweEnabled()) {
+    await getStateClient().storeNonce(identifier, value, ttlSeconds);
+  }
+  return { value, expiresAt: new Date(Date.now() + ttlSeconds * 1000), identifier };
+}
+```
+
+When SIWE is disabled it still returns a nonce so clients can continue their flow, but nothing is persisted server-side.
+
+### `verifyNonce(params)`
+
+Consumes and verifies the nonce via the state worker. If the worker is disabled, it yields `{ isValid: true }` to maintain backwards compatibility.
+
+### `verifySiweMessage(params)`
+
+Wraps the official `siwe` package to validate:
+
+- Domain (derived from `NEXT_PUBLIC_DOMAIN` or request headers)
+- Address (`msg.address` vs. `params.address`)
+- Nonce
+- Time window (issuedAt vs. current time)
+- Signature (via `SiweMessage.verify` + downstream `viem.verifyMessage` in the route)
+
+Parsed messages are returned so the caller can enforce additional policy (domain allowlists, host binding, etc.).
+
+## Client Helpers
+
+`siwe.client.ts` exposes browser-safe utilities:
+
+- `isSiweEnabled()` – reads `NEXT_PUBLIC_ENABLE_STATE_WORKER`
+- `getDomain()` / `getUri()` – consistent domain + URI formatting
+- `createSiweMessage(params)` – EIP-4361 formatter
+
+Use them alongside the client-side signing helpers in `@lib/client/signing` to avoid drift between front end and back end.
+
+## Flow Summary
+
+<Steps>
+### 1. Request Nonce
+`GET /api/nonce` → `generateNonce` → Durable Object persists value with 5-minute TTL.
+
+### 2. Build SIWE Message
+Client uses `createSiweMessage` and `buildEnvelope` to prepare the EIP-4361 payload.
+
+### 3. Sign
+Wallet signs the message; on mobile with WalletConnect, the UI calls `openWalletDeeplink()` as a best-effort wallet nudge.
+
+### 4. Exchange
+`/api/gate-access` verifies the nonce, SIWE message, and on-chain ownership before delivering content and minting a JWT.
+</Steps>
+
+<Callout type="info">
+Every SIWE signature is also re-verified with `viem.verifyMessage` in the route for belt-and-suspenders protection.
+</Callout>

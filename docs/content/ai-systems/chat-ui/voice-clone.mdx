@@ -1,0 +1,106 @@
+---
+title: Voice Clone (TTS)
+description: How RapBotRito generates spoken word audio with ElevenLabs and local playback.
+---
+
+import { Callout, FileTree } from 'nextra/components'
+import { StorybookEmbed } from '@components/StorybookEmbed'
+
+# Voice Clone (TTS)
+
+RapBotRito can generate spoken word audio from its own responses. The TTS pipeline is built as a provider adapter so we can swap vendors, but the current production implementation uses ElevenLabs for the Rito Rhymes voice clone.
+
+## User Flow
+
+1. The assistant bubble renders a "Play Audio" button (`AssistantAudioButton`).
+2. Clicking the button unlocks audio on the current gesture and either replays cached audio or requests TTS for the current assistant message.
+3. New audio responses are cached in memory and routed through the global Music Bar for playback.
+
+## Request + Playback Pipeline
+
+- `AssistantAudioButton.tsx` builds a speakable string via `extractSpeakableText`, which removes inline tool tags and normalizes whitespace so the TTS only receives words meant to be spoken.
+- When no cached audio exists, the button POSTs `{ text, messageId }` to `ttsPublicConfig.apiPath` and includes `Authorization: Bearer` when JWT gating is enabled.
+- `/api/tts` verifies JWTs (if configured), resolves the provider from `ttsServerConfig`, and calls `synthesizeElevenLabs` for ElevenLabs.
+- The audio `ArrayBuffer` is stored in `useTtsAudioStore` (keyed by `messageId` plus a text hash) and sent to `MusicProvider.loadArrayBuffer` for playback.
+- If the message text changes, the cached entry is cleared and regenerated.
+
+## Playback Behavior
+
+- If the current track id matches the message id, the button seeks to `0` and plays.
+- If audio exists in `useTtsAudioStore` but is not loaded, it loads the cached `ArrayBuffer` with `MusicProvider.loadArrayBuffer` and plays.
+- If no cached audio exists (or the text hash changed), it requests `/api/tts`, stores the result, then plays.
+
+## Local Audio Caching
+
+The `useTtsAudioStore` keeps a per-message record:
+
+- `status`: `idle`, `generating`, or `ready`.
+- `textHash`: invalidates cached audio if the assistant message changes.
+- `arrayBuffer`: raw bytes used by `MusicProvider` for immediate playback.
+
+This keeps audio local and avoids re-fetching when a user hits Play again.
+
+## Cleanup & Reset
+
+- `useTtsAudioStore.clear()` runs when the conversation is reset (messages length returns to 0 in `dapp/components/chatBot/index.tsx`).
+- The store is in-memory, so a page refresh clears cached voice clips.
+- Errors clear the per-message entry so the next click re-attempts generation.
+
+## Provider Adapter
+
+TTS providers live under `dapp/app/lib/tts/providers`. The registry selects the active provider from `TTS_PROVIDER`.
+
+- `elevenlabs`: current production provider.
+- `disabled`: returns a 503 from `/api/tts`.
+
+The adapter layer is intentionally thin so we can add new providers without changing the UI.
+
+## Files
+
+<FileTree>
+  <FileTree.Folder name="dapp/app">
+    <FileTree.Folder name="api">
+      <FileTree.Folder name="tts">
+        <FileTree.File name="route.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="config">
+      <FileTree.File name="tts.public.ts" />
+      <FileTree.File name="tts.server.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="lib">
+      <FileTree.Folder name="tts">
+        <FileTree.Folder name="providers">
+          <FileTree.File name="elevenlabs.ts" />
+          <FileTree.File name="registry.ts" />
+          <FileTree.File name="types.ts" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="dapp/components/chatBot">
+    <FileTree.Folder name="ChatMessages">
+      <FileTree.Folder name="components">
+        <FileTree.File name="AssistantAudioButton.tsx" />
+      </FileTree.Folder>
+      <FileTree.Folder name="utils">
+        <FileTree.File name="extractSpeakableText.ts" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="MusicPlayer">
+      <FileTree.File name="MusicProvider.tsx" />
+      <FileTree.File name="MusicBar.tsx" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="dapp/app/store">
+    <FileTree.File name="ttsAudioStore.ts" />
+  </FileTree.Folder>
+</FileTree>
+
+## Storybook Demo
+
+<StorybookEmbed title="ChatBot/TTS" story="TtsPlayback" height="640px" />
+
+<Callout type="info">
+  The TTS pipeline is designed to be multi-provider. ElevenLabs powers the current production voice clone, but the API shape and registry support additional providers without UI changes.
+</Callout>

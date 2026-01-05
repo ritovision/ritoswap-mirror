@@ -1,0 +1,182 @@
+---
+title: Pinecone Semantic Database
+description: Index layout, seeding workflows, and runtime integration for semantic search.
+---
+
+import { Callout, Steps, Table, FileTree, Cards } from 'nextra/components'
+
+# Pinecone Semantic Database
+
+RitoSwap uses Pinecone as the vector store for memes, rhymes, GIFs, and images. It is the backing store for the `pinecone_search` MCP tool and the `agent-rap-verse` resource gathering phase.
+
+<Callout type="warning">
+  `dapp/app/config/pinecone.config.ts` is server-only and throws if imported in client code.
+</Callout>
+
+## Code Map
+
+<FileTree>
+  <FileTree.Folder name="dapp">
+    <FileTree.Folder name="app">
+      <FileTree.Folder name="config">
+        <FileTree.File name="pinecone.config.ts" />
+      </FileTree.Folder>
+      <FileTree.Folder name="lib/mcp/tools">
+        <FileTree.File name="pinecone-search.ts" />
+        <FileTree.Folder name="agent-rap-verse/phases">
+          <FileTree.File name="gathering.ts" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="pinecone">
+      <FileTree.File name="create-index.ts" />
+      <FileTree.File name="seed.ts" />
+      <FileTree.File name="check-stats.ts" />
+      <FileTree.File name="clear-namespace.ts" />
+      <FileTree.File name="gifs.json" />
+      <FileTree.File name="rito-pics.json" />
+      <FileTree.File name="ritorhymes.json" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Configuration
+
+<Table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Purpose</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>PINECONE_API_KEY</code></td>
+      <td>Pinecone API key</td>
+      <td>Required for `pineconeConfig.isConfigured` and all tools/scripts.</td>
+    </tr>
+    <tr>
+      <td><code>PINECONE_INDEX_1_NAME</code></td>
+      <td>Primary index name</td>
+      <td>Used by the CLI scripts under `dapp/pinecone`.</td>
+    </tr>
+    <tr>
+      <td><code>PINECONE_INDEX_1_NAMESPACES</code></td>
+      <td>Comma-separated namespaces</td>
+      <td>Validates tool input and controls the `seed.ts` namespace allow-list.</td>
+    </tr>
+    <tr>
+      <td><code>PINECONE_INDEX_2_NAME</code>/<code>PINECONE_INDEX_2_NAMESPACES</code></td>
+      <td>Optional additional index</td>
+      <td>Parsed by `pinecone.config.ts`. The CLI scripts target index 1 only.</td>
+    </tr>
+    <tr>
+      <td><code>PINECONE_INDEX_3_NAME</code>/<code>PINECONE_INDEX_3_NAMESPACES</code></td>
+      <td>Optional additional index</td>
+      <td>Parsed by `pinecone.config.ts`. The CLI scripts target index 1 only.</td>
+    </tr>
+    <tr>
+      <td><code>PINECONE_CLOUD</code>/<code>PINECONE_REGION</code></td>
+      <td>Index creation spec</td>
+      <td>Consumed by `create-index.ts` (defaults to aws/us-east-1).</td>
+    </tr>
+  </tbody>
+</Table>
+
+Example `.env` snippet:
+
+```bash
+PINECONE_API_KEY=your-key-here
+PINECONE_INDEX_1_NAME=rito-search
+PINECONE_INDEX_1_NAMESPACES=gifs,rito-pics,ritorhymes
+PINECONE_CLOUD=aws
+PINECONE_REGION=us-east-1
+```
+
+### Multi-Index Note
+
+Current usage seeds and queries only `PINECONE_INDEX_1_*`. The runtime config can load index 2/3 if those env vars are set, but the `dapp/pinecone` scripts only target index 1 today.
+
+## Index + Namespace Strategy
+
+- A single index can host multiple datasets via namespaces, keeping the schema consistent while letting you isolate content.
+- The JSON datasets in `dapp/pinecone` are typically seeded into matching namespaces (for example `gifs`, `rito-pics`, `ritorhymes`).
+- `pineconeConfig` and `seed.ts` both validate namespaces against `PINECONE_INDEX_1_NAMESPACES`, so keep the list in sync with whatever you seed.
+
+## Seeding Workflow
+
+Run these commands from `dapp/` so the script paths resolve.
+
+<Steps>
+  {<h3>1. Create the index</h3>}
+  `create-index.ts` creates a serverless index sized for `multilingual-e5-large` (1024 dimensions, cosine).
+
+  ```bash
+  npx tsx pinecone/create-index.ts
+  ```
+
+  {<h3>2. Seed a namespace</h3>}
+  `seed.ts` embeds `text` fields with inputType `passage` and upserts in batches. The namespace must be listed in `PINECONE_INDEX_1_NAMESPACES` or the script exits.
+
+  ```bash
+  npx tsx pinecone/seed.ts pinecone/gifs.json gifs
+  ```
+
+  {<h3>3. Check stats</h3>}
+  Use `check-stats.ts` to confirm vector counts and namespace health.
+
+  ```bash
+  npx tsx pinecone/check-stats.ts
+  ```
+
+  {<h3>4. Clear a namespace (destructive)</h3>}
+  `clear-namespace.ts` deletes every vector in the namespace.
+
+  ```bash
+  npx tsx pinecone/clear-namespace.ts gifs
+  ```
+</Steps>
+
+<Callout type="warning">
+  `clear-namespace.ts` is destructive. It will remove every vector in the target namespace.
+</Callout>
+
+## Dataset Format
+
+`seed.ts` expects a JSON array with `id`, `text`, and optional `metadata`. Metadata is sanitized (arrays become string arrays, objects are JSON stringified) and the `text` field is also attached to metadata for easy retrieval.
+
+```json
+[
+  {
+    "id": "gif_0001",
+    "text": "woman makes a flamethrower with a lighter by blowing the flame",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/...",
+      "tags": ["flame", "lighter"],
+      "mood": "intense"
+    }
+  }
+]
+```
+
+## Runtime Integration
+
+- `dapp/app/config/pinecone.config.ts` parses env, validates index/namespace combos, and blocks client-side imports.
+- `dapp/app/lib/mcp/tools/pinecone-search.ts` builds a dynamic input schema from `pineconeConfig` and uses `multilingual-e5-large` for query embeddings.
+- `pinecone_search` accepts an optional `filter` object for metadata filtering, passed directly to Pinecone queries.
+- `dapp/app/lib/mcp/tools/index.ts` registers `pinecone_search` only when `pineconeConfig.isConfigured` is true.
+- `agent-rap-verse` calls `pinecone_search` during the gathering phase to pull memes, images, and rhyme samples.
+- When the namespace is `gifs` (case-insensitive), `pinecone_search` emits `<gif>` tags so the UI can render the chosen asset.
+
+<Cards num={3}>
+  <Cards.Card title="MCP Tool: pinecone_search" href="/ai-systems/mcp-stack/pinecone-search" arrow />
+  <Cards.Card title="GIF Renderer" href="/ai-systems/chat-ui/inline-tools/gifs" arrow />
+  <Cards.Card title="Images & SVGs" href="/ai-systems/chat-ui/inline-tools/images" arrow />
+</Cards>
+
+## Troubleshooting
+
+- `Pinecone not configured` at boot means the API key is missing or no index names were provided.
+- `Index "..." not found` or `Namespace "..." not found` usually means the env list does not match what you seeded.
+- If results are empty, run `check-stats.ts` to confirm vectors exist and confirm your namespace name.

@@ -1,0 +1,295 @@
+---
+title: Vitest Testing Overview
+description: How Vitest, React Testing Library, MSW, and OpenAPI contract tests are organized in the RitoSwap dapp.
+---
+
+import { Callout, Tabs, FileTree, Table, Cards } from 'nextra/components'
+
+# Testing Overview
+
+RitoSwap’s dapp has a substantial automated test suite (over 200 Vitest files and well over a thousand individual tests) covering wallet UX, token gating, API routes, OpenAPI contracts, and state management.
+
+This page explains **how the tests are structured, what each layer is responsible for, and how they work together**. It is intentionally focused on **project-specific patterns**, not generic Vitest tutorials.
+
+<Callout type="info">
+  This overview focuses on Vitest-based tests inside the dapp.  
+  E2E flows using Playwright, Synpress, Postman, and Supertest are mentioned for context but documented separately.
+</Callout>
+
+
+<Tabs
+  items={['At a glance', 'Test layers', 'Infrastructure', 'Adding tests']}
+  defaultIndex={0}
+  storageKey="testing-overview-tabs"
+>
+  <Tabs.Tab>
+    ## At a glance
+
+    - **Test runner:** Vitest (`vitest`, `@vitest/ui`) with a `happy-dom` environment.
+    - **UI testing:** React Testing Library + `@testing-library/jest-dom` for wallet UX and components.
+    - **Network & infra:**
+      - MSW (`msw/node`) for mocking external HTTP calls (e.g. Alchemy).
+      - Prisma client mocked globally so tests never touch a real database.
+      - Next.js primitives (`next/link`, `next/image`, `next/navigation`) stubbed for DOM-safe rendering.
+    - **API routes:** Next.js route handlers (`app/api/.../route.ts`) tested directly via `NextRequest` + mocked dependencies. The same pattern is used for every gate‑adjacent surface (`gate-access`, `token-status`, `nonce`, `form-submission-gate`, `quota-reset`, `chat`, `mcp`, and `openapi`).
+    - **Contract tests:** A dedicated layer (`app/api/__contract__/contract.test.ts`) validating example responses against `public/openapi.json` using an OpenAPI validator.
+    - **Coverage:** Enforced via `vitest.config.ts` with thresholds on branches, functions, lines, and statements, plus a curated exclusion list for infra, configs, and non-critical UI.
+
+    The goal is to **prioritize security‑critical flows (auth, token gating, rate limiting) and user‑visible wallet UX**, rather than chase artificial 100% coverage.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ## Test layers
+
+    <Table>
+      <thead>
+        <tr>
+          <th>Layer</th>
+          <th>What it tests</th>
+          <th>Examples</th>
+          <th>Primary tools</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Unit / Store</td>
+          <td>
+            Pure logic, Zustand state transitions, and invariants without network or DOM.
+          </td>
+          <td>
+            <code>app/store/__tests__/chatModeStore.test.ts</code>
+          </td>
+          <td>
+            Vitest, direct store access, custom env helpers.
+          </td>
+        </tr>
+        <tr>
+          <td>Component</td>
+          <td>
+            Wallet and chain UI behaviour: ENS name handling, address truncation, modals, button flows.
+          </td>
+          <td>
+            <code>components/utilities/wallet/__tests__/AddressDisplay.test.tsx</code><br />
+            <code>components/utilities/wallet/__tests__/AccountModal.test.tsx</code>
+          </td>
+          <td>
+            React Testing Library, `happy-dom`, wagmi hook mocks, timers.
+          </td>
+        </tr>
+        <tr>
+          <td>API route</td>
+          <td>
+            Next.js route behaviour: status codes, headers, problem+json payloads, rate limits, DB/chain decisions. Beyond the flagship key-gate endpoints, suites also cover nonce issuance, form submissions, quota resets, chat/MCP bridges, and the OpenAPI surface so every authenticated entry point stays pinned.
+          </td>
+          <td>
+            <code>app/api/gate-access/__tests__/gate-access.test.ts</code><br />
+            <code>app/api/token-status/__tests__/token-status.test.ts</code> (and similar)
+          </td>
+          <td>
+            Vitest, `NextRequest`, mocks for viem, Prisma, SIWE, JWT, rate limiters.
+          </td>
+        </tr>
+        <tr>
+          <td>API contract</td>
+          <td>
+            Alignment between documented OpenAPI spec and example responses for each endpoint & status code.
+          </td>
+          <td>
+            <code>app/api/__contract__/contract.test.ts</code>
+          </td>
+          <td>
+            OpenAPI validator, `public/openapi.json`, Vitest.
+          </td>
+        </tr>
+      </tbody>
+    </Table>
+
+    Each layer focuses on a different failure mode:
+
+    - **Unit/Store** tests guard business rules and state transitions.
+    - **Component** tests guard wallet UX and visual behaviour.
+    - **API route** tests guard HTTP contracts and security-sensitive flows.
+    - **API contract** tests guard OpenAPI documentation drift.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ## Infrastructure & configuration
+
+    ### Key files
+
+    <FileTree>
+      <FileTree.Folder name="root">
+        <FileTree.File name="vitest.config.ts" />
+        <FileTree.Folder name="test" defaultOpen>
+          <FileTree.File name="setup.ts" />
+          <FileTree.Folder name="helpers">
+            <FileTree.File name="env.ts" />
+          </FileTree.Folder>
+          <FileTree.Folder name="utils">
+            <FileTree.File name="wagmi.tsx" />
+          </FileTree.Folder>
+        </FileTree.Folder>
+        <FileTree.Folder name="app">
+          <FileTree.Folder name="api">
+            <FileTree.Folder name="__contract__">
+              <FileTree.File name="contract.test.ts" />
+            </FileTree.Folder>
+            <FileTree.Folder name="gate-access">
+              <FileTree.Folder name="__tests__">
+                <FileTree.File name="gate-access.test.ts" />
+              </FileTree.Folder>
+            </FileTree.Folder>
+            <FileTree.Folder name="token-status">
+              <FileTree.Folder name="__tests__">
+                <FileTree.File name="token-status.test.ts" />
+              </FileTree.Folder>
+            </FileTree.Folder>
+          </FileTree.Folder>
+          <FileTree.Folder name="store">
+            <FileTree.Folder name="__tests__" defaultOpen>
+              <FileTree.File name="chatModeStore.test.ts" />
+            </FileTree.Folder>
+          </FileTree.Folder>
+        </FileTree.Folder>
+        <FileTree.Folder name="components">
+          <FileTree.Folder name="utilities">
+            <FileTree.Folder name="wallet">
+              <FileTree.Folder name="__tests__">
+                <FileTree.File name="AddressDisplay.test.tsx" />
+                <FileTree.File name="AccountModal.test.tsx" />
+              </FileTree.Folder>
+            </FileTree.Folder>
+          </FileTree.Folder>
+        </FileTree.Folder>
+        <FileTree.Folder name="public">
+          <FileTree.File name="openapi.json" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+    </FileTree>
+
+    ### Vitest configuration
+
+    The `vitest.config.ts` file wires together:
+
+    - **Vite plugins:** React + `vite-tsconfig-paths` so tests respect path aliases and JSX transforms.
+    - **CSS modules:** `css.modules.generateScopedName` ensures deterministic class names in tests.
+    - **Test runner settings:**
+      - `environment: 'happy-dom'` for browser-like DOM without a real browser.
+      - `globals: true` so `describe`, `it`, `expect`, `vi` are available globally.
+      - `setupFiles: ['./test/setup.ts']` to register mocks, MSW, and DOM shims once.
+      - `exclude` patterns for `node_modules`, build output, Cloudflare workers, and e2e directories.
+    - **Coverage:**
+      - Provider: `v8` with `text`, `json`, and `html` reporters.
+      - Thresholds: `branches`, `functions`, `lines`, and `statements` all at 75.
+      - A curated `coverage.exclude` list for:
+        - Config files and build artefacts.
+        - Test utilities, Storybook stories, debug views.
+        - Server-only entry points that don’t make sense in a browser env.
+
+    ### Test environment helpers
+
+    - `test/setup.ts`
+      - Mocks Prisma client so no real DB is used.
+      - Starts an MSW server using `alchemyHandlers` for portfolio tests.
+      - Defines `onUnhandledRequest` so localhost Supertest traffic passes while other unhandled requests cause errors.
+      - Stubs `next/navigation`, `next/link`, and `next/image` for React Testing Library.
+      - Installs `matchMedia` and `IntersectionObserver` shims so responsive logic and observers work in tests.
+    - `test/helpers/env.ts`
+      - Provides `seedBase`, `seedServerTest`, and other helpers to set up consistent `process.env` for tests.
+      - Mocks `@config/server.env` so env-dependent code reads from a controlled snapshot.
+      - Includes helpers like `withEnv` and `resetModulesAndSeed` for tests that need fresh module evaluation.
+    - `test/utils/wagmi.tsx`
+      - Provides `createTestConfig` and `TestWrapper` components with `WagmiProvider` + `QueryClientProvider` for tests that need actual wagmi context.
+      - Re-exports React Testing Library utilities for convenience.
+
+    ### Configuration & infrastructure validation
+
+    Vitest also enforces the repo’s configuration contracts so a misconfigured run fails fast:
+
+    - **Environment schemas:** Suites in `app/config/__tests__` (e.g. `server.env.test.ts`, `public.env.test.ts`, `jwt.server.test.ts`, `chain.test.ts`, `ai.server.test.ts`, `ai.public.test.ts`, `pinecone.config.test.ts`) import the real modules under fresh env snapshots to guarantee required secrets, feature flags, and connector settings are present.
+    - **Client utilities:** Tests like `app/utils/__tests__/assetFetcher.test.ts` and `mobile.test.ts` mock viem/fetch/globals to keep wallet-dependent helpers deterministic.
+    - **Cloudflare workers:** `cloudflare/src/__tests__` covers the durable object state store and email worker so rate limits, nonce storage, and breach notifications behave the same in Node and on the edge.
+  </Tabs.Tab>
+
+  <Tabs.Tab>
+    ## Adding tests in this repo
+
+    This section focuses on **when to use each layer** and the expected patterns, rather than syntax.
+
+    ### Choosing the right layer
+
+    - **You changed a Zustand store or complex state logic**
+      - Add or update tests under <code>app/store/__tests__</code>.
+      - Use the existing pattern from <code>chatModeStore.test.ts</code>:
+        - Assert initial state.
+        - Assert state transitions for each public method.
+        - Verify immutability (new state objects where appropriate).
+    - **You added or modified a wallet or chain UI component**
+      - Add tests under <code>components/utilities/wallet/__tests__</code> (or an equivalent <code>__tests__</code> folder).
+      - Mock wagmi hooks (e.g. <code>useAccount</code>, <code>useEnsName</code>, <code>useEnsAvatar</code>, <code>useChainId</code>) directly, or wrap with <code>TestWrapper</code> if you need real providers.
+      - Use fake timers for time-based transitions (e.g. ENS reveal).
+      - Assert on rendered text, attributes, and DOM structure rather than implementation details.
+    - **You changed a Next.js API route**
+      - Add or update tests under <code>app/api/&lt;route&gt;/__tests__</code>.
+      - Import the handler (<code>GET</code>, <code>POST</code>, etc.) and construct <code>NextRequest</code> instances.
+      - Mock external dependencies: Prisma, viem, SIWE helpers, JWT helpers, rate limiters, gated content.
+      - Cover at least:
+        - Happy path (200s).
+        - Validation failures (400s).
+        - Auth failures (401/403).
+        - Not‑found or domain‑specific errors (404).
+        - Rate limiting (429).
+        - At least one unexpected error scenario.
+    - **You changed the OpenAPI spec or external contract**
+      - Update <code>public/openapi.json</code>.
+      - Update <code>CONTRACT_TESTS</code> in <code>app/api/__contract__/contract.test.ts</code>:
+        - Add/modify the endpoint entry.
+        - Ensure test cases cover each documented status code.
+      - Use the meta tests at the bottom of <code>contract.test.ts</code> to confirm all paths and status codes are represented.
+
+    ### How to run tests
+
+    - **Run the full Vitest suite:**
+
+      ```bash
+      pnpm vitest
+      ```
+
+    - **Run a single file:**
+
+      ```bash
+      pnpm vitest app/api/gate-access/__tests__/gate-access.test.ts
+      ```
+
+    - **Use the Vitest UI:**
+
+      ```bash
+      pnpm vitest --ui
+      ```
+
+    These commands assume you are in the <code>dapp</code> directory and that dependencies have been installed.
+  </Tabs.Tab>
+</Tabs>
+
+
+## Where to go next
+
+Use the pages below for deeper, layer-specific guidance:
+
+<Cards.Card
+  title="Unit & Component Testing"
+  href="/dapp/vitest/unit-comp-testing"
+  arrow
+/>
+
+<Cards.Card
+  title="API Route Testing"
+  href="/dapp/vitest/api-route-testing"
+  arrow
+/>
+
+<Cards.Card
+  title="API Contract & OpenAPI Testing"
+  href="/dapp/vitest/api-contract-openapi"
+  arrow
+/>

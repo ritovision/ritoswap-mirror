@@ -1,0 +1,195 @@
+---
+title: "Token Status"
+description: "Lightweight token existence and usage tracking API for the RitoSwap dApp"
+---
+
+import { Callout, Table } from 'nextra/components'
+import ChainConfigSnippet from '@snippets/ChainConfigSnippet.mdx'
+import SwaggerDocs from '@components/utilities/swaggerdocs/SwaggerDocs'
+
+# Token Status API
+
+The Token Status API provides real-time information about Colored Key NFT existence and usage within the RitoSwap ecosystem. It powers UI states like "Available", "Already used for access", or "Token doesn’t exist" without forcing the frontend to hit the chain directly.
+
+This endpoint is optimized for **frequent polling** from the dApp UI.
+
+<Callout type="info">
+  Use this page for a high-level understanding of how token status works.
+  For full request/response schema and example payloads, see the **OpenAPI Reference** section below.
+</Callout>
+
+## What this endpoint tracks
+
+Each token has two distinct states:
+
+1. **On-chain existence**  
+   Whether the token has been minted and exists in the Key NFT smart contract.
+
+2. **Off-chain usage**  
+   Whether the token has already been used to access gated content, along with who used it and when.
+
+The API combines these into a single JSON response so the dApp can render token state with one call.
+
+At a high level, the backend does:
+
+1. Check the database for an existing token record (including usage info).
+2. If missing, hit the chain once to verify existence.
+3. If it exists on-chain but not in the DB, create a record (unused).
+4. Return the combined state back to the client.
+
+This keeps the UI snappy while avoiding unnecessary chain reads.
+
+## Endpoint summary
+
+<Table>
+  <thead>
+    <tr>
+      <th>Property</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>URL</td>
+      <td><code>/api/token-status/[tokenId]</code></td>
+    </tr>
+    <tr>
+      <td>Method</td>
+      <td><code>GET</code></td>
+    </tr>
+    <tr>
+      <td>URL Parameters</td>
+      <td><code>tokenId</code> – The NFT token ID to check (non-negative integer)</td>
+    </tr>
+    <tr>
+      <td>Authentication</td>
+      <td>None (public endpoint)</td>
+    </tr>
+    <tr>
+      <td>Typical Usage</td>
+      <td>Real-time UI checks when viewing tokens or attempting gated access</td>
+    </tr>
+  </tbody>
+</Table>
+
+<ChainConfigSnippet />
+
+## Response shape (high-level)
+
+All valid requests (with a valid numeric <code>tokenId</code>) return **HTTP 200**, even if the token does not exist. The presence and state of the token are communicated via the JSON fields:
+
+```ts
+interface TokenStatusResponse {
+  count: number;         // 1 if the token exists, 0 if it does not
+  exists: boolean;       // true if the token exists on-chain
+  used: boolean;         // true if it has been used for gating
+  usedBy: string | null; // address that used it (if used)
+  usedAt: string | null; // ISO timestamp of usage (if used)
+}
+```
+
+Typical results:
+
+- **Token exists and unused**  
+  <code>exists: true</code>, <code>used: false</code>, <code>usedBy: null</code>, <code>usedAt: null</code>
+
+- **Token exists and used**  
+  <code>exists: true</code>, <code>used: true</code>, <code>usedBy</code> and <code>usedAt</code> populated
+
+- **Token does not exist**  
+  <code>exists: false</code>, <code>used: false</code>, <code>count: 0</code>
+
+Use <code>exists</code> and <code>used</code> as your primary flags in the UI.
+
+## Minimal request example
+
+A simple fetch from the dApp:
+
+```ts
+// Check status of token #42
+async function getTokenStatus(tokenId: number) {
+  const res = await fetch(`/api/token-status/${tokenId}`);
+
+  if (!res.ok) {
+    // See “Error behavior” below for details
+    throw new Error(`Failed to check token status: ${res.status}`);
+  }
+
+  const data = (await res.json()) as {
+    count: number;
+    exists: boolean;
+    used: boolean;
+    usedBy: string | null;
+    usedAt: string | null;
+  };
+
+  return data;
+}
+```
+
+Example usage in a React component:
+
+```tsx
+function TokenStatusBadge({ tokenId }: { tokenId: number }) {
+  const [status, setStatus] = React.useState<null | {
+    exists: boolean;
+    used: boolean;
+  }>(null);
+
+  React.useEffect(() => {
+    getTokenStatus(tokenId)
+      .then((data) => setStatus({ exists: data.exists, used: data.used }))
+      .catch(() => setStatus(null));
+  }, [tokenId]);
+
+  if (!status) return <span>Checking…</span>;
+  if (!status.exists) return <span>Does not exist</span>;
+  if (status.used) return <span>Used</span>;
+
+  return <span>Available</span>;
+}
+```
+
+## Error behavior & rate limiting
+
+This endpoint distinguishes between:
+
+- **Validation errors (400)**  
+  Returned when <code>tokenId</code> is missing, negative, or not a valid number.
+
+- **Rate limiting (429)**  
+  Returned when a client exceeds the allowed request rate.  
+  The response includes headers like:
+  - <code>X-RateLimit-Limit</code>
+  - <code>X-RateLimit-Remaining</code>
+  - <code>Retry-After</code>
+
+  Use <code>Retry-After</code> to back off polling intervals.
+
+- **Internal errors (500)**  
+  Returned when something unexpected happens while checking status
+  (e.g. DB connectivity issues, RPC failures, etc.).
+
+For exact JSON shapes and full header definitions, rely on the OpenAPI reference below.
+
+## Polling guidelines
+
+The endpoint is designed to handle real-time UI polling, but you should still be polite:
+
+- Poll more frequently while a token is in a “pending” or “unknown” state.  
+- Slow down or stop polling once:
+  - the token is marked as <code>used</code>, or  
+  - the user navigates away / the tab is hidden.
+
+A simple pattern is:
+
+- 3–5 second interval while waiting for on-chain actions to settle.
+- Back off if you receive <code>429</code> and respect the <code>Retry-After</code> header.
+- Stop polling once <code>used === true</code> if that’s a terminal state for your flow.
+
+## OpenAPI Reference
+
+For full request/response schema, enums, example payloads, and all status codes,
+use the generated OpenAPI docs filtered to this tag:
+
+<SwaggerDocs tag="Token Status" />

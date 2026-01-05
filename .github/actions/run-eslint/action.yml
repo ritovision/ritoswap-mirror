@@ -1,0 +1,25 @@
+name: Run ESLint
+description: Runs ESLint with configurable strictness
+
+inputs:
+  working-directory:
+    description: 'Working directory to run ESLint from'
+    required: false
+    default: './dapp'
+  strict:
+    description: 'Fail on warnings (--max-warnings 0)'
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Run ESLint
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        if [ "${{ inputs.strict }}" == "true" ]; then
+          pnpm exec eslint . --max-warnings 0
+        else
+          pnpm exec eslint .
+        fi

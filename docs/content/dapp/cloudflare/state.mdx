@@ -1,0 +1,308 @@
+---
+title: Durable State API
+description: Internal JSON API for nonces, rate limits, and quotas backed by a Cloudflare Durable Object.
+---
+
+
+import { Table } from 'nextra/components'
+
+# Durable State API
+
+The Durable State API is an internal JSON endpoint used by the dapp to manage nonces, enforce rate limits, and track quotas. It is backed by a single Cloudflare Durable Object that acts as a small, strongly-consistent state engine running alongside the worker.
+
+This endpoint is **not** intended to be exposed directly to untrusted public clients. It is designed to be called from trusted services (such as the Next.js app) using a shared bearer token.
+
+---
+
+## Endpoint summary
+
+Within the worker, all requests whose path starts with `/state` are routed to this handler.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Property</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Method</td>
+      <td><code>POST</code> only</td>
+    </tr>
+    <tr>
+      <td>Path</td>
+      <td>Any path beginning with <code>/state</code></td>
+    </tr>
+    <tr>
+      <td>Content type</td>
+      <td><code>application/json</code></td>
+    </tr>
+    <tr>
+      <td>Authentication</td>
+      <td><code>Authorization: Bearer STATE_SERVICE_AUTH_TOKEN</code></td>
+    </tr>
+  </tbody>
+</Table>
+
+If a request does not use `POST`, the handler returns a `405 Method Not Allowed` error. All valid requests must include a JSON body describing which state action to perform.
+
+---
+
+## Authentication
+
+Access to the Durable State API is guarded by a shared bearer token.
+
+- The worker expects a header in every request:
+  - `Authorization: Bearer STATE_SERVICE_AUTH_TOKEN`
+- The value of `STATE_SERVICE_AUTH_TOKEN` is configured as a Cloudflare secret and must match the corresponding environment variable in the Next.js app.
+
+If authentication or configuration is missing:
+
+- If the Durable Object binding (`STATE_STORE`) is not configured, the worker responds with a `500` error and a message indicating that state storage is not configured.
+- If `STATE_SERVICE_AUTH_TOKEN` is not set in the worker environment, the worker responds with a `500` error indicating the auth token is missing.
+- If the `Authorization` header is absent or does not match the expected bearer value, the worker responds with `401 Unauthorized`.
+
+---
+
+## Request body
+
+The request body is a JSON object that specifies an `action` and the parameters required for that action. The worker validates the payload and forwards it to the Durable Object, which executes the requested operation.
+
+At a high level, the supported actions fall into three groups:
+
+1. **Nonce actions** – simple ephemeral tokens.
+2. **Rate limit checks** – sliding-window rate limiting.
+3. **Quota management** – usage windows for arbitrary keys.
+
+If the body is empty or cannot be parsed as JSON, the worker returns a `400` error.
+
+### Nonce actions
+
+Nonces are short-lived values used for authentication flows (for example, SIWE or other sign-in flows). They are keyed by an application-defined identifier.
+
+Supported nonce actions:
+
+- `nonce:set`
+  - Fields:
+    - `identifier` – string key for the nonce (for example, a wallet address or session identifier).
+    - `value` – string value to store.
+    - `ttlSeconds` – number of seconds before the nonce expires.
+  - Behavior:
+    - Stores the value under the given identifier with a time-to-live.
+
+- `nonce:get`
+  - Fields:
+    - `identifier` – key to look up.
+  - Behavior:
+    - Returns the current value for the identifier or `null` if none is present.
+
+- `nonce:consume`
+  - Fields:
+    - `identifier` – key to look up.
+  - Behavior:
+    - Returns the value associated with the identifier and deletes it in a single step. If no value is present, it returns `null`.
+
+Example payloads:
+
+```json
+{
+  "action": "nonce:set",
+  "identifier": "wallet:0x1234…",
+  "value": "random-nonce-value",
+  "ttlSeconds": 300
+}
+```
+
+```json
+{
+  "action": "nonce:get",
+  "identifier": "wallet:0x1234…"
+}
+```
+
+```json
+{
+  "action": "nonce:consume",
+  "identifier": "wallet:0x1234…"
+}
+```
+
+### Rate limit action
+
+Rate limits allow the dapp to screen operations (for example, login attempts or API calls) before performing them.
+
+- `ratelimit:check`
+  - Fields:
+    - `limiter` – string name for the limiter (for example, `"login"` or `"siwe"`).
+    - `identifier` – key to rate limit (for example, IP address or wallet address).
+    - `limit` – maximum number of allowed operations within the window.
+    - `windowSeconds` – length of the sliding window in seconds.
+  - Behavior:
+    - Tracks a list of timestamps for the given limiter and identifier.
+    - Removes entries that fall outside the current window.
+    - Marks the call as allowed if the number of timestamps is still below `limit`, otherwise as blocked.
+
+Example:
+
+```json
+{
+  "action": "ratelimit:check",
+  "limiter": "siwe",
+  "identifier": "ip:203.0.113.5",
+  "limit": 5,
+  "windowSeconds": 60
+}
+```
+
+### Quota actions
+
+Quotas represent a reusable window of allowed usage for arbitrary keys. They track how much of a limit has been consumed and when the window resets.
+
+Supported quota actions:
+
+- `quota:ensure`
+  - Fields:
+    - `key` – string key identifying the quota bucket.
+    - `limit` – maximum allowed usage within the window.
+    - `durationSec` – window length in seconds.
+  - Behavior:
+    - Ensures that a quota window exists for the key. If none exists or it has expired, a new window is created.
+
+- `quota:increment`
+  - Fields:
+    - `key` – quota key.
+    - `amount` – amount by which to increment usage.
+  - Behavior:
+    - Increments `used` within the window and returns the new usage and remaining capacity.
+    - If the window has not been initialized (for example, no prior `quota:ensure` call), the operation fails with a `404`-style error.
+
+- `quota:incrementBatch`
+  - Fields:
+    - `entries` – array of `{ key, amount }` objects.
+  - Behavior:
+    - Applies increments across multiple quota keys in a single call.
+    - If any referenced key does not have an initialized window, the operation fails and identifies which window was missing.
+
+- `quota:resetKeys`
+  - Fields:
+    - `keys` – array of quota keys to clear.
+  - Behavior:
+    - Deletes quota entries for each key, returning how many were removed.
+
+- `quota:resetPrefix`
+  - Fields:
+    - `prefix` – key prefix.
+  - Behavior:
+    - Deletes all quota entries whose keys start with the specified prefix.
+
+Example payloads:
+
+```json
+{
+  "action": "quota:ensure",
+  "key": "nft-mint:collection-1",
+  "limit": 100,
+  "durationSec": 3600
+}
+```
+
+```json
+{
+  "action": "quota:increment",
+  "key": "nft-mint:collection-1",
+  "amount": 1
+}
+```
+
+```json
+{
+  "action": "quota:resetPrefix",
+  "prefix": "nft-mint:"
+}
+```
+
+---
+
+## Response structure
+
+All responses returned by the Durable Object share a common envelope. The worker simply forwards these responses back to the caller.
+
+The envelope has two possible shapes:
+
+- **Success**:
+  - `ok: true`
+  - `result` – action-specific payload.
+- **Error**:
+  - `ok: false`
+  - `error` – human-readable message.
+
+The HTTP status code reflects the outcome:
+
+- Successful operations generally return `200`.
+- Invalid requests return `400`.
+- Missing quota windows return `404`.
+- Misconfigurations (such as missing bindings or secrets) return `500`.
+
+### Action-specific result shapes
+
+The `result` field varies by action type:
+
+- **Nonce actions**
+  - `nonce:set` – `result` is `true` when the value is stored successfully.
+  - `nonce:get` – `result` is the stored string value or `null`.
+  - `nonce:consume` – `result` is the stored string value (if present) or `null` once consumed.
+
+- **Rate limit**
+  - `ratelimit:check` – `result` is an object with:
+    - `success` – `true` if the call falls within the limit; otherwise `false`.
+    - `limit` – configured limit for the window.
+    - `remaining` – remaining allowed calls within the current window (zero when blocked).
+    - `reset` – timestamp (in milliseconds) when the window will fully reset.
+
+- **Quotas**
+  - `quota:ensure` – `result` is a quota window object:
+    - `limit` – maximum allowed usage within the window.
+    - `used` – current usage.
+    - `duration` – total length of the window in seconds.
+    - `resetAt` – epoch timestamp (in seconds) indicating when the window resets.
+  - `quota:increment` – `result` is an object containing:
+    - `used` – updated usage.
+    - `remaining` – how much capacity is left before the quota is exhausted.
+  - `quota:incrementBatch` – `result` is `true` when all increments succeed.
+  - `quota:resetKeys` / `quota:resetPrefix` – `result` is an object that reports how many entries were deleted and which keys were affected.
+
+---
+
+## Error handling
+
+In addition to the envelope mentioned above, the worker uses standard HTTP status codes for common error paths:
+
+- `405 Method Not Allowed` – The request used a method other than `POST`.
+- `400 Bad Request` – The body was missing, could not be parsed as JSON, or the `action` field was unsupported.
+- `401 Unauthorized` – The `Authorization` header was missing or did not match the configured bearer token.
+- `404 Not Found` – A quota operation referenced a quota window that has not been initialized.
+- `500 Internal Server Error` – The worker was misconfigured (for example, missing `STATE_STORE` binding or `STATE_SERVICE_AUTH_TOKEN`).
+
+These errors are intended to be consumed by internal services rather than end users. The messages are primarily targeted at developers operating the dapp.
+
+---
+
+## Internal behavior (overview)
+
+The Durable Object behind the `/state` endpoint is responsible for executing all state operations. While most callers only need the HTTP contract, it can be useful to understand how the implementation behaves:
+
+- The worker resolves a single Durable Object instance from the `STATE_STORE` binding and uses it as a global state engine.
+- Nonces are stored with an explicit expiration based on `ttlSeconds`, so they automatically disappear after they are no longer valid.
+- Rate limits are modeled as lists of timestamps. On each check, timestamps outside the configured window are discarded before evaluating whether another call is allowed.
+- Quotas store a window with a fixed `limit`, `used` count, `duration`, and `resetAt` time. Once `resetAt` is reached, a new window is established on the next `quota:ensure` call.
+- Keys are organized in a namespaced fashion (for example, using prefixes) so that prefix-based resets can efficiently clear related entries.
+
+The actual TypeScript types and storage keys are implementation details; the contract exposed by the Durable State API is the JSON interface documented above.
+
+---
+
+## Related topics
+
+- **Overview:** See the main Cloudflare Worker overview page for information on Wrangler configuration, environment variables, and testing.
+- **Email Relay API:** See the email relay documentation for details on the companion endpoint that sends gated messages via Brevo.

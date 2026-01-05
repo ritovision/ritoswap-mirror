@@ -1,0 +1,64 @@
+---
+title: Runtime Architecture
+description: How the client, Next.js routes, SSE, and MCP server coordinate
+---
+
+import { Steps, Callout } from 'nextra/components'
+
+# Runtime Architecture
+
+The AI runtime is anchored around three cooperating layers:
+
+1. **Client transport + UI** — `dapp/components/chatBot/index.tsx` wires `@ai-sdk/react` to the custom `ToolAwareTransport` in `dapp/app/lib/llm/client/ToolAwareTransport.ts`.
+2. **Streaming chat route** — `dapp/app/lib/llm/handler.ts` turns every POST `/api/chat` call into a Server-Sent Event stream with tool instrumentation.
+3. **Tool execution** — `dapp/app/lib/mcp/server` accepts JSON-RPC calls, verifies JWT state, and dispatches into the registry under `dapp/app/lib/mcp/tools`.
+
+## End-to-End Flow
+
+<Steps>
+  {<h3>1. Metadata Injection</h3>}
+  The `ToolAwareTransport` intercepts outgoing fetches, merges the active chat mode (`useChatModeStore`) into the request body, and tees the incoming SSE stream so the client can update tool chips as events arrive.
+
+  {<h3>2. Handler Streaming</h3>}
+  `handleChatRequest` (`dapp/app/lib/llm/handler.ts`) parses metadata, enforces JWT + token quotas, binds mode-specific tool schemas via `getOpenAIToolSchemas`, and uses `sseInit`/`streamLLMResponse` to stream text deltas and tool lifecycle frames.
+
+  {<h3>3. Tool Dispatch</h3>}
+  When the LLM yields a tool call, `callMcpTool` posts to `/api/mcp`. The MCP server replays JWT checks (global + per-tool), then `MCPDispatcher` resolves the handler from `toolRegistry`. Responses are streamed back to both the model and UI simultaneously.
+</Steps>
+
+The AI system is a hybrid implementation that bridges standard Web2 APIs with Web3 state. It is designed to be **model-agnostic** but **context-aware**, injecting real-time blockchain data into every conversation.
+
+## Tech Stack
+
+The system leverages a modern stack to handle the complexity of streaming, tool execution, and state management:
+
+*   **Framework**: **Next.js App Router** (API Routes) for the backend endpoints.
+*   **Orchestration**: **LangChain** (`@langchain/core`, `@langchain/openai`) for LLM interaction and tool binding.
+*   **Client SDK**: **Vercel AI SDK** (`@ai-sdk/react`) for the `useChat` hook and frontend state management.
+*   **Vector DB**: **Pinecone** (`@pinecone-database/pinecone`) for semantic search and long-term memory.
+*   **Blockchain**: **Viem** & **Wagmi** for all on-chain interactions (reading balances, simulating transactions).
+*   **Validation**: **JSON Schema** for strict tool definitions and **Zod** for internal type safety.
+
+## Streaming Contracts
+
+- **SSE frames** — emitted by `dapp/app/lib/llm/sse-stream.ts`, include `text-delta`, `tool-input-*`, `tool-output-*`, and `finish` events. The client store in `dapp/app/store/toolActivity.ts` listens and maintains chip state.
+- **Tool chip hydration** — image tools emit `{ kind: 'store-image' }` JSON payloads; `useHydrateToolImages.ts` decodes the base64 into `useLocalImageStore`.
+- **Goodbye hooks** — inline `<goodbye />` tags parsed by `ChatMessages/utils/parseContentWithMedia.ts` trigger the front-end to show a reset animation, mirroring the post-battle requirements baked into rap battle prompts.
+
+## Voice Clone Path
+
+The spoken-word pipeline is a separate request path that still shares the same audio surface as the Music Bar:
+
+- `AssistantAudioButton.tsx` builds speakable text and either replays cached audio or POSTs to `/api/tts` when a clip is missing.
+- `dapp/app/api/tts/route.ts` validates JWTs (if required), then delegates to `dapp/app/lib/tts/providers`.
+- The ElevenLabs provider returns an `ArrayBuffer`, which is cached in `dapp/app/store/ttsAudioStore.ts` and routed through `MusicProvider.loadArrayBuffer` so the Music Bar can play it.
+
+## Supporting Services
+
+- **State service** — when `NEXT_PUBLIC_ENABLE_STATE_WORKER` is enabled, quota reads/writes go through the Cloudflare Durable Object implemented in `dapp/cloudflare/src/durable/state.ts`. The Next.js route handlers call it via `dapp/app/lib/state/client.ts`.
+- **Pinecone** — semantic queries consistently route through the MCP `pinecone_search` tool, which enforces namespace validity using the metadata in `dapp/app/config/pinecone.config.ts`.
+- **Providers** — `dapp/app/lib/llm/providers/registry.ts` hides the differences between OpenAI and LM Studio. Each request can pick a `modelIndex`, while configuration pages document how to toggle providers.
+
+<Callout type="info">
+  The streaming contract is intentionally symmetric: everything the LLM sees about a tool call is also emitted to the UI. That makes the transcript reproducible and keeps presenters (`dapp/components/chatBot/ToolActivity/catalog`) stateless.
+</Callout>

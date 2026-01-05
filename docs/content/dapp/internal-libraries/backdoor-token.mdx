@@ -1,0 +1,45 @@
+---
+title: "Backdoor Token Helper"
+description: "Controlled token reset utility for QA and demos."
+---
+
+import { Callout, FileTree } from 'nextra/components'
+
+# Backdoor Token Helper
+
+`@lib/backdoorToken/BackdoorToken.ts` provides a guarded escape hatch that can reset a specific token’s usage record after it has been consumed. It exists for QA/demo flows where you need to reuse the same NFT without minting/burning every time.
+
+## How It Works
+
+1. Environment flags (`BACKDOOR_TOKEN`, `TOKEN_ID`, `BACKDOOR_ADDRESS`) describe which token/address pair is eligible.
+2. `/api/form-submission-gate` calls `scheduleTokenReset(tokenId, address, reqId)` after marking the token as used.
+3. The helper validates inputs via shared Zod schemas, ensures the configured token/address match, and in production requires `BACKDOOR_ADDRESS` to be set.
+4. It loads the appropriate Prisma delegate and flips the `used`, `usedBy`, and `usedAt` fields back to the unused state.
+
+```ts
+await scheduleTokenReset(42, '0xabc...', requestId);
+```
+
+- In development, logs include loud emoji-prefixed messages indicating whether the backdoor was activated.
+- In production, all messaging is intentionally vague (“Special handling activated”) so the feature can stay hidden.
+
+<Callout type="warning">
+The helper is opt-in. If `BACKDOOR_TOKEN` or `TOKEN_ID` are missing, or the caller address doesn’t match, it simply returns without touching the database. Never enable it in production unless you truly need a reset mechanism and understand the security implications.
+</Callout>
+
+## Environment Flags (`server.env`)
+
+| Key | Description |
+| --- | --- |
+| `BACKDOOR_TOKEN` | Master switch (`true`/`false`) |
+| `TOKEN_ID` | Numeric token ID that may be reset |
+| `BACKDOOR_ADDRESS` | Optional; required when `NODE_ENV=production` |
+
+## File Tree
+
+<FileTree>
+  <FileTree.Folder name="app/lib/backdoorToken">
+    <FileTree.File name="BackdoorToken.ts" />
+    <FileTree.File name="BackdoorToken.test.ts" />
+  </FileTree.Folder>
+</FileTree>

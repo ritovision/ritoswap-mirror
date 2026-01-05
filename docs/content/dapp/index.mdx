@@ -1,0 +1,451 @@
+---
+title: DApp – Overview
+description: Complete overview of the RitoSwap decentralized application workspace
+---
+
+import versions from '@lib/versions';
+import { Callout, Steps, Tabs, FileTree, Cards } from 'nextra/components'
+
+# DApp Overview
+**Version: {versions.dapp}**
+
+This overview provides entry points for configuring and understanding the RitoSwap decentralized application workspace. Each section includes links to detailed documentation where deeper technical implementation is required. External service documentation may be necessary for third-party integrations.
+
+## Pages Architecture
+
+The dApp consists of six core pages, each serving distinct functions within its ecosystem:
+
+| Pages | Purpose |
+|-------|---------|
+| [Home](/dapp/pages/home) | Landing page with introduction to RitoSwap ecosystem |
+| [Mint](/dapp/pages/mint) | NFT minting interface for Colored Keys smart contract |
+| [Gate](/dapp/pages/gate) | Token-gated content and exclusive access portal |
+| [Portfolio](/dapp/pages/portfolio) | Multi-chain NFT portfolio viewer |
+| [Swap](/dapp/pages/swap) | Cross-chain token trading via the Li.Fi widget |
+| [Policy](/dapp/pages/policy) | Terms of service and privacy policy |
+
+## Requirements Walkthrough
+
+This section provides a comprehensive overview of the infrastructure and service requirements necessary to operate the RitoSwap dApp with its complete feature set. The following steps outline categories of dependencies that must be configured for full functionality, presenting a roadmap for understanding the scope of requirements before beginning the actual setup process.
+
+Each requirement represents a configuration task involving external service providers, API key generation, database setup, or infrastructure deployment. The steps below organize these requirements into logical groups, with hyperlinks to detailed implementation documentation for each component.
+
+<Callout type="info">
+  **Note**: This guide introduces requirements only. You will need to follow the hyperlinked documentation within each step for actual implementation instructions.
+</Callout>
+
+<Steps>
+
+### Deploy Smart Contract & Configure Network
+
+Deploy the Colored Keys ERC-721 contract to your target network and configure the unified chain selector that the dapp reads at runtime.
+
+- ✅ [Deploy Colored Keys smart contract](#smart-contract-integration) to your target network
+- ✅ Set the active chain via `.env`:
+  ```bash
+  NEXT_PUBLIC_ACTIVE_CHAIN=sepolia   # ethereum | sepolia | ritonet
+  # Only required for ritonet/local development
+  NEXT_PUBLIC_LOCAL_CHAIN_ID=90999999
+  NEXT_PUBLIC_LOCAL_BLOCKCHAIN_RPC=http://127.0.0.1:8545
+  NEXT_PUBLIC_LOCAL_BLOCKCHAIN_WSS=ws://127.0.0.1:8545
+  NEXT_PUBLIC_LOCAL_BLOCKCHAIN_NAME=RitoNet
+  ```
+- ℹ️ *No override?* The validated env defaults to **Sepolia** (`NEXT_PUBLIC_ACTIVE_CHAIN=sepolia`), so fresh checkouts automatically target that testnet until you change the value.
+
+### Configure Blockchain Infrastructure
+
+Set up the essential blockchain connectivity services that enable wallet connections and multi-chain functionality.
+
+- ✅ [Create WalletConnect project ID](#wallet-infrastructure) and add to env:
+  ```bash
+  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
+  ```
+- ✅ [Obtain Alchemy API key](#wallet-infrastructure) for multi-chain support:
+  ```bash
+  NEXT_PUBLIC_ALCHEMY_API_KEY=your_alchemy_key
+  ```
+- ✅ [Set public domain](#siwe-authentication) for SIWE authentication:
+  ```bash
+  NEXT_PUBLIC_DOMAIN=your_domain.com
+  ```
+
+### Set Up Data Layer & Authentication
+
+Configure the database and state service that power token usage tracking, rate limits, and SIWE.
+
+- ✅ [Configure Prisma Accelerate database](#database--state-management):
+  ```bash
+  DATABASE_URL=postgresql://user:password@host:5432/dbname
+  ```
+- ✅ Run database migrations:
+  ```bash
+  pnpm prisma:migrate
+  ```
+- ✅ [Enable the Cloudflare Durable Object state service](#state-worker):
+  ```bash
+  NEXT_PUBLIC_ENABLE_STATE_WORKER=true
+  STATE_WORKER_URL=https://ritoswap-state-worker.example.workers.dev/state
+  STATE_WORKER_API_KEY=your_state_api_key
+  ```
+  The state worker replaces the legacy Redis dependency and backs both SIWE nonce storage and per-endpoint rate limiting.
+- 📘 Review the [Environment Configuration Reference](/dapp/environment-configuration) to confirm every `NEXT_PUBLIC_*` and server-only flag is set for your deployment mode.
+
+### Configure Content Delivery & Trading
+
+Set up storage for exclusive content and enable cross-chain trading functionality.
+
+- ✅ [Create Cloudflare R2 storage bucket](#cloudflare-r2-storage) for exclusive content
+- ✅ [Configure the Li.Fi swap widget](#cross-chain-trading) for cross-chain DEX functionality (no extra env vars required)
+
+### Set Up Email Notifications
+
+Configure the email service for administrative notifications when the gated form is submitted. You can send directly from the Next.js API or delegate to Cloudflare Workers for higher throughput.
+
+- ✅ [Set up Brevo SMTP service](#brevo-smtp-provider)
+- ✅ Add server email credentials:
+  ```bash
+  BREVO_API_KEY=your_brevo_api_key
+  SENDER_EMAIL=noreply@yourdomain.com
+  RECEIVER_EMAIL=admin@yourdomain.com
+  USE_CLOUDFLARE_WORKER=true            # false = send directly from Next.js
+  CLOUDFLARE_WORKER_URL=https://ritoswap-email.worker.dev
+  ```
+- ✅ Whitelist both Vercel and Cloudflare Worker IP ranges inside Brevo to prevent rejected requests
+
+</Steps>
+
+### Running the dApp
+
+Once all services are configured and environment variables are set, you can run the dApp on your chosen network:
+
+#### Development Mode
+
+For Sepolia testnet development:
+```bash
+pnpm dev:sepolia
+```
+
+For Ethereum mainnet development:
+```bash
+pnpm dev:ethereum
+```
+
+These commands automatically set the correct network configuration and start the development server on all network interfaces (`0.0.0.0`).
+
+#### Production Build
+
+Generate production build for Sepolia:
+```bash
+pnpm build:sepolia
+```
+
+Generate production build for Ethereum mainnet:
+```bash
+pnpm build:ethereum
+```
+
+The build commands run Prisma generation before creating the optimized production bundle. Ensure your `DATABASE_URL` is configured before building.
+
+## Core Infrastructure
+
+### Smart Contract Integration
+
+The dApp requires deployment of the Colored Keys ERC-721 contract. Configure one network at a time by setting `NEXT_PUBLIC_ACTIVE_CHAIN` and, for RitoNet, providing the local RPC/WebSocket metadata shown earlier.
+
+<Cards num={2}>
+  <Cards.Card title="Smart Contract UI" href="/dapp/smart-contract-ui">
+    Visual components for contract interaction
+  </Cards.Card>
+  <Cards.Card title="Smart Contract Data" href="/dapp/smart-contract-data">
+    Data fetching and state management
+  </Cards.Card>
+</Cards>
+
+<Cards.Card title="Local Blockchain Setup" href="/local-blockchain/dapp" arrow>
+  Connect dApp to local Ritonet blockchain
+</Cards.Card>
+
+### Wallet Infrastructure
+
+Configure wallet connections with Alchemy API and WalletConnect. The system includes fallback mechanisms when keys are unavailable.
+
+```bash
+NEXT_PUBLIC_ALCHEMY_API_KEY=your_key_here
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=d506c8083e0c05aa9c9f80b310b9bd4f
+NEXT_PUBLIC_APP_NAME=RitoSwap
+NEXT_PUBLIC_APP_DESCRIPTION=RitoSwap DEX
+```
+
+The UI also maintains a view-chain state for balances and network labels that is separate from the wallet chain. See [Dapp Chain State](/dapp/connectivity/dapp-chain-state) for details.
+
+<Cards num={3}>
+  <Cards.Card title="Wallet UI Configuration" href="/dapp/wallet-ui">
+    ConnectKit setup and customization
+  </Cards.Card>
+  <Cards.Card title="Mobile Wallet Deeplinking" href="/dapp/wc-deeplinking">
+    WalletConnect mobile browser integration for seamless wallet interactions
+  </Cards.Card>
+  <Cards.Card title="Dapp Chain State" href="/dapp/connectivity/dapp-chain-state">
+    View-chain selection used for balances and network labels
+  </Cards.Card>
+</Cards>
+
+### Database & State Management
+
+PostgreSQL database with Prisma ORM manages off-chain state for token usage tracking, rate limiting, and session management. The database synchronizes with on-chain data to provide a unified view of token states.
+
+```bash
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+```
+
+The Prisma schema defines models for token usage, SIWE sessions, and rate limit tracking. Database migrations ensure schema consistency across environments. The system maintains separate tables for each blockchain network (Ethereum mainnet, Sepolia, and local Ritonet) to prevent cross-chain data conflicts.
+
+<Cards.Card title="Prisma Database Layer" href="/dapp/internal-libraries/prisma" arrow>
+  Multichain token tracking with Prisma Accelerate
+</Cards.Card>
+<Cards.Card title="Environment Configuration" href="/dapp/environment-configuration" arrow>
+  Complete reference for public+server env flags and validation rules
+</Cards.Card>
+
+## Token-Gated Access System
+
+The token-gating system combines blockchain verification, database state management, SIWE authentication, and email notifications to provide secure exclusive content access based on NFT ownership.
+
+<Cards.Card title="Token Gate Overview" href="/dapp/tokengate" arrow>
+  Complete token-gating architecture and implementation
+</Cards.Card>
+
+### Email Infrastructure
+
+The system provides flexible email delivery for administrative notifications when token gates are accessed.
+
+#### Brevo SMTP Provider
+
+Brevo (formerly SendinBlue) serves as the SMTP provider for automated email notifications. Setting up Brevo requires several configuration steps to ensure reliable email delivery.
+
+Create an account with [Brevo](https://www.brevo.com/) and configure the following:
+
+1. **API Key Generation**: Generate an API key from the Brevo dashboard and add it to your environment configuration under `BREVO_API_KEY`
+
+2. **IP Whitelisting**: Whitelist the IP addresses of your email-sending sources in the Brevo dashboard. This includes both your Vercel deployment IPs and any Cloudflare Worker IPs if using the worker configuration
+
+3. **Sender Configuration**: Configure a sender email address that Brevo will use to send automated emails, adding it as `SENDER_EMAIL` in your environment
+
+4. **Receiver Setup**: Set up a receiver email address where form submissions and notifications should be sent, configured as `RECEIVER_EMAIL`
+
+If you prefer using an alternative SMTP provider, you will need to refactor the API endpoint implementations in `app/api/form-submission-gate/route.ts` and `gatedContent.tsx` to accommodate your provider's API structure.
+
+#### Primary: Vercel Serverless Function
+
+The default email handling mechanism operates through Vercel's serverless functions. This configuration provides direct integration with your deployment environment and requires minimal setup beyond the Brevo SMTP configuration.
+
+```bash
+BREVO_API_KEY=xkeysib-your-api-key-here
+SENDER_EMAIL=noreply@yourdomain.com
+RECEIVER_EMAIL=admin@yourdomain.com
+USE_CLOUDFLARE_WORKER=false  # Keep false for Vercel
+```
+
+When using the Vercel serverless function approach, ensure that `USE_CLOUDFLARE_WORKER` remains `false` or is omitted entirely from your environment configuration. The serverless function handles all email composition and delivery within the same API request cycle.
+
+#### Alternative: Cloudflare Worker
+
+For high-performance email processing at scale, you can delegate email sending to a Cloudflare Worker. This approach leverages Cloudflare's global edge network for faster response times and better scalability.
+
+Enable Cloudflare Worker delegation by setting:
+
+```bash
+USE_CLOUDFLARE_WORKER=true
+CLOUDFLARE_WORKER_URL=https://your-worker.workers.dev
+```
+
+To implement the Cloudflare Worker:
+
+1. Bootstrap the worker workspace inside `dapp/cloudflare/`
+2. Run `pnpm install`, `pnpm dev`, and ultimately `pnpm deploy` to publish the Durable Object + email proxy
+3. Upload secrets via the provided `pnpm secret:*` scripts (`BREVO_API_KEY`, `SENDER_EMAIL`, `RECEIVER_EMAIL`, `STATE_SERVICE_AUTH_TOKEN`)
+4. Add the worker URL to `STATE_WORKER_URL` (for state API calls) and `CLOUDFLARE_WORKER_URL` (for email delegation) inside the Next.js `.env`
+
+The Worker configuration allows customization of email metadata:
+
+```javascript
+const emailPayload = {
+  sender: {
+    name: 'RitoSwap Gate',
+    email: SENDER_EMAIL,
+  },
+  to: [{
+    email: RECEIVER_EMAIL,
+    name: 'RitoSwap Admin',
+  }]
+}
+```
+
+<Callout type="info">
+  Remember to whitelist IP addresses in Brevo dashboard for both Vercel and Cloudflare origins to ensure email delivery
+</Callout>
+
+<Cards num={2}>
+  <Cards.Card title="Gated Content Library" href="/dapp/internal-libraries/gated-content-library">
+    Client-side gating logic and content management
+  </Cards.Card>
+  <Cards.Card title="Form Submission API" href="/dapp/api/form-submission-gate">
+    Server-side verification endpoint with email notifications
+  </Cards.Card>
+</Cards>
+
+### Security & Authentication
+
+The security infrastructure implements multiple layers of protection including rate limiting, SIWE (Sign-In with Ethereum) authentication, and cryptographic nonce management.
+
+#### SIWE Authentication
+
+SIWE (Sign-In with Ethereum) provides secure, standardized authentication using Ethereum wallets. When enabled, it offers domain-bound authentication with replay protection through cryptographic nonces. The SIWE implementation follows the EIP-4361 specification, ensuring compatibility with all major wallets while providing robust security against replay attacks and domain spoofing.
+
+```bash
+NEXT_PUBLIC_ENABLE_STATE_WORKER=true
+STATE_WORKER_URL=https://ritoswap-state-worker.worker.dev/state
+STATE_WORKER_API_KEY=your_state_api_key
+```
+
+Set the flag to `false` in development to fall back to legacy (rate-limit-free) behavior while testing.
+
+#### Durable State Service
+
+The Cloudflare Durable Object powers both rate limiting and nonce storage for SIWE sessions. The Next.js app authenticates to the worker using the `STATE_WORKER_API_KEY`, and every API route shares the same strongly-consistent backing store.
+
+<Cards num={4}>
+  <Cards.Card title="Rate Limiting" href="/dapp/internal-libraries/rate-limit-library">
+    Request throttling and abuse prevention
+  </Cards.Card>
+  <Cards.Card title="SIWE Library" href="/dapp/internal-libraries/siwe-library">
+    Sign-In with Ethereum authentication implementation
+  </Cards.Card>
+  <Cards.Card title="Nonce Management" href="/dapp/api/nonce">
+    Cryptographic nonce generation and validation
+  </Cards.Card>
+  <Cards.Card title="State Worker" href="/dapp/internal-libraries/state-worker">
+    Durable Object that backs rate limits and SIWE nonces (email relay runs in a separate worker route)
+  </Cards.Card>
+</Cards>
+
+### Content Delivery & Storage
+
+#### Cloudflare R2 Storage
+
+Cloudflare R2 provides secure object storage with signed URL generation for protected content delivery. The R2 integration enables time-limited access to exclusive audio content for token holders, ensuring that premium content remains protected while providing seamless streaming experiences.
+
+<Cards.Card title="R2 Library" href="/dapp/internal-libraries/r2-library" arrow>
+  Cloudflare R2 bucket integration and signed URLs
+</Cards.Card>
+
+### Additional API Endpoints
+
+The token gate system includes several specialized API endpoints for different aspects of the authentication and verification flow:
+
+<Cards num={3}>
+  <Cards.Card title="Gate Access API" href="/dapp/api/gate-access">
+    Secure content delivery with dual authentication
+  </Cards.Card>
+  <Cards.Card title="Token Status API" href="/dapp/api/token-status">
+    Real-time token existence and usage tracking
+  </Cards.Card>
+  <Cards.Card title="Gated Content Generation" href="/dapp/internal-libraries/gated-content-library">
+    Content assembly and delivery system
+  </Cards.Card>
+</Cards>
+
+## User Interface Components
+
+### Navigation System
+
+The navigation infrastructure provides responsive, context-aware navigation throughout the dApp.
+
+<Cards.Card title="Navigation System" href="/dapp/navbars" arrow>
+  Responsive navbar architecture and implementation
+</Cards.Card>
+
+### Portfolio Viewer
+
+The multi-chain NFT portfolio viewer leverages the Alchemy API to display NFTs across supported EVM chains. Configuration details and implementation specifics are available in the [Portfolio page documentation](/dapp/pages/portfolio).
+
+<Cards.Card title="Portfolio UI Deep Dive" href="/dapp/portfolio-ui" arrow>
+  Advanced portfolio component architecture and Alchemy integration
+</Cards.Card>
+
+### Cross-Chain Trading
+
+Integration with the Li.Fi swap widget enables cross-chain token trading directly within the dApp. The widget is mounted inside `/app/swap/components/SwapClient.tsx`, and all configuration (theme, variant, wallet interception) lives in the `widgetConfig` object—no additional environment variables are required. If you customize wallet flows, update `walletConfig.onConnect` to keep the widget aligned with your ConnectKit modal.
+
+<Callout type="warning">
+  The Li.Fi widget currently targets the React 18 / Next.js 13 runtime assumptions used in this repo. If you upgrade frameworks, validate the widget again or temporarily remove the swap page to avoid hydration regressions.
+</Callout>
+
+## Application Features
+
+### Progressive Web App
+
+Enable Progressive Web App functionality for installable experiences and service worker caching:
+
+```bash
+NEXT_PUBLIC_SW=true  # Set to false to disable
+```
+
+<Cards.Card title="PWA Configuration" href="/dapp/pwa" arrow>
+  Service worker setup and manifest configuration
+</Cards.Card>
+
+### Connectivity Guard
+
+The app shell blocks blockchain interactions when the browser goes offline:
+
+<Cards.Card title="Offline Detection" href="/dapp/connectivity/offline" arrow>
+  Network monitoring and full-screen offline modal behavior
+</Cards.Card>
+<Cards.Card title="Dapp Chain State" href="/dapp/connectivity/dapp-chain-state" arrow>
+  View-chain selection used for balances and network labels
+</Cards.Card>
+
+### Notifications System
+
+The notification system provides both toast notifications for immediate feedback and optional browser notifications for important events:
+
+```bash
+NEXT_PUBLIC_LOCAL_NOTIFICATIONS=on  # Set to 'off' to disable browser notifications
+```
+
+<Cards.Card title="Notifications" href="/dapp/notifications" arrow>
+  Toast and browser notification implementation
+</Cards.Card>
+
+### Music Integration
+
+The dApp features an embedded music player with crypto-themed tracks that enhance the user experience.
+
+<Cards.Card title="Crypto Music Player" href="/dapp/music" arrow>
+  Embedded music player component and audio management
+</Cards.Card>
+
+### Styling Architecture
+
+The styling system uses CSS modules with scoped classes to maintain component isolation and prevent style conflicts.
+
+<Cards.Card title="CSS System" href="/dapp/css" arrow>
+  Scoped modules and custom styling patterns
+</Cards.Card>
+
+## Footer Components
+
+The footer system provides modular components for comprehensive site information and navigation.
+
+<Cards.Card title="Footer Overview" href="/dapp/footer" arrow>
+  Complete footer system architecture
+</Cards.Card>
+
+| Component | Purpose |
+|-----------|---------|
+| [ImageQuote](/dapp/footer/imageQuote) | Dynamic quote display with thematic imagery |
+| [Legal](/dapp/footer/legal) | Legal disclaimers and compliance links |
+| [Logo Array](/dapp/footer/logo-array) | Partner and technology stack logos |
+| [Menu](/dapp/footer/menu) | Secondary navigation and resource links |
+| [Social Bar](/dapp/footer/socialbar) | Social media presence and community links |

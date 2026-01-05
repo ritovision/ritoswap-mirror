@@ -1,0 +1,94 @@
+---
+title: Docs Site Overview
+description: How the RitoSwap docs workspace is structured, built, and deployed.
+---
+
+import { Callout, Cards, FileTree, Table } from 'nextra/components'
+
+# Docs Site Overview
+
+This workspace documents **all** RitoSwap workspaces, including the docs site itself. It is built with Nextra 4 and branded to match the RitoVision feel.
+
+## Stack & structure
+
+<Table>
+  <thead>
+    <tr>
+      <th>Concern</th>
+      <th>Implementation</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Framework</td>
+      <td>Next.js (App Router) + Nextra 4</td>
+    </tr>
+    <tr>
+      <td>Content</td>
+      <td>MDX files under <code>docs/content</code></td>
+    </tr>
+    <tr>
+      <td>UI components</td>
+      <td>Custom React components under <code>docs/app</code></td>
+    </tr>
+    <tr>
+      <td>Theme config</td>
+      <td><code>docs/theme.config.tsx</code></td>
+    </tr>
+    <tr>
+      <td>MDX components</td>
+      <td><code>docs/mdx-components.tsx</code></td>
+    </tr>
+  </tbody>
+</Table>
+
+<FileTree>
+  <FileTree.Folder name="docs" defaultOpen>
+    <FileTree.Folder name="app" />
+    <FileTree.Folder name="content" />
+    <FileTree.Folder name="public" />
+    <FileTree.Folder name="scripts" />
+    <FileTree.Folder name="styles" />
+    <FileTree.File name="next.config.mjs" />
+    <FileTree.File name="theme.config.tsx" />
+    <FileTree.File name="package.json" />
+  </FileTree.Folder>
+</FileTree>
+
+## Build & deploy
+
+The docs site is deployed on Vercel and includes a Storybook build + sitemap generation in the pipeline.
+
+- <code>pnpm dev</code> runs the docs site locally.
+- <code>pnpm build</code> builds the Next.js app.
+- <code>pnpm prebuild</code> runs <code>pnpm --filter ritoswap run build-sb:docs</code> to publish Storybook into <code>docs/public/storybook-static</code>.
+- <code>pnpm postbuild</code> runs <code>docs/scripts/generate-sitemap.mjs</code> and <code>pagefind</code> for search.
+- <code>pnpm test</code> runs Vitest for docs-only tests.
+
+<Callout type="info">
+  Vercel deployment is configured in <code>docs/vercel.json</code> and uses <code>pnpm build</code> as the build command.
+</Callout>
+
+## Branding source of truth
+
+The docs theme and RitoVision styling are centralized in <code>docs/styles/override.css</code>. Other files exist in <code>docs/styles</code>, but override.css is the canonical source today.
+
+## Navigate this section
+
+<Cards>
+  <Cards.Card title="Storybook Playgrounds" href="/docs-site/storybook" arrow>
+    How interactive UI demos are embedded and built.
+  </Cards.Card>
+  <Cards.Card title="OpenAPI Playground" href="/docs-site/openapi" arrow>
+    Interactive Swagger UI for docs endpoints.
+  </Cards.Card>
+  <Cards.Card title="Styling & Branding" href="/docs-site/styling-and-branding" arrow>
+    RitoVision typography, colors, and theme overrides.
+  </Cards.Card>
+  <Cards.Card title="Bottom Bar" href="/docs-site/bottom-bar" arrow>
+    Docs navigation system and drawer architecture.
+  </Cards.Card>
+  <Cards.Card title="Error Boundaries" href="/docs-site/error-boundaries" arrow>
+    Custom error UI and recovery flows.
+  </Cards.Card>
+</Cards>

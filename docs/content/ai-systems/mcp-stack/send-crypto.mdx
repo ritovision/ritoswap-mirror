@@ -1,0 +1,117 @@
+---
+title: MCP Tool · send_crypto_to_signed_in_user
+description: JWT-gated native transfers with quota protection.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# `send_crypto_to_signed_in_user`
+
+This tool (`dapp/app/lib/mcp/tools/send-crypto.ts`) lets the chatbot send 0.1–0.3 ETH on the active network. Registration is conditional on `AI_PRIVATE_KEY` being set.
+
+## Security & Gating
+
+- **JWT injection** — `MCPDispatcher` adds `__jwt.address` so the LLM can’t spoof a destination. The handler refuses to read any user-provided address and only trusts `extractJwtAddress(params)`.
+- **Manual preflight** — Before sending, the tool fetches the signer’s balance, estimates gas with viem, and ensures the AI wallet can cover `amountEth + fee`.
+- **Quotas** — Successful sends call `recordCryptoSpend` when the quota feature flag is active; failures leave quota state untouched.
+- **Chain config** — `getChainConfig` supplies the active RPC + chain ID so viem clients point to the same network the chat session is using (RitoNet, Sepolia, Mainnet, etc.).
+
+```ts
+// dapp/app/lib/mcp/tools/send-crypto.ts
+const tool: Tool<{ amountEth: number }> = {
+  name: 'send_crypto_to_signed_in_user',
+  requiresJwt: true,
+  inputSchema: InputSchema,
+  async handler(params) {
+    const priv = aiServerConfig.secrets.aiPrivateKey;
+    if (!priv) fail('send-crypto is unavailable: AI_PRIVATE_KEY not configured.');
+
+    const amountEth = Number(params.amountEth);
+    if (!Number.isFinite(amountEth) || amountEth < 0.1 || amountEth > 0.3) {
+      fail('amountEth must be between 0.1 and 0.3 ETH (inclusive).');
+    }
+
+    const to = extractJwtAddress(params as Record<string, unknown>);
+    if (!to) fail('No JWT-bound address available.');
+
+    const { rpcUrl, chainId } = getChainConfig();
+    const account = privateKeyToAccount(priv);
+    const walletClient = createWalletClient({ account, transport: http(rpcUrl) });
+    const publicClient = createPublicClient({ transport: http(rpcUrl) });
+
+    const value = parseEther(amountEth.toString());
+    const [balance, estGas, gasPrice] = await Promise.all([
+      publicClient.getBalance({ address: account.address }),
+      publicClient.estimateGas({ account: account.address, to, value }),
+      publicClient.getGasPrice(),
+    ]);
+    if (balance < value + estGas * gasPrice) {
+      return errorResultShape('Insufficient balance for amount + gas');
+    }
+
+    const hash = await walletClient.sendTransaction({ to, value });
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    if (isCryptoQuotaFeatureActive()) await recordCryptoSpend(to, amountEth);
+
+    return {
+      content: [
+        { type: 'text', text: `Sent Crypto.\n${formatEthAmount(amountEth)} ETH sent to ${shortAddr(to)}.` },
+        { type: 'json', data: formatPayload(hash, to, amountEth, chainId) },
+      ],
+    };
+  },
+};
+```
+
+## Presenter Behavior
+
+`dapp/components/chatBot/ToolActivity/catalog/presenters/send_crypto.presenter.ts` summarizes the outcome:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Label</th>
+      <th>Details</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>pending</td>
+      <td>`Sending Crypto`</td>
+      <td>No body text to keep the chip compact.</td>
+    </tr>
+    <tr>
+      <td>success</td>
+      <td>`Sent Crypto.`</td>
+      <td>Shows `<amount> ETH sent to <short addr> on <network>`, falling back to the streamed text if the JSON is missing.</td>
+    </tr>
+    <tr>
+      <td>error</td>
+      <td>`Failed to Send Crypto.`</td>
+      <td>Recognizes wallet/auth errors (“Your wallet must be connected…”) so the user knows to re-authenticate.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Playground Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--send-crypto-interactive&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Send Crypto (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Tips
+
+<Callout type="warning">
+Because the tool estimates gas and checks the AI wallet’s balance on every call, local testing still requires funding the signer before the transaction can be broadcast.
+</Callout>

@@ -1,0 +1,80 @@
+---
+title: API Overview
+description: Chat and MCP endpoints, SSE expectations, and deployment notes
+---
+
+import { Callout, Steps } from 'nextra/components'
+
+# API Overview
+
+The AI footprint exposes four HTTP surfaces from the Next.js app:
+
+1. **`POST /api/chat`** — primary chat ingress, handled by `dapp/app/api/chat/route.ts` with `handleChatRequest`.
+2. **`POST /api/tts`** — text-to-speech endpoint for the RapBotRito voice clone (`dapp/app/api/tts/route.ts`).
+3. **`POST /api/mcp`** — JSON-RPC bridge to the MCP server (`dapp/app/api/mcp/route.ts`).
+4. **`POST /api/quota-reset`** — admin-only endpoint for clearing token/crypto windows (`dapp/app/api/quota-reset/route.ts`).
+
+## `/api/chat`
+
+- Expects a body with `{ messages, metadata?, model?, modelIndex? }`.
+- Responds with an SSE stream containing `text-*` events plus tool lifecycle markers.
+- Honors `Authorization: Bearer` when `NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT` is true. Missing or invalid tokens receive `401` JSON responses before any SSE is opened.
+- Times out after `maxDuration = 30` seconds by default.
+
+<Callout>
+  Because the handler reads the JSON body **before** opening the stream, malformed payloads fail fast and never hold open a socket.
+</Callout>
+
+## `/api/tts`
+
+Text-to-speech entry point for the RapBotRito voice clone. ElevenLabs is the current production provider.
+
+- Expects JSON `{ text: string, messageId?: string }`.
+- Returns raw audio bytes with `Content-Type` set by the provider (default `audio/mpeg`).
+- Echoes `X-Message-Id` so the client can associate playback with the originating assistant message.
+- Honors `Authorization: Bearer` when `NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT` is true.
+- Returns `401` for missing or invalid JWTs when chat auth is enabled.
+- Returns `503` when `TTS_PROVIDER=disabled`.
+- Returns `500` for provider failures.
+
+## `/api/mcp`
+
+<Steps>
+  {<h3>1. Validate & Gate</h3>}
+  Parses the JSON-RPC payload, verifies JWTs if required, logs the requested method and params, and rejects non-POST methods.
+
+  {<h3>2. Dispatch</h3>}
+  Passes the request + parsed body to `mcpServer.handleRequest`, which reruns per-tool JWT gating and executes the handler.
+
+  {<h3>3. Return JSON</h3>}
+  Success responses contain `{ result }` while errors follow the JSON-RPC `{ error: { code, message } }` shape. HTTP 500s are reserved for dispatcher failures.
+</Steps>
+
+This route mirrors the chat route’s auth logic so tools cannot be called directly without the same credentials the chat surface would use.
+
+## `/api/quota-reset`
+
+- Uses constant-time secret comparisons to avoid timing attacks.
+- Supports secrets via headers, bearer tokens, body, or query string.
+- Refuses to run if `aiServerConfig.quotaReset.enabled` is false or the state service is inactive.
+
+The AI system exposes a minimal set of HTTP endpoints to power the chat experience. These endpoints are designed to be consumed by the `dapp` frontend but are documented here for completeness.
+
+## Data Structures
+
+While the API uses standard JSON, it relies on specific schemas for type safety and validation:
+
+*   **DTOs**: The API expects typed Data Transfer Objects (e.g., `UiMessage`, `ChatMetadata`) for requests.
+*   **Tool Schemas**: Tools are defined using **Raw JSON Schema** to ensure the LLM generates valid arguments (e.g., strict enums for chain names).
+*   **Stream Protocol**: The response uses a custom Server-Sent Events (SSE) protocol that interleaves text deltas with custom events like `tool-input-start` and `tool-output-available`.
+
+## Deployment Notes
+
+- **Providers** — Switching to LM Studio simply requires setting `AI_PROVIDER=lmstudio` and `AI_BASE_URL` (pointing at your `/v1` endpoint). No code changes are necessary because `providerRegistry` abstracts the API.
+- **State worker** — Set `NEXT_PUBLIC_ENABLE_STATE_WORKER=true` in the public env, then supply `STATE_WORKER_URL` and `STATE_WORKER_API_KEY` in `server.env.ts`. The client logs whether the worker is active during boot.
+- **Edge compatibility** — All AI routes declare `runtime = 'nodejs'` to guarantee access to the required Node APIs (crypto, streaming response helpers). Keep this in mind when tweaking Next.js deployment targets.
+- **SSE buffering** — Vercel/CDN caches must disable response buffering for SSE. `sse-stream.ts` already sets `Cache-Control: no-transform` and `X-Accel-Buffering: no`.
+
+<Callout type="info">
+  When running locally, remember to [seed Pinecone](/ai-systems/pinecone), provide dummy JWT secrets, and disable quotas if you are not running the Cloudflare worker. The docs in this section assume the full production wiring is in place.
+</Callout>

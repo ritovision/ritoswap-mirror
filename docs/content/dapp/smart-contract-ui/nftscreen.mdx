@@ -1,0 +1,522 @@
+---
+title: "NFTScreen"
+description: "Dynamic NFT visualization component with smooth state transitions and color animations"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+import { NFTScreenUI, NFTScreenShowcase } from '@components/mockui/NFTScreenUI'
+
+
+
+# NFTScreen
+
+The NFTScreen component serves as the visual centerpiece of the minting interface, dynamically displaying the current NFT ownership state through animated graphics. This component masterfully handles the complex challenge of smoothly transitioning between different visual states while maintaining visual continuity during wallet switches and data loading. Through its sophisticated state management and hardcoded SVG approach, it delivers performant, visually appealing NFT representation without the overhead of external image loading.
+
+## Component Architecture
+
+NFTScreen implements a multi-layered state system that separates display logic from data fetching, enabling smooth visual transitions even during complex blockchain operations. The component uses a combination of local state management for transition control and store subscriptions for data updates, creating a responsive yet stable visual experience that never shows loading states or flickers during updates.
+
+### Visual State Machine
+
+The component manages four distinct visual states that represent the user's relationship with the NFT system:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Visual State</th>
+      <th>Display</th>
+      <th>Trigger Conditions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Lock Icon</td>
+      <td>Padlock image (150x150)</td>
+      <td>User not connected to wallet</td>
+    </tr>
+    <tr>
+      <td>Default Key</td>
+      <td>White key on dark background</td>
+      <td>Connected but no NFT owned</td>
+    </tr>
+    <tr>
+      <td>User Key</td>
+      <td>Colored key with custom background</td>
+      <td>NFT owned with color data</td>
+    </tr>
+    <tr>
+      <td>Loading</td>
+      <td>Empty (no visual)</td>
+      <td>Initial component mount or wallet connecting</td>
+    </tr>
+  </tbody>
+</Table>
+
+### Interactive Demo
+<div style={{ marginTop: '2rem' }}>
+<NFTScreenShowcase />
+</div>
+
+### Hardcoded SVG Strategy
+
+NFTScreen takes a unique approach by hardcoding the key SVG directly in the component rather than fetching it from the blockchain or external sources:
+
+```typescript
+<svg viewBox="0 0 200 100" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="60" cy="50" r="20" fill="none" stroke="currentColor" strokeWidth={10} />
+  <rect x="80" y="45" width="100" height="10" rx={5} fill="currentColor" />
+  <path d="M145 30 A5 5 0 0 1 150 35 V46 H140 V35 A5 5 0 0 1 145 30 Z" fill="currentColor" />
+  <path d="M165 36 A5 5 0 0 1 170 41 V46 H160 V41 A5 5 0 0 1 165 36 Z" fill="currentColor" />
+</svg>
+```
+
+This approach provides several benefits: elimination of network requests for images, instant rendering without loading delays, easy color manipulation through CSS, and consistent display across all environments.
+
+<Callout type="warning">
+The hardcoded SVG approach works perfectly for Colored Keys where the image structure is known and constant. For other NFT collections with varying images, developers would need to implement dynamic image loading or maintain a library of hardcoded assets.
+</Callout>
+
+## Props and Interface
+
+NFTScreen requires no props, deriving all necessary data from hooks and stores:
+
+```typescript
+export default function NFTScreen() {
+  const { isConnected, isConnecting } = useAccount()
+  const {
+    hasNFT,
+    backgroundColor,
+    keyColor,
+    tokenId,
+    isSwitchingAccount,
+    previousData,
+  } = useNFTStore()
+}
+```
+
+This zero-configuration design ensures consistency and simplifies integration.
+
+## State Transition System
+
+The component implements a sophisticated debounced state transition system to prevent visual flashing:
+
+### State Management Variables
+
+```typescript
+const [isInitialized, setIsInitialized] = useState(false)
+const [displayState, setDisplayState] = useState<'lock' | 'default-key' | 'user-key' | 'loading'>('loading')
+const [isStable, setIsStable] = useState(false)
+const stateTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+```
+
+Each variable serves a specific purpose in managing smooth transitions:
+
+- `isInitialized` - Prevents rendering until wagmi connection state stabilizes
+- `displayState` - Current visual state being rendered
+- `isStable` - Marks when component has reached a stable state for CSS animations
+- `stateTimeoutRef` - Manages debounce timers for state changes
+
+### Transition Debouncing
+
+The component uses a 200ms debounce for most state transitions:
+
+```typescript
+stateTimeoutRef.current = setTimeout(() => {
+  if (targetState !== displayState) {
+    setDisplayState(targetState)
+  }
+}, 200) // Small delay to prevent rapid flashing
+```
+
+However, transitions from the initial loading state happen immediately to ensure quick first render.
+
+### Initial Connection Stabilization
+
+The component implements a 300ms initialization delay to allow wagmi to restore any previous wallet connections:
+
+```typescript
+useEffect(() => {
+  const timer = setTimeout(() => {
+    setIsInitialized(true)
+  }, 300) // Give wagmi time to restore connection
+  return () => clearTimeout(timer)
+}, [])
+```
+
+This critical delay prevents the component from briefly flashing the lock icon when the page loads with an already-connected wallet. Without this delay, users would see: loading → lock → key, instead of the desired: loading → key.
+
+## Account Switching Preservation
+
+One of NFTScreen's most sophisticated features is its handling of account switches:
+
+```typescript
+const displayData = isSwitchingAccount && previousData
+  ? {
+      backgroundColor: previousData.backgroundColor,
+      keyColor: previousData.keyColor,
+      tokenId: previousData.tokenId,
+    }
+  : { backgroundColor, keyColor, tokenId }
+```
+
+During account switches, the component continues displaying the previous account's NFT data, preventing the jarring experience of briefly showing "no NFT" while new data loads.
+
+## Color Application System
+
+The component applies colors dynamically based on ownership state:
+
+### Background Color
+
+```typescript
+const wrapperStyle =
+  displayState === 'user-key'
+    ? {
+        backgroundColor: displayData.backgroundColor ?? 'rgba(0,0,0,0.3)',
+        transition: isSwitchingAccount
+          ? 'none'
+          : 'background-color 1s ease-in-out',
+      }
+    : { backgroundColor: 'rgba(0,0,0,0.3)' }
+```
+
+Transitions are disabled during account switches to prevent color flashing.
+
+### Key Color
+
+```typescript
+const svgColor =
+  displayState === 'user-key'
+    ? displayData.keyColor ?? 'white'
+    : 'white'
+```
+
+The SVG uses `currentColor`, allowing the color to be controlled through CSS.
+
+## Token ID Display
+
+The component displays the token ID above the visual representation:
+
+```typescript
+<div className={styles.tokenIdText}>
+  {displayTokenId != null ? `Key #${displayTokenId}` : ''}
+</div>
+```
+
+The empty string fallback ensures consistent spacing even when no token is owned.
+
+## CSS Animation Strategy
+
+NFTScreen uses sophisticated CSS animations for smooth transitions:
+
+```css
+.wrapper {
+  opacity: 1;
+  transform: scale(1);
+  transition: all 0.5s ease-in-out;
+}
+
+.wrapper.stable {
+  opacity: 1;
+  transform: scale(1);
+  transition: all 0.5s ease-in-out;
+  /* No animation - relies on transitions only */
+}
+
+.wrapper.switching {
+  opacity: 0.3;
+  transform: scale(0.98);
+}
+```
+
+The multi-class approach allows different transition behaviors based on component state.
+
+### Dynamic Class Application
+
+The component combines multiple CSS classes dynamically based on state:
+
+```typescript
+<div 
+  className={[
+    styles.wrapper,
+    isSwitchingAccount && styles.switching,
+    isStable && styles.stable,
+  ]
+    .filter(Boolean)
+    .join(' ')}
+>
+```
+
+This pattern ensures only relevant CSS classes are applied, with `filter(Boolean)` removing any false values before joining.
+`styles.stable` currently shares the same CSS rules as `styles.wrapper`, so it's purely a state flag that indicates the screen has exited the initial loading phase; you can hook different “settled” transitions onto it later without touching the component logic.
+
+## Performance Optimizations
+
+The component implements several performance optimizations:
+
+**Debounced Updates** - The 200ms debounce prevents rapid visual changes during blockchain query resolution.
+
+**CSS-Only Animations** - All transitions use GPU-accelerated CSS properties for smooth 60fps animations.
+
+**Conditional Rendering** - The loading state renders nothing, preventing unnecessary DOM manipulation.
+
+**Ref-Based Timers** - Using refs for timeouts prevents memory leaks and ensures proper cleanup.
+
+## Responsive Design
+
+NFTScreen adapts its layout for mobile devices:
+
+```css
+@media (max-width: 768px) {
+  .wrapper {
+    min-height: 400px; /* Reduced from 550px */
+  }
+  
+  .container {
+    max-width: 350px; /* Reduced from 500px */
+  }
+  
+  .tokenIdText {
+    font-size: 1rem; /* Reduced from 1.2rem */
+  }
+}
+```
+
+The aspect ratio remains 1:1 to maintain visual consistency across screen sizes.
+
+## Integration with Store
+
+The component deeply integrates with the NFT store for state management:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Store Field</th>
+      <th>Usage</th>
+      <th>Fallback Behavior</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`hasNFT`</td>
+      <td>Determines key vs lock display</td>
+      <td>Shows default key if false</td>
+    </tr>
+    <tr>
+      <td>`backgroundColor`</td>
+      <td>NFT background color</td>
+      <td>Dark transparent if null</td>
+    </tr>
+    <tr>
+      <td>`keyColor`</td>
+      <td>SVG key color</td>
+      <td>White if null</td>
+    </tr>
+    <tr>
+      <td>`tokenId`</td>
+      <td>Display text above visual</td>
+      <td>Empty string if null</td>
+    </tr>
+    <tr>
+      <td>`isSwitchingAccount`</td>
+      <td>Triggers preservation mode</td>
+      <td>Normal display if false</td>
+    </tr>
+    <tr>
+      <td>`previousData`</td>
+      <td>Source for switch preservation</td>
+      <td>Current data if null</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Error Handling
+
+While NFTScreen doesn't explicitly handle errors, it's designed to degrade gracefully:
+
+- Missing color data falls back to default white key
+- Failed image loads don't occur due to hardcoded SVG
+- Null token IDs simply don't display
+- Unexpected states would continue showing the current visual state
+
+## Test Identifiers
+
+The component provides several `data-testid` attributes for reliable test selection:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Test ID</th>
+      <th>Element</th>
+      <th>When Present</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`lock-icon`</td>
+      <td>Lock icon wrapper</td>
+      <td>When user is not connected</td>
+    </tr>
+    <tr>
+      <td>`key-wrapper`</td>
+      <td>Key background wrapper</td>
+      <td>When showing any key state</td>
+    </tr>
+    <tr>
+      <td>`key-svg`</td>
+      <td>SVG key element</td>
+      <td>When showing any key state</td>
+    </tr>
+  </tbody>
+</Table>
+
+These identifiers enable precise component selection in integration and end-to-end tests.
+
+## Testing Strategies
+
+Testing NFTScreen requires careful state simulation:
+
+```typescript
+describe('NFTScreen', () => {
+  it('shows custom colored key when user has NFT', async () => {
+    mockUseNFTStore({
+      hasNFT: true,
+      backgroundColor: '#FF0000',
+      keyColor: '#00FF00',
+      tokenId: 42,
+    })
+    
+    render(<NFTScreen />)
+    
+    await waitFor(() => {
+      expect(screen.getByText('Key #42')).toBeInTheDocument()
+      const wrapper = screen.getByTestId('key-wrapper')
+      expect(wrapper).toHaveStyle({ backgroundColor: '#FF0000' })
+    })
+  })
+})
+```
+
+## Customization Guide
+
+To adapt NFTScreen for different NFT collections:
+
+### Dynamic Image Loading
+
+Replace the hardcoded SVG with dynamic image loading:
+
+```typescript
+{displayState === 'user-key' && tokenURI ? (
+  <img src={tokenURI} alt={`NFT #${tokenId}`} />
+) : (
+  // Default visualization
+)}
+```
+
+### Alternative Visualizations
+
+The SVG structure can be modified to show different default states:
+
+```typescript
+// Example: Badge instead of key
+<svg viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="45" fill="currentColor" />
+  <text x="50" y="50" textAnchor="middle">NFT</text>
+</svg>
+```
+
+### Animation Variations
+
+Transition effects can be customized through CSS:
+
+```css
+/* Example: Rotation effect */
+.wrapper.switching {
+  transform: scale(0.98) rotate(5deg);
+}
+```
+
+## Common Patterns and Anti-Patterns
+
+### Recommended Patterns
+
+**State Debouncing** - Always debounce rapid state changes to prevent visual instability.
+
+**Fallback Values** - Provide sensible defaults for all nullable data to ensure consistent display.
+
+**Transition Control** - Use CSS classes to control animation behavior based on component state.
+
+### Anti-Patterns to Avoid
+
+**Direct DOM Manipulation** - Let React handle all DOM updates through state changes.
+
+**Synchronous State Updates** - Always use timeouts or effects for state transitions.
+
+**Loading Spinners** - Avoid showing loading states; maintain current visual until new data arrives.
+
+## Accessibility Considerations
+
+NFTScreen implements several accessibility features:
+
+**Alternative Text** - The lock image includes proper alt text for screen readers.
+
+**Semantic Structure** - Token ID text provides context for the visual display.
+
+**Color Contrast** - Default colors ensure sufficient contrast for visibility.
+
+**Descriptive Roles** - The key visualization wrapper declares `role="img"` with an `aria-label` such as “Key number 42,” so screen readers understand what is being shown.
+
+**Live Updates** - The token ID element uses `aria-live="polite"` to announce changes during account switches without interrupting the user.
+
+## Troubleshooting Guide
+
+<Table>
+  <thead>
+    <tr>
+      <th>Issue</th>
+      <th>Likely Cause</th>
+      <th>Solution</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Key flickers during load</td>
+      <td>Missing initialization delay</td>
+      <td>Ensure 300ms initialization timer</td>
+    </tr>
+    <tr>
+      <td>Colors don't animate</td>
+      <td>Transition disabled</td>
+      <td>Check isSwitchingAccount state</td>
+    </tr>
+    <tr>
+      <td>Wrong display during switch</td>
+      <td>previousData not set</td>
+      <td>Verify store switch logic</td>
+    </tr>
+    <tr>
+      <td>Lock shows with NFT</td>
+      <td>Connection state issue</td>
+      <td>Check wagmi isConnected value</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Summary
+
+NFTScreen exemplifies sophisticated state management in React components dealing with asynchronous blockchain data. Through its innovative use of hardcoded SVGs, debounced state transitions, and account switch preservation, it delivers a smooth, professional visual experience that masks the complexity of underlying blockchain operations. The component's zero-configuration design, graceful fallbacks, and performance optimizations make it a robust solution for NFT visualization. While currently optimized for Colored Keys with known visual structure, its architecture provides clear patterns for adaptation to other NFT collections requiring dynamic image loading or alternative visualizations.
+
+## Playground
+
+Use the full Storybook UI to explore the NFT display states and tweak controls in real time.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/mint-nftscreen--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Mint/NFTScreen - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>

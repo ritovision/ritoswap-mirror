@@ -1,0 +1,55 @@
+---
+title: Harnesses
+description: Helpers that wrap stories with wallet readiness, fetch stubs, and modal flows.
+---
+
+import { FileTree } from 'nextra/components'
+
+# Harnesses
+
+Harnesses provide small, reusable wrappers for common UI states in Storybook.
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name=".storybook" defaultOpen>
+      <FileTree.Folder name="harnesses" defaultOpen>
+        <FileTree.File name="WalletReady.tsx" />
+        <FileTree.File name="FetchMock.tsx" />
+        <FileTree.File name="connectModalHarness.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## WalletReady
+
+`WalletReady` waits for wagmi connection state and optionally displays a loading row until the wallet is connected. Use it when a story needs a wallet before rendering content.
+
+```tsx
+import WalletReady from '@/.storybook/harnesses/WalletReady';
+
+<WalletReady requiredConnected>
+  <YourComponent />
+</WalletReady>
+```
+
+## FetchMock
+
+`FetchMock` overrides `window.fetch` for the lifetime of the story so you can intercept API calls.
+
+```tsx
+import FetchMock from '@/.storybook/harnesses/FetchMock';
+
+<FetchMock handlers={[async () => new Response(JSON.stringify({ ok: true }))]}>
+  <YourComponent />
+</FetchMock>
+```
+
+## Connect modal harness
+
+`connectModalHarness.tsx` exposes:
+
+- `ConnectModalViewsHarness` for isolated views (default, QR, connecting, error, canceled, get-wallet).
+- `ConnectModalFlowHarness` for an interactive flow with local controls.
+
+These harnesses are used by `dapp/components/wallet/connectModal/ConnectModal.stories.tsx`.

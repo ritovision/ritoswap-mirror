@@ -1,0 +1,177 @@
+name: Docs & Storybook Pipeline
+run-name: >-
+  Docs & Storybook Pipeline${{ github.event_name == 'workflow_dispatch' && github.event.inputs.trigger_id && format(' (mirror {0})', github.event.inputs.trigger_id) || '' }}
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'dapp/**'
+      - 'docs/**'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'dapp/**'
+      - 'docs/**'
+  workflow_dispatch:
+    inputs:
+      trigger_id:
+        description: 'Mirror run id'
+        required: false
+        type: string
+
+jobs:
+  # Detect which paths changed for conditional job execution
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      dapp: ${{ steps.filter.outputs.dapp }}
+      docs: ${{ steps.filter.outputs.docs }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            dapp:
+              - 'dapp/**'
+            docs:
+              - 'docs/**'
+
+  # Step 1: Storybook lint + test (dapp workspace, only if dapp changed)
+  storybook-lint-test:
+    needs: changes
+    if: needs.changes.outputs.dapp == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dapp
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Run ESLint
+        uses: ./.github/actions/run-eslint
+        with:
+          strict: 'true'
+
+      - name: Run Vitest tests (no Codecov)
+        uses: ./.github/actions/run-vitest-tests
+        with:
+          upload-coverage: 'false'
+
+  # Step 2: Deploy Storybook (only if dapp changed and on main)
+  deploy-storybook:
+    needs: [storybook-lint-test, changes]
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request' &&
+      (needs.changes.outputs.dapp == 'true' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment: storybook
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./dapp
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+
+      - name: Build Storybook
+        working-directory: ./dapp
+        run: pnpm build-sb
+
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+
+      - name: Link Vercel project
+        run: vercel link --yes --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Prepare Vercel output
+        run: |
+          mkdir -p .vercel/output/static
+          cp -r dapp/storybook-static/* .vercel/output/static/
+          echo '{"version":3}' > .vercel/output/config.json
+
+      - name: Deploy Storybook to Vercel
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+  # Step 3: Docs lint + test (docs workspace, runs if docs or dapp changed)
+  docs-lint-test:
+    needs: changes
+    if: needs.changes.outputs.docs == 'true' || needs.changes.outputs.dapp == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./docs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          working-directory: ./docs
+
+      - name: Install dependencies
+        uses: ./.github/actions/install-deps
+        with:
+          filter: 'docs'
+
+      - name: Run ESLint (Next.js lint)
+        working-directory: ./docs
+        run: pnpm lint
+
+      - name: Run tests (vitest)
+        working-directory: ./docs
+        run: pnpm test
+
+  # Step 4: Deploy Docs (waits for storybook deploy if dapp changed)
+  deploy-docs:
+    needs: [docs-lint-test, deploy-storybook, storybook-lint-test, changes]
+    if: |
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      github.event_name != 'pull_request' &&
+      needs.docs-lint-test.result == 'success' &&
+      (needs.storybook-lint-test.result == 'success' || needs.storybook-lint-test.result == 'skipped') &&
+      (needs.deploy-storybook.result == 'success' || needs.deploy-storybook.result == 'skipped')
+    runs-on: ubuntu-latest
+    environment: docs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js and pnpm
+        uses: ./.github/actions/setup-node-pnpm
+        with:
+          pnpm-version: '10.13.1'
+          working-directory: .
+
+      - name: Install dependencies (docs + dapp)
+        working-directory: .
+        run: pnpm install --filter docs --filter ritoswap --frozen-lockfile
+
+      - name: Deploy to Vercel (docs)
+        uses: ./.github/actions/vercel-deploy
+        with:
+          mode: 'prebuilt'
+          production: 'true'
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: .  # Run from repo root - Vercel project settings have Root Directory = docs

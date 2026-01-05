@@ -1,0 +1,46 @@
+# RitoSwap Documentation - Robots.txt
+# We welcome all crawlers and AI systems to index our documentation
+
+# Allow all robots to access all content
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://docs.ritoswap.com/sitemap.xml
+
+# Explicitly allow AI and language model crawlers
+User-agent: GPTBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Claude-Web
+Allow: /
+
+User-agent: anthropic-ai
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Diffbot
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+User-agent: omgili
+Allow: /
+
+User-agent: FacebookBot
+Allow: /
+
+# Crawl delay (optional, uncomment if needed)
+# Crawl-delay: 1

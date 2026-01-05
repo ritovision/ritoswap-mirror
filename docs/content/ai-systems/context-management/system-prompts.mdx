@@ -1,0 +1,120 @@
+---
+title: System Prompts
+description: How the agent's core identity, mode instructions, and tool capabilities are constructed on the server.
+---
+
+# System Prompts (Server-Side Context)
+
+The "System Prompt" is the foundational context that defines the agent's persona, capabilities, and constraints. In RitoSwap, this is not a static string but a dynamically composed artifact constructed for every request.
+
+## The Composition Pipeline
+
+The system prompt is built in `dapp/app/lib/llm/handler.ts` and `dapp/app/lib/llm/message-converter.ts`.
+
+### 1. Dynamic Base System
+The root of the prompt is generated based on the active provider and model configuration. This ensures the agent is self-aware of its underlying architecture.
+
+```typescript
+// dapp/app/lib/llm/handler.ts
+function getDefaultSystem(): string {
+  const provider = aiServerConfig.provider;
+  const model = aiServerConfig.models[0];
+  
+  return `You are a helpful AI assistant powered by ${provider} (${model}) for the RitoSwap dApp...`;
+}
+```
+
+### 2. Mode Composition (Client-Side)
+The **Active Mode** instructions are actually composed on the **Client** (`dapp/components/chatBot/index.tsx`) when the user selects a mode. This ensures the UI and the agent are immediately aligned.
+
+```typescript
+// dapp/components/chatBot/index.tsx
+const systemText = composeSystemPrompt(activeMode, nftContext);
+// ...
+setMessages([{ id: 'system-mode', role: 'system', parts: [{ text: systemText }] }, ...]);
+```
+
+The server then receives this system message and *appends* the secure NFT context (see below) and enforces the tool whitelist.
+
+#### Prompt Fragments
+To keep prompts modular, we use **Fragments** located in `dapp/app/lib/llm/modes/fragments`. These are reusable blocks of text that teach the LLM specific skills.
+
+**Example: Teaching Inline Tools**
+Instead of hardcoding tool instructions into every mode, we import the `ChainLogoTool` fragment:
+
+```typescript
+// dapp/app/lib/llm/modes/fragments/inline-tools/ChainLogoTool.ts
+export const ChainLogoTool = `Use ChainLogo tool to render a blockchain's logo inline in chat.
+
+Commands:
+<chain-logo name="Ethereum" /> (defaults to 200 width)
+<chain-logo name="Bitcoin" width="64" />
+
+It can adapt approximate blockchain names but try to use the full name.
+Use this freely when talking about blockchains.
+`;
+```
+
+This fragment is then interpolated into the mode's system prompt:
+
+```typescript
+// dapp/app/lib/llm/modes/configs/agentBattle.ts
+buildPrompt: (nftContext) => `
+  ...
+  ## INLINE TOOLS
+  ${ChainLogoTool}
+  ${GIFtool}
+  ...
+`
+```
+
+The `rapStyle.ts` fragment also includes punctuation guidance so the voice clone can pause naturally between bars when spoken audio is generated.
+
+### 3. NFT Context Injection
+Today the *User Context* (wallet + NFT state) is serialized on the **client** and embedded directly inside the mode prompt before it is sent to the server. See `buildNftContext()` in `dapp/components/chatBot/index.tsx`, which produces:
+
+```typescript
+return [
+  'NFT_CONTEXT_JSON:',
+  JSON.stringify(jsonContext),
+  'NFT_CONTEXT_HUMAN:',
+  humanSummary,
+  ensInstruction,
+].filter(Boolean).join('\n');
+```
+
+Because the client already sends a fully composed system message, the server typically reuses that message as-is. The fallback logic in `message-converter.ts` only appends NFT metadata when no explicit system prompt was supplied:
+
+```typescript
+// dapp/app/lib/llm/message-converter.ts
+if (!sysText && metadata && 'nftContext' in metadata) {
+  systemPrompt = `${defaultSystem}\n` +
+    `NFT_CONTEXT_JSON:\n${JSON.stringify(metadata.nftContext)}\n` +
+    `NFT_CONTEXT_HUMAN:\n${nftHumanSummary}`;
+}
+```
+
+In other words, metadata currently carries the **mode** (for tool filtering) while the NFT context itself rides inside the trusted system message produced on the client. Should the transport ever start sending a structured `nftContext` field, the server already knows how to append it securely thanks to this fallback.
+
+## Key Files
+
+| File | Purpose |
+|------|---------|
+| `dapp/app/lib/llm/handler.ts` | Entry point that orchestrates prompt construction. |
+| `dapp/app/lib/llm/modes/composePrompt.ts` | Selects the correct mode configuration. |
+| `dapp/app/lib/llm/modes/fragments/*.ts` | Reusable prompt blocks for tools and behaviors. |
+| `dapp/app/lib/llm/message-converter.ts` | Appends the raw NFT context data to the final prompt. |
+
+import { Cards } from 'nextra/components'
+
+## Related Docs
+
+<Cards num={1}>
+  <Cards.Card
+    title="Inline Tool Renderers"
+    href="/ai-systems/chat-ui/inline-tools"
+    arrow
+  >
+    See how the UI renders the tags (e.g., `<chain-logo />`) defined in these prompt fragments.
+  </Cards.Card>
+</Cards>

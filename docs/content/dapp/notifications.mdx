@@ -1,0 +1,318 @@
+---
+title: "Notifications"
+description: "Dual notification system for blockchain events with toast and native browser notifications"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+
+# Notification System
+
+RitoSwap implements a sophisticated dual notification system that ensures users maintain complete awareness of blockchain events and state changes. This system combines ephemeral toast notifications for immediate feedback with persistent browser notifications for critical events, creating multiple layers of user communication that eliminate ambiguity around transaction outcomes and state transitions.
+
+## Architectural Rationale
+
+Blockchain transactions introduce unique user experience challenges that traditional web applications rarely encounter. When users initiate a transaction, they enter a period of uncertainty that can last from seconds to minutes while awaiting confirmation. During this time, users might switch tabs, minimize their browser, or even step away from their device. RitoSwap's notification system addresses these challenges through a carefully orchestrated approach that maintains user confidence throughout the entire transaction lifecycle.
+
+The dual notification architecture serves distinct but complementary purposes. Toast notifications provide immediate, in-context feedback that confirms action receipt and completion without disrupting the user's workflow. Browser notifications extend this communication beyond the application context, ensuring users receive confirmation even when their attention has shifted elsewhere. This redundancy proves particularly valuable in blockchain contexts where transaction finality carries significant importance.
+
+## System Architecture
+
+The notification system operates through a unified API that intelligently routes messages to both notification channels while respecting user preferences and system capabilities.
+
+### Core Implementation
+
+The notification utility centralizes all notification logic, providing a consistent interface for components throughout the application:
+
+```typescript
+export async function sendNotification(title: string, options?: NotificationOptions) {
+  // Toast notifications for immediate in-app feedback
+  if (isToastEnabled) {
+    toast.success(title, {
+      duration: 5000,
+      position: 'bottom-right',
+      style: {
+        background: 'var(--primary-color)',
+        color: 'white',
+        border: '2px solid var(--utility-green)',
+      },
+    })
+  }
+
+  // Browser notifications for persistent alerts
+  if (isLocalNotificationEnabled && 'Notification' in window) {
+    // Handle permission and display logic
+  }
+}
+```
+
+This unified approach ensures consistent messaging across both channels while allowing independent control of each notification type.
+
+### Environment Configuration
+
+The system implements control for browser notifications through environment variables, while toast notifications remain always active as an essential component of the user interface feedback system:
+
+```bash
+# Disable browser notifications by setting to "off"
+NEXT_PUBLIC_LOCAL_NOTIFICATIONS=off
+```
+
+This configuration approach maintains toast notifications as a core component of the application experience while allowing users to opt out of browser notifications if desired. The design philosophy prioritizes essential in-app feedback while respecting user preferences for system-level notifications.
+
+## Toast Notifications
+
+Toast notifications serve as the primary feedback mechanism for user actions, appearing within the application interface to provide immediate confirmation without requiring user interaction.
+
+### Visual Design and Positioning
+
+RitoSwap's toast implementation leverages React Hot Toast with custom styling that maintains consistency with the application's Blade Runner-inspired aesthetic:
+
+```typescript
+toastOptions={{
+  style: {
+    background: "black",
+    color: "white",
+    border: "var(--default-border)",
+    borderRadius: "12px",
+    fontFamily: "var(--font-primary)",
+    padding: "1rem 2rem",
+  },
+  success: {
+    style: {
+      background: "var(--primary-color)",
+      border: "2px solid var(--utility-green)",
+    },
+  },
+  error: {
+    style: {
+      background: "black",
+      border: "2px solid var(--accent-color)",
+    },
+  },
+}}
+```
+
+The bottom-right positioning keeps notifications visible without obscuring primary interface elements, while the 5-second duration provides sufficient time for comprehension without becoming intrusive.
+
+### Notification States
+
+The toast system implements three distinct notification states that correspond to different stages of blockchain interactions:
+
+<Table>
+  <thead>
+    <tr>
+      <th>State</th>
+      <th>Visual Treatment</th>
+      <th>Use Case</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Success</td>
+      <td>Green border, primary background</td>
+      <td>Transaction confirmations, successful operations</td>
+    </tr>
+    <tr>
+      <td>Error</td>
+      <td>Red accent border, black background</td>
+      <td>Failed transactions, validation errors</td>
+    </tr>
+    <tr>
+      <td>Loading</td>
+      <td>Default border, spinner icon</td>
+      <td>Pending transactions, processing states</td>
+    </tr>
+  </tbody>
+</Table>
+
+### Content Handling
+
+Toast notifications implement intelligent content wrapping to accommodate varying message lengths:
+
+```css
+maxHeight: "12rem",
+overflowY: "auto",
+whiteSpace: "normal",
+wordBreak: "break-word",
+```
+
+This approach ensures even lengthy error messages remain fully readable while maintaining visual consistency.
+
+## Browser Notifications
+
+Browser notifications extend RitoSwap's communication reach beyond the active browser context, providing persistent alerts that ensure users never miss critical blockchain events.
+
+### Permission Management
+
+The system implements respectful permission requesting that avoids aggressive prompts:
+
+```typescript
+// Request permission only when user is likely to benefit
+if ('Notification' in window && Notification.permission === 'default') {
+  Notification.requestPermission()
+}
+```
+
+Permission requests occur during natural interaction points, such as initial wallet connection or first transaction initiation, when users are most likely to understand the value of notifications.
+
+### Notification Lifecycle
+
+Browser notifications follow a carefully managed lifecycle that balances persistence with respect for user attention:
+
+```typescript
+const notification = new Notification(title, {
+  icon: '/images/SEO/favicon.png',
+  badge: '/images/SEO/favicon.png',
+  tag: 'unique-event-tag', // Prevents duplicate notifications
+  ...options
+})
+
+// Auto-dismiss after 5 seconds to prevent notification accumulation
+setTimeout(() => notification.close(), 5000)
+```
+
+The automatic dismissal prevents notification center cluttering while ensuring messages remain visible long enough for users who may be away from their devices.
+
+### Platform Considerations
+
+Browser notification support varies across platforms and browsers, requiring careful capability detection:
+
+<Callout type="info">
+Browser notifications require HTTPS in production environments and may not be available in all browsers. The system gracefully degrades to toast-only notifications when browser notifications are unavailable or denied.
+</Callout>
+
+## Event Catalog
+
+RitoSwap monitors six critical blockchain events that warrant user notification, each with carefully crafted messaging that provides clarity without technical complexity:
+
+### NFT Lifecycle Events
+
+**NFT Minted** triggers when a mint transaction achieves blockchain confirmation. The notification "Your NFT has been successfully minted" provides definitive confirmation that the user now owns a Colored Key NFT, eliminating any uncertainty about transaction success.
+
+**NFT Burned** confirms the permanent destruction of a user's NFT with "Your NFT has been successfully burned." This irreversible action requires clear confirmation to ensure users understand the finality of their action.
+
+**NFT Received** alerts users to incoming transfers with "You have received a new NFT." This notification proves particularly valuable as users might not be actively monitoring their wallet when transfers occur.
+
+**NFT Transferred** confirms outgoing transfers with "Your NFT has been successfully transferred," providing closure to the transfer process and confirming the NFT has left the user's possession.
+
+### Token Gate Events
+
+**Token Gate Unlocked** celebrates successful gate access with "Access granted to the token gate," marking the moment when NFT ownership translates into tangible utility.
+
+**Message Recorded** provides comprehensive confirmation with "Your message has been recorded and your key has been used," acknowledging both the message submission and the corresponding change in NFT status.
+
+## Integration Patterns
+
+The notification system integrates seamlessly with RitoSwap's broader architecture through consistent patterns that ensure reliable event detection and notification delivery.
+
+### Transaction Monitoring
+
+Components monitor transaction receipts and trigger appropriate notifications upon confirmation:
+
+```typescript
+useEffect(() => {
+  if (isSuccess && transactionReceipt) {
+    NFTNotifications.minted()
+    forceRefresh() // Update UI state
+  }
+}, [isSuccess, transactionReceipt])
+```
+
+This pattern ensures notifications fire only after blockchain confirmation, preventing premature success messages.
+
+### Error Handling
+
+The system provides specialized error notification handling that translates technical blockchain errors into user-friendly messages:
+
+```typescript
+if (error) {
+  const errorMessage = parseBlockchainError(error)
+  sendErrorNotification(errorMessage)
+}
+```
+
+### State Synchronization
+
+Notifications work in concert with state updates to ensure UI consistency:
+
+```typescript
+// Notification and state update occur together
+NFTNotifications.gateUnlocked()
+updateTokenUsageStatus(true)
+refreshNFTData()
+```
+
+## User Experience Considerations
+
+The notification system implements several design decisions that optimize for user comprehension and satisfaction.
+
+### Message Clarity
+
+All notification messages use plain language that avoids technical jargon. Instead of "Transaction 0x123... confirmed on block 12345," users see "Your NFT has been successfully minted." This approach ensures notifications remain accessible to users regardless of their blockchain expertise.
+
+### Timing and Frequency
+
+The system implements intelligent throttling to prevent notification fatigue during high-activity periods. Multiple rapid transactions result in consolidated notifications rather than overwhelming notification streams.
+
+### Visual Hierarchy
+
+Success notifications receive green accent colors that align with universal positive feedback patterns, while errors use the application's red accent color for immediate recognition. This color coding provides instant comprehension before users even read the message content.
+
+## Testing and Debugging
+
+Effective testing of the notification system requires simulating various scenarios and system states.
+
+### Environment Variable Testing
+
+Developers can test different notification configurations by modifying environment variables:
+
+```bash
+# Test with only toast notifications
+NEXT_PUBLIC_DISABLE_LOCAL_NOTIFICATIONS=off
+
+# Test with only browser notifications
+NEXT_PUBLIC_DISABLE_TOAST_NOTIFICATIONS=off
+
+# Test with all notifications disabled
+NEXT_PUBLIC_DISABLE_TOAST_NOTIFICATIONS=off
+NEXT_PUBLIC_DISABLE_LOCAL_NOTIFICATIONS=off
+```
+
+### Browser Permission States
+
+Testing should cover all permission scenarios. Developers can reset notification permissions in browser settings to test the permission request flow. Testing with permissions denied ensures the application gracefully falls back to toast-only notifications. Testing with permissions granted verifies both notification types function correctly.
+
+### Event Simulation
+
+The notification system can be tested independently of blockchain interactions:
+
+```typescript
+// Manually trigger notifications for testing
+NFTNotifications.minted()
+sendErrorNotification("Test error message")
+const loadingId = sendLoadingNotification("Test loading state")
+setTimeout(() => dismissLoadingNotification(loadingId), 3000)
+```
+
+## Performance Impact
+
+The notification system implements several optimizations to minimize performance overhead.
+
+Toast notifications render outside the main React tree, preventing re-renders of application components. The React Hot Toast library implements efficient DOM updates and automatic cleanup of dismissed notifications.
+
+Browser notifications operate through native browser APIs with minimal JavaScript overhead. The automatic dismissal timer prevents memory accumulation from long-lived notification objects.
+
+The permission checking logic caches results to avoid repeated API calls, while environment variable checks occur once during module initialization rather than on each notification.
+
+## Accessibility Considerations
+
+The notification system maintains accessibility through several implementations.
+
+Toast notifications respect system preferences for reduced motion, disabling animations when appropriate. Screen readers announce notification content through proper ARIA attributes. Sufficient color contrast ensures readability for users with visual impairments.
+
+Browser notifications leverage native OS accessibility features, ensuring compatibility with system-wide accessibility tools and preferences.
+
+## Summary
+
+RitoSwap's dual notification system exemplifies thoughtful design for blockchain user experiences. By combining immediate toast feedback with persistent browser notifications, the system ensures users maintain complete awareness of their blockchain interactions regardless of their attention state. The implementation respects user preferences through granular environment controls while defaulting to maximum awareness, acknowledging that in blockchain contexts, missing a notification could mean missing a critical transaction confirmation.
+
+The system's success lies not in technical complexity but in its careful orchestration of simple, reliable components that work together to eliminate the uncertainty inherent in blockchain interactions. Through clear messaging, consistent visual design, and intelligent timing, the notification system transforms potentially anxious waiting periods into confident user experiences, reinforcing RitoSwap's commitment to making blockchain technology accessible and trustworthy for all users.

@@ -1,0 +1,448 @@
+/* docs/styles/override.css */
+/* a catch-all file for all sub-styles combined*/
+
+:root,
+html[data-theme='dark'] {
+  /* 1) Brand blue as defined in theme.config.tsx */
+  --nextra-primary-hue: 204;
+  --nextra-primary-saturation: 96%;
+
+  /* 2) White text everywhere */
+  --nextra-foreground-default: #FFFFFF;
+  --nextra-foreground-muted:   #FFFFFF;
+  --nextra-foreground-dim:     #FFFFFF;
+
+  /* 3) Your secondary-blue & red for custom uses */
+  --primary-color: #012035;
+  --secondary-color: #04426C;
+  --accent-color:    #f61715;
+  --accent-color-2: #FF5700; 
+  --utility-green: #11C045;
+  --default-border: 2px solid var(--secondary-color);
+  
+  /* 4) Override key colour slots in the docs theme: */
+  --nextra-link-text-color:    var(--primary-color);
+  --nextra-link-hover-color:   var(--secondary-color);
+  --nextra-link-active-color:  var(--accent-color);
+
+  --nextra-border-color:       var(--secondary-color);
+  --nextra-blockquote-border:  var(--secondary-color);
+
+  --nextra-heading-color:      var(--primary-color);
+  --nextra-heading-border:     var(--secondary-color);
+
+  --nextra-code-inline-bg:     rgba(1,32,53,0.1);
+  --nextra-code-pre-bg:        rgba(1,32,53,0.15);
+
+  --nextra-section-divider:    var(--secondary-color);
+  --nextra-scrollbar-thumb:    var(--secondary-color);
+  --nextra-scrollbar-track:    var(--primary-color);
+
+  /* 5) Selection, focus rings, etc */
+  --nextra-selection-bg:       rgba(4,66,108,0.3);
+  --nextra-focus-outline:      var(--accent-color);
+
+  --font-primary: "AgencyB", sans-serif;
+  --font-body: "Michroma", sans-serif;
+}
+
+html[data-theme='light'] {
+  /* if you want tweaks in dark mode, repeat above */
+  --nextra-primary-saturation: 96%;
+}
+
+/* docs/styles.css */
+
+body {
+    background-color: var(--primary-color);
+}
+
+
+
+/* 1) Change the hr divider color: */
+.nextra-border {
+  border-color: var(--secondary-color) !important;
+}
+
+/* 2) Change the Footer container background: */
+div[class*="x:bg-gray-100"] {
+  background-color: var(--primary-color) !important;
+}
+
+/* 3) Change the <footer> text color & padding: */
+footer[class*="x:flex"] {
+  color: #FFFFFF !important;        /* white text */
+  padding-top: 2rem !important;     /* e.g. increase top padding */
+  padding-bottom: 2rem !important;
+}
+
+/* 4) Tweak the switchers row (locale + theme): */
+div[class*="x:flex"][class*="x:max-w-"] {
+  justify-content: center !important;  /* center the icons */
+}
+
+/* 5) Make sure this file is imported last! */
+
+/* Always use your primary blue for the input background */
+.nextra-search input {
+  background-color: var(--primary-color) !important;
+  border: 1px solid transparent; /* ensure a border exists */
+}
+
+/* On hover, make the border your secondary blue */
+.nextra-search input:hover {
+  border-color: var(--secondary-color) !important;
+}
+
+
+.labelBkg * {
+  background-color: var(--primary-color) !important;
+}
+
+/* Change background fill of main node container to primary blue */
+rect.label-container {
+  fill: var(--primary-color) !important;
+  stroke: var(--secondary-color) !important;
+}
+
+/* Also update any nested rects (fallback for nested .label > rect) */
+g.label rect {
+  fill: var(--primary-color) !important;
+  stroke: var(--secondary-color) !important;
+}
+
+
+html.dark .nextra-sidebar-footer {
+  background-color: var(--primary-color);
+}
+
+.x\:not-first\:mt-6.x\:leading-7 {
+  max-width: 40ch;        /* prevent super–long lines */
+  margin: 1.5rem auto 0;  /* top margin + horizontal auto-centering */
+  padding: 0 1rem;        /* gutter on left & right */
+  text-align: center;     /* center the text */
+}
+
+/* match your footer span’s Tailwind‐generated classes */
+.x\:flex.x\:font-semibold.x\:items-center.x\:gap-2.x\:p-4 {
+  max-width: 40ch;         /* don’t let it run too wide */
+  margin: 1rem auto;       /* vertical gutter + auto-center */
+  padding: 1rem;           /* keep its own padding */
+  justify-content: center; /* center its contents in the flex */
+  text-align: center;      /* just in case */
+}
+
+/* Always give each card a 2px border in --secondary-color */
+.nextra-cards > .nextra-card {
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: var(--secondary-color) !important;
+}
+
+/* Base dark-mode overlay */
+html.dark .nextra-cards > .nextra-card {
+  background-color: rgba(128, 128, 128, 0.1) !important;
+  transition: background-color 0.2s ease;
+}
+
+/* On hover, bump the opacity to 0.2 */
+html.dark .nextra-cards > .nextra-card:hover {
+  background-color: rgba(128, 128, 128, 0.2) !important;
+}
+
+/* Always give standalone cards a 2px border in --secondary-color */
+.nextra-card:not(.nextra-cards > .nextra-card) {
+  border-width: 2px !important;
+  border-style: solid !important;
+  border-color: var(--secondary-color) !important;
+  margin-top: 1.5rem;
+}
+
+/* Base dark-mode overlay for standalone cards */
+html.dark .nextra-card:not(.nextra-cards > .nextra-card) {
+  background-color: rgba(128, 128, 128, 0.1) !important;
+  transition: background-color 0.2s ease;
+}
+
+/* On hover, bump the opacity to 0.2 */
+html.dark .nextra-card:not(.nextra-cards > .nextra-card):hover {
+  background-color: rgba(128, 128, 128, 0.2) !important;
+}
+
+
+html.dark button.x\:text-gray-500 {
+  color: white !important; /* Tailwind’s gray-500 */
+}
+
+/* In dark mode, make non-hover link text gray again */
+html.dark a.x\:text-gray-500 {
+  color: white !important; /* Tailwind’s gray-500 */
+}
+
+/* Force footer to center content on all screen sizes */
+footer.x\:mx-auto {
+  justify-content: center !important; /* override md:justify-start */
+  text-align: center;
+}
+
+html.dark .x\:mt-12.x\:mb-8.x\:text-xs.x\:text-gray-500.x\:text-end {
+  color: #ffffff !important;
+}
+
+
+/* 2. Declare your custom fonts (served from public/fonts) */
+@font-face {
+  font-family: 'AgencyB';
+  src: url('/fonts/AGENCYB.woff') format('woff'),
+       url('/fonts/AGENCYB.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Michroma';
+  src: url('/fonts/Michroma-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 3. Apply them site-wide */
+body {
+  font-family: 'Michroma', sans-serif;
+}
+
+p {
+  color: white;
+ margin-left: 0 !important;
+  text-align: left !important;
+  display: block !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'AgencyB', sans-serif;
+  letter-spacing: 0.03em;
+  color: white;
+  font-weight: 1;
+}
+
+blockquote {
+  color: white;
+    border-left: 4px solid var(--secondary-color);
+    border-radius: 2px;
+    padding: 1px 0px;
+}
+
+
+
+li code.nextra-code {
+  border: .5px solid var(--secondary-color) !important;         
+}
+
+/* 1. Give all MDX code blocks (<pre>) a white border only */
+pre.not-prose {
+  border: 1px solid var(--secondary-color) !important;
+  box-shadow: none !important;      /* strip out the default ring shadow */
+}
+
+/* Make the code blocks “Copy code” button’s icon/text gray by default and white on hover */
+button[title="Copy code"] {
+  color: #6b7280 !important;        /* Tailwind’s gray-500 */
+}
+
+button[title="Copy code"]:hover {
+  color: #ffffff !important;
+}
+
+
+/* Always show the toolbar in the code block (including the copy button) */
+pre.not-prose > div {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Make the permalink icon white instead of gray */
+a.subheading-anchor,
+a.subheading-anchor:hover,
+a.subheading-anchor:focus-visible {
+  color: #fff !important;
+  fill:  #fff !important;
+}
+
+a.subheading-anchor::before,
+a.subheading-anchor::after {
+  color: #fff !important;
+  fill:  #fff !important;
+}
+
+/* Invert hover logic *only* for links inside the border-t section */
+div.x\:mb-8.x\:border-t a {
+  color: #1f2937 !important;          /* Tailwind gray-800 */
+}
+
+html.dark div.x\:mb-8.x\:border-t a {
+  color: #e5e7eb !important;          /* Tailwind gray-200 */
+}
+
+div.x\:mb-8.x\:border-t a:hover {
+  color: #4b5563 !important;          /* Tailwind gray-600 */
+}
+
+html.dark div.x\:mb-8.x\:border-t a:hover {
+  color: #9ca3af !important;          /* Tailwind gray-400 */
+}
+
+/* override mobile nav background */
+.nextra-mobile-nav {
+  background-color: var(--primary-color) !important;
+}
+/* override the left-border pseudo-element on your mobile sidebar lists */
+.nextra-mobile-nav ul::before {
+  background-color: var(--secondary-color) !important;
+}
+
+/* mobile only: background = custom secondary blue */
+@media (max-width: 767px) {
+  .nextra-search input {
+    background-color: var(--secondary-color) !important;
+  }
+}
+
+/* Target the outer 404 container by its inline height */
+div[style*="height: 100vh"] {
+  background-color: var(--primary-color) !important;
+}
+
+/* Dark-mode banner gradient: primary-blue on top, black on bottom */
+.dark .nextra-banner {
+  background:  var(--primary-color) !important;
+   border: 1px solid var(--secondary-color);
+   color: white;
+}
+
+
+/* Override the 404 heading */
+.next-error-h1 {
+  font-size: 3rem !important;
+  line-height: 1.2 !important;
+}
+
+/* Override the subheading immediately after it */
+.next-error-h1 + div h2 {
+  font-size: 2rem !important;
+  line-height: 1.6 !important;
+}
+
+/* 1) Slightly increase letter-spacing on each step’s heading */
+.nextra-steps h3 {
+  letter-spacing: 0.05em; /* tweak this value to dial spacing up/down */
+}
+
+/* 2) Force the left border to use your custom-secondary-blue variable */
+.nextra-steps {
+  border-left-width: 1px;       /* ensure you still have a 1px left border */
+  border-left-style: solid;
+  border-left-color: var(--secondary-color) !important;
+}
+
+/* 3) (Optional) ensure dark mode uses the same border color */
+.dark .nextra-steps {
+  border-left-color: var(--secondary-color) !important;
+}
+
+/* make the step-number circles transparent with white border & text */
+.nextra-steps h3::before {
+  /* transparent fill */
+  background-color: var(--primary-color) !important;
+  /* white ring */
+  border: 1px solid white !important;
+  /* white number */
+  color: white !important;
+  /* keep ’em perfectly round */
+  border-radius: 9999px !important;
+  padding-top: 2.5px;
+  padding-left: 2px;
+}
+
+
+/* apply to all tables */
+table th,
+table td {
+  
+  padding: 1rem;
+}
+
+table th,
+table td {
+  border: 1px solid var(--secondary-color);
+   border-collapse: collapse;
+}
+
+table {
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* 1) remove any bottom border from all nextra-scrollbar containers */
+.nextra-scrollbar {
+  border-bottom: none !important;
+}
+
+/* 2) re-apply the white bottom border only on the tablist */
+.nextra-scrollbar[role="tablist"] {
+  border-bottom: 1px solid #fff !important;
+}
+
+
+/* Triple the bottom border on the “selected” tab */
+div[role="tablist"] button[aria-selected="true"],
+div[role="tablist"] button[data-headlessui-state="selected"],
+div[role="tablist"] button:focus-visible {
+  border-bottom-width: 6px !important;
+}
+
+
+/* 1) Remove the light/dark border & shadow on the open dropdown panel */
+div.nextra-scrollbar[role="menu"] {
+  border: none !important;
+}
+
+/* 2) Kill any focus outline/box-shadow on the panel itself */
+div.nextra-scrollbar[role="menu"]:focus,
+div.nextra-scrollbar[role="menu"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 3) Remove the white “focus square” on the menu button after click */
+button[aria-haspopup="menu"]:focus,
+button[aria-haspopup="menu"]:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+
+/*  — add a little extra letter-spacing to all of those sidebar anchors — */
+html a.x\:break-words {
+  letter-spacing: 0.1em;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--primary-color);
+  border-radius: 4px;
+  border: 2px solid var(--primary-color);
+}
+
+/* 1) Remove the borderfrom code blocks */
+pre > code.nextra-code {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+li.\[word-break\:break-word\] {
+  font-size: 1.2rem;
+  color: var(--accent-color) !important;
+}

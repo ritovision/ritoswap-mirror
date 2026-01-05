@@ -1,0 +1,111 @@
+import { Callout, Cards, Steps, Tabs } from 'nextra/components'
+
+# Reusable Flows & Helpers
+
+All high-level actions live under `dapp/e2e/playwright/flows` and `dapp/e2e/playwright/utils`. Specs import from `../utils` (the barrel file) so they can chain flows without worrying about selector drift or timing issues.
+
+## Flow catalog
+
+<Cards num={2}>
+  <Cards.Card title="NFT flows" href="#nft-flows" arrow>
+    Mint/burn helpers plus safety guards that ensure we always start from a clean slate.
+  </Cards.Card>
+  <Cards.Card title="Gate & form flows" href="#gate--form" arrow>
+    Token gate unlock retries and gated form submissions.
+  </Cards.Card>
+  <Cards.Card title="Chat & music flows" href="#chat--music" arrow>
+    Conversational helpers, inline renderer assertions, and secret song playback.
+  </Cards.Card>
+  <Cards.Card title="Wallet & nav utils" href="#wallet--navigation" arrow>
+    Connect/disconnect logic, QR previews, and navigation helpers.
+  </Cards.Card>
+</Cards>
+
+## NFT flows
+
+### `mintKey(page)`
+
+- Clicks the “Mint NFT” button and waits for the burn button to appear (`60s` timeout).
+- Used after `burnIfKeyPresent` to guarantee the UI is ready to mint.
+
+### `burnKey(page)`
+
+- Works with both idle (`Burn NFT`) and busy (`Burning NFT, processing`) aria labels.
+- Waits until the mint button returns, ensuring the UI resets.
+
+### `burnIfKeyPresent(page)`
+
+1. Logs the current UI state via `NFTUtils.debugState()`.
+2. Waits for the mint UI to settle (loading placeholder → final buttons).
+3. Calls `canBurn()` and burns the NFT if required, then verifies the mint button is back.
+
+These helpers make the real Sepolia specs idempotent—failed runs won’t leave stray NFTs behind.
+
+## Gate & form
+
+### `unlockTokenGateWithRetry(page, options)`
+
+<Steps>
+  {<h3>Retry envelope</h3>}
+  Attempts the unlock up to `maxAttempts` (default 3). Between attempts it can reload the page and wait `pauseBetweenAttemptsMs`.
+
+  {<h3>Dual success criteria</h3>}
+  Races the appearance of `#gatedTextarea` against a successful `/api/gate-access` response. Either condition counts as a success.
+
+  {<h3>Error recovery</h3>}
+  Looks for a processing modal/dialog and tries to cancel it before refreshing. Throws only after exhausting all attempts.
+</Steps>
+
+### `submitMsgRito(page, message)`
+
+Switches to the “Msg Rito” tab, fills `#gatedTextarea`, and handles both the explicit submit button and the fallback `Sign & Submit` variant. It is typically called after the gate unlock flow succeeds.
+
+## Chat & music
+
+`flows/chatbot-helpers.flow.ts` provides granular helpers (`sendChatMessage`, `deleteChatConversation`, etc.) while `flows/chatbot.flow.ts` bundles a legacy `chatOnce` function for one-off interactions.
+
+<Tabs items={['Smart chat', 'Inline renderers', 'Music player']} storageKey="chat-flows" defaultIndex={0}>
+  <Tabs.Tab>
+    - `smartChat(page, message, expectedResponse?, options)` determines whether a conversation is already active.  
+    - It clicks the desired mode button (default “Freestyle Rap Mode”), optionally resets the chat, sends the message, and asserts the assistant response.  
+    - Use `options.skipResponseCheck` when the response is an inline renderer or handled via a separate assertion.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    - `INLINE_RENDERER_TESTS` maps triggers → assertions.  
+    - `runInlineRendererTest(page, 'keynft')` sends the trigger via `smartChat` and asserts the corresponding SVG, GIF, or `<img>` tag in the last assistant bubble.  
+    - Helper assertions (`assertChainLogoVisible`, `assertGifVisible`, etc.) live alongside the tests for re-use.
+  </Tabs.Tab>
+  <Tabs.Tab>
+    - `playSecretSong(page)` clicks the “Secret Song” tab and confirms the audio player transitions into a playing state (either via aria labels or status text).  
+    - `music-player.flow.ts` also exposes `waitForMusicBar`, `assertMusicBarSong`, `assertMusicBarPlaying/Paused`, and `toggleMusicBar`.  
+    - Combine these with chat commands (e.g. `smartChat(... 'play altcoin love')`) to validate the end-to-end music experience.
+  </Tabs.Tab>
+</Tabs>
+
+## Wallet & navigation
+
+`flows/wallet.flow.ts` wraps `WalletTestUtils` for spec-friendly calls:
+
+- `ensureConnected(page, walletName?)` / `ensureDisconnected(page)` — idempotent connect/disconnect.
+- `previewWalletConnectQr(page)` — opens the modal, switches to WalletConnect, waits for a QR image (desktop only), and returns to the wallet list.
+- `previewQrThenConnect(page)` — preview + connect using whatever wallet is currently highlighted.
+- `reconnectAfterReload(page)` — ensures the connection persists after a hard reload.
+- `cancelConnectViaEsc(page)` — exercises the ESC-to-close path and asserts the modal disappears.
+- `isMobileWidth(page)` — utility that specs use to `test.skip` QR checks on mobile.
+
+Navigation helpers (`NavigationUtils`) and screenshot helpers (`ScreenshotUtils`) live in `utils/wallet.utils.ts` as well, giving you `helper.navigation.goto('/gate')` or quick before/after captures.
+
+## Chat utilities
+
+`utils/chat.utils.ts` centralises selectors and lifecycle waits:
+
+- `ChatSelectors` enumerates the CSS/test-id fallbacks.
+- `waitForStreamingToFinish()` waits for the stop button to appear/disappear (covers streaming completion).
+- `scrollChatToBottom()` ensures the last assistant bubble is visible before matching text.
+- `expectLastAssistantToContain()` is the go-to assertion for textual replies.
+
+<Callout type="info" emoji="♻️">
+When you find yourself repeating the same selectors in a new spec, consider moving them into a flow or utility here. Keeping the selectors in one place makes refactors far less painful.
+</Callout>
+
+Ready to see how the flows come together? Jump to the spec playbooks page for scenario-by-scenario breakdowns.

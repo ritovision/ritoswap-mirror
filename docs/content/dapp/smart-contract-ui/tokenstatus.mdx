@@ -1,0 +1,448 @@
+---
+title: "Token Status"
+description: "Dynamic status display component of account holder's NFT state with smooth text transitions"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+import {
+  TokenStatusUI,
+  TokenStatusShowcase,
+} from '@components/mockui/TokenStatusUI'
+
+
+
+# TokenStatus
+
+The TokenStatus component provides dynamic status messaging that communicates the current NFT ownership state to users through elegantly animated text transitions. This seemingly simple component plays a crucial role in maintaining user orientation by clearly articulating their current state in the NFT lifecycle. Through careful state management and transition timing, it ensures status updates feel smooth and polished rather than jarring or abrupt.
+
+## Component Architecture
+
+TokenStatus implements a sophisticated transition system that goes beyond simple text swapping. The component maintains internal state to manage the timing and animation of text changes, ensuring that updates happen smoothly even when the underlying data changes rapidly. This approach prevents the flickering and jumpiness that often plague reactive interfaces dealing with asynchronous blockchain data. It also includes a hydration-safe gate so the server render and first client paint always match, eliminating warning spam while keeping the UI responsive once wallet data is ready.
+
+### State Display Logic
+
+The component displays one of five possible states based on wallet connection and NFT ownership:
+
+<Table>
+  <thead>
+    <tr>
+      <th>State</th>
+      <th>Conditions</th>
+      <th>Display Text</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Loading</td>
+      <td>Initial render, data fetching</td>
+      <td>"Loading..."</td>
+    </tr>
+    <tr>
+      <td>Not Connected</td>
+      <td>`!isConnected`</td>
+      <td>"You are not signed in"</td>
+    </tr>
+    <tr>
+      <td>No NFT</td>
+      <td>`isConnected && !hasNFT`</td>
+      <td>"You don't have a key yet"</td>
+    </tr>
+    <tr>
+      <td>Unused NFT</td>
+      <td>`isConnected && hasNFT && !hasUsedTokenGate`</td>
+      <td>"You have an unused key!"</td>
+    </tr>
+    <tr>
+      <td>Used NFT</td>
+      <td>`isConnected && hasNFT && hasUsedTokenGate`</td>
+      <td>"You have a used key..."</td>
+    </tr>
+  </tbody>
+</Table>
+
+The punctuation choices are deliberate, with exclamation points indicating positive states and ellipses suggesting completion or waiting states.
+
+### Interactive Demo
+
+<div style={{ marginTop: '2rem' }}>
+<TokenStatusShowcase />
+</div>
+
+## Props and Interface
+
+TokenStatus is a zero-configuration component that derives all its data from hooks and stores while guarding the first render for hydration safety:
+
+```typescript
+export default function TokenStatus() {
+  const { isConnected } = useAccount()
+  const { hasNFT, hasUsedTokenGate, isLoading } = useNFTStore()
+
+  // Forces the SSR + first client render to match.
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+}
+````
+
+This design ensures consistency across the application and prevents prop drilling. Until `mounted` flips to true the component renders a neutral `"Loading..."` placeholder (with `suppressHydrationWarning`) so React never complains about mismatched markup. Once on the client it immediately swaps to the wallet-aware text and keeps everything in sync via effects described below.
+
+## Transition Management
+
+The component's defining feature is its smooth transition system that prevents jarring text changes:
+
+### Transition State Machine
+
+```typescript
+const [displayText, setDisplayText] = useState("Loading...")
+const [isTransitioning, setIsTransitioning] = useState(false)
+const [hasInitialLoad, setHasInitialLoad] = useState(false)
+const previousTextRef = useRef("Loading...")
+const timeoutIdsRef = useRef(new Set<ReturnType<typeof setTimeout>>())
+```
+
+These state variables work together to orchestrate smooth transitions:
+
+* `displayText` - The currently displayed text
+* `isTransitioning` - Whether a transition is in progress
+* `hasInitialLoad` - Prevents transitions during initial data load
+* `previousTextRef` - Tracks the last displayed text to prevent unnecessary transitions
+* `timeoutIdsRef` - Holds scheduled fades so rapid updates can cancel in-flight animations
+
+### Transition Timing
+
+The transition effect implements a two-phase animation:
+
+<Steps>
+### Phase 1: Fade Out (500ms)
+The current text fades out and moves slightly upward, creating a gentle exit animation.
+
+### Phase 2: Pause and Update (50ms)
+
+After fade out completes, there's a 50ms pause before the new text is set.
+
+### Phase 3: Fade In (500ms)
+
+The new text fades in from a slightly elevated position over another 500ms CSS transition. 
+</Steps>
+
+This ~1 second total transition time (500ms + 50ms + 500ms) strikes a balance between feeling responsive and avoiding abrupt changes.
+
+## Initial Load Handling
+
+TokenStatus implements special logic to handle the initial data loading phase gracefully and keep subscriptions tidy. Conceptually, two small helpers keep the timeout bookkeeping manageable; the real component inlines this behavior using `addTimeout` and `timeoutIdsRef.current`:
+
+```typescript
+// Pseudocode helpers – actual implementation inlines these using addTimeout + timeoutIdsRef.current
+const addTimeout = (cb: () => void, delay = 0) => {
+  const id = setTimeout(() => {
+    cb()
+    timeoutIdsRef.current.delete(id)
+  }, delay)
+  timeoutIdsRef.current.add(id)
+}
+
+const clearAllTimeouts = () => {
+  timeoutIdsRef.current.forEach((id) => clearTimeout(id))
+  timeoutIdsRef.current.clear()
+}
+
+const scheduleTransition = (nextText: string) => {
+  addTimeout(() => setIsTransitioning(true), 0)
+  addTimeout(() => {
+    setDisplayText(nextText)
+    addTimeout(() => setIsTransitioning(false), 50)
+  }, 500)
+}
+```
+
+The state updates are then split across three effects; the snippet below shows their structure conceptually:
+
+```typescript
+// Effect 1: once mounted + not loading, set baseline text and mark initial load complete.
+useEffect(() => {
+  if (!mounted || isLoading) return
+  const initial = getText()
+  previousTextRef.current = initial
+  setHasInitialLoad(true)
+  setDisplayText(initial)
+}, [mounted, isLoading])
+
+// Effect 2: when a wallet disconnects, immediately reset text and stop animations.
+useEffect(() => {
+  if (!mounted || isConnected) return
+  clearAllTimeouts()
+  previousTextRef.current = "You are not signed in"
+  setDisplayText("You are not signed in")
+  setIsTransitioning(false)
+}, [mounted, isConnected])
+
+// Effect 3: for real transitions, cancel existing timers, fade out/in, and clean up.
+useEffect(() => {
+  if (!mounted || !hasInitialLoad || isLoading) return
+  const next = getText()
+  if (next === previousTextRef.current) return
+  previousTextRef.current = next
+  scheduleTransition(next)
+  return clearAllTimeouts
+}, [mounted, isConnected, hasNFT, hasUsedTokenGate, isLoading, hasInitialLoad])
+```
+
+This approach guarantees users see "Loading..." until real data is available, resets to a safe message the moment the wallet disconnects, and prevents intermediate flickers by cancelling obsolete timers before scheduling new ones.
+
+## CSS Animation Integration
+
+The component uses CSS classes to implement smooth transitions:
+
+```css
+.text {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.5s ease-in-out, transform 0.5s ease-in-out;
+  animation: initialFadeIn 1s ease-in-out;
+}
+
+.text.transitioning {
+  opacity: 0;
+  transform: translateY(-5px);
+}
+
+@keyframes initialFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+```
+
+The combination of opacity and subtle vertical movement creates a sophisticated transition effect that feels polished and professional. Additionally, there's a 1-second initial fade-in animation that runs when the component first mounts.
+
+## Store Integration
+
+TokenStatus subscribes to specific fields from the NFT store:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Store Field</th>
+      <th>Purpose</th>
+      <th>Update Trigger</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`hasNFT`</td>
+      <td>Determines NFT ownership state</td>
+      <td>Mint, burn, or transfer events</td>
+    </tr>
+    <tr>
+      <td>`hasUsedTokenGate`</td>
+      <td>Tracks token gate usage</td>
+      <td>Token gate interaction</td>
+    </tr>
+    <tr>
+      <td>`isLoading`</td>
+      <td>Prevents transitions during data fetch</td>
+      <td>Blockchain query state</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Performance Optimizations
+
+The component implements several strategies to ensure optimal performance:
+
+**Ref-Based Comparison** - Using `previousTextRef` prevents unnecessary transitions when the text hasn't actually changed, crucial during rapid re-renders.
+
+**Timeout Registry** - Every fade timer is tracked in `timeoutIdsRef`, making it easy to cancel queued animations before scheduling new ones. This solves race conditions when wallet data flips quickly.
+
+**Early Returns** - Each effect bails early during initial load or when text hasn't changed, minimizing computational overhead.
+
+**CSS-Based Animation** - All visual transitions use GPU-accelerated CSS properties rather than JavaScript-based animations.
+
+## Responsive Design
+
+TokenStatus includes responsive styling for mobile devices:
+
+```css
+@media (max-width: 768px) {
+  .text {
+    font-size: 2rem; /* Down from 2.5rem */
+  }
+  
+  .container {
+    min-height: 3rem; /* Down from 3.5rem */
+    margin-bottom: 0rem; /* Remove bottom margin on mobile */
+  }
+}
+```
+
+The reserved container height prevents layout shift as text changes, maintaining visual stability across all screen sizes.
+
+## Hook Dependencies
+
+The component relies on two primary data sources:
+
+### wagmi Hooks
+
+* **useAccount** - Provides wallet connection status
+
+### Store Hooks
+
+* **useNFTStore** - Provides NFT ownership and usage data
+
+These effects use targeted dependency arrays:
+
+* The initial load effect intentionally only depends on `[mounted, isLoading]` even though `getText()` reads additional values; this freezes a baseline status once loading completes instead of recomputing it on every minor store change.
+* The disconnect effect depends on `[mounted, isConnected]`.
+* The transition effect tracks the full set `[mounted, isConnected, hasNFT, hasUsedTokenGate, isLoading, hasInitialLoad]` so it can respond to real state changes without creating render loops.
+
+## Common Integration Patterns
+
+TokenStatus is typically used as the first element in the minting interface:
+
+```typescript
+function MintPage() {
+  return (
+    <div>
+      <TokenStatus />      {/* Status at top */}
+      <NFTScreen />    {/* Visual below */}
+      <ButtonSection /> {/* Actions at bottom */}
+    </div>
+  )
+}
+```
+
+This arrangement creates a natural reading flow from status to visualization to actions.
+
+## Customization Options
+
+While TokenStatus works out of the box, several aspects can be customized:
+
+### Text Customization
+
+The status messages can be modified by changing the `getText()` function:
+
+```typescript
+const getText = () => {
+  if (!isConnected) return "Connect your wallet"
+  if (hasNFT && hasUsedTokenGate) return "Key already redeemed"
+  // ... etc
+}
+```
+
+### Animation Timing
+
+Transition durations can be adjusted in both the JavaScript and CSS:
+
+```typescript
+setTimeout(() => setDisplayText(newText), 500) // Adjust fade out time
+```
+
+### Styling
+
+The component uses CSS modules, making style customization straightforward through the TokenStatus.module.css file.
+
+## Error States
+
+While TokenStatus doesn't explicitly handle error states, it gracefully degrades:
+
+* If store data is unavailable, the component stays on the hydration placeholder until hooks recover
+* Disconnects immediately show "You are not signed in" because of the dedicated reset effect
+* The loading state prevents display of incorrect information during data fetches
+
+## Testing Strategies
+
+Testing TokenStatus requires mocking both wagmi and store hooks while preserving the rest of their modules:
+
+```typescript
+vi.mock('wagmi', () => {
+  return vi.importActual<typeof import('wagmi')>('wagmi').then((actual) => ({
+    ...actual,
+    useAccount: vi.fn(),
+  }))
+})
+
+vi.mock('@store/nftStore', () => ({
+  useNFTStore: vi.fn(),
+}))
+```
+
+From there you can drive the mocks to cover every state combination, assert the ARIA attributes, and advance fake timers to ensure transitions schedule `setTimeout` calls correctly. The existing suite in `dapp/app/mint/components/__tests__/TokenStatus.test.tsx` demonstrates these patterns in depth. To exercise the disconnect behavior described above, you can also add a small test that starts in a connected state and then flips `isConnected` to `false`, asserting that the message immediately resets to `You are not signed in` without leaving the text in a transitioning state.
+
+## Accessibility Considerations
+
+TokenStatus implements several accessibility best practices:
+
+**Semantic HTML** - Uses an h1 element to properly structure the page hierarchy and wraps it in a `role="status"` region with `aria-live="polite"` / `aria-atomic="true"` so assistive tech hears each state change.
+
+**High Contrast** - White text on dark backgrounds ensures readability.
+
+**Animation Respect** - Transitions use CSS for smooth visual changes, and the hydration placeholder keeps text present for screen readers even before wallet data loads.
+
+<Callout type="info">
+The component's animations are subtle enough to avoid triggering motion sensitivity while still providing visual polish.
+</Callout>
+
+## Common Issues and Solutions
+
+<Table>
+  <thead>
+    <tr>
+      <th>Issue</th>
+      <th>Cause</th>
+      <th>Solution</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Text flickers on load</td>
+      <td>Missing initial load check</td>
+      <td>Ensure hasInitialLoad logic is implemented</td>
+    </tr>
+    <tr>
+      <td>Transitions feel slow</td>
+      <td>Long animation duration</td>
+      <td>Reduce transition time in CSS and setTimeout</td>
+    </tr>
+    <tr>
+      <td>Text doesn't update</td>
+      <td>Missing dependencies</td>
+      <td>Check effect dependency array completeness</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Best Practices
+
+When working with TokenStatus or similar status components:
+
+**Maintain State Hierarchy** - Always check connection status before NFT status to ensure logical message flow.
+
+**Preserve Visual Stability** - Use fixed container heights to prevent layout shift during transitions.
+
+**Coordinate Timing** - Ensure transition timing matches other animated components for cohesive feel.
+
+**Test State Combinations** - Verify all possible state combinations display appropriate messages.
+
+## Summary
+
+TokenStatus demonstrates how careful attention to transition timing and state management can elevate a simple text display into a polished UI element. By implementing sophisticated transition logic, handling initial load states gracefully, and maintaining visual stability through reserved space, it provides clear user feedback without the jarring updates common in blockchain applications. The component's zero-configuration design and store integration make it a drop-in solution that enhances the user experience through thoughtful animation and clear communication of system state.
+
+## Playground
+
+Use the full Storybook UI to explore the status states and tweak controls in real time.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/mint-tokenstatus--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Mint/TokenStatus - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>

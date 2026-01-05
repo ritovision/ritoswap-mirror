@@ -1,0 +1,316 @@
+---
+title: "Audioplayer"
+description: "A guide to the audioplayer and wrapper components"
+---
+
+import { FileTree, Steps, Tabs } from 'nextra/components'
+import CustomAudioPlayer from '@components/media/audio/CustomAudioPlayer'
+import AudioWrapper from '@components/media/audio/AudioWrapper'
+import CryptoMusicSection from '@components/media/audio/CryptoMusicSection'
+
+# Music & Audioplayer
+
+RitoSwap is a music-first dApp, and this page documents the reusable audio components used across the dApp experience. Not covered here, the RapBotRito AI system has its own separate audio player called a music bar (see [Music Bar](/ai-systems/chat-ui/inline-tools/music-bar)). The voice clone uses a separate TTS pipeline (see [Voice Clone](/ai-systems/chat-ui/voice-clone)) that generates spoken-word clips.
+
+<FileTree>
+  <FileTree.Folder name="components" defaultOpen>
+    <FileTree.Folder name="media" defaultOpen>
+      <FileTree.Folder name="audio" defaultOpen>
+        <FileTree.File name="CustomAudioPlayer.tsx" />
+        <FileTree.File name="CustomAudioPlayer.module.css" />
+        <FileTree.File name="AudioWrapper.tsx" />
+        <FileTree.File name="AudioWrapper.module.css" />
+        <FileTree.File name="CryptoMusicSection.tsx" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Module: CustomAudioPlayer
+
+### Overview
+
+A drop-in React audio player component built on Howler.js, offering:  
+- Play/pause controls  
+- Seekable timeline (mouse + touch)  
+- Volume slider + mute button (with "remember last volume")  
+- Accessible announcements for screen readers  
+
+<div
+  style={{
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '2rem',
+  }}
+>
+  <div style={{ maxWidth: '350px', width: '90%' }}>
+    <CustomAudioPlayer
+      title="Altcoin Love"
+      audioSrc="/audio/Altcoin_Love.mp3"
+    />
+  </div>
+</div>
+
+### Basic Usage
+
+```jsx
+<CustomAudioPlayer
+  title="Altcoin Love"
+  audioSrc="/audio/Altcoin_Love.mp3"
+/>
+```
+
+### Layout & Positioning
+
+By default, the component:
+- Takes up 100% of its container width
+- Is centered and constrained to a max-width: 600px
+- Centers its controls horizontally
+- Uses flexbox for internal layout
+
+To control width and positioning, wrap the component in a container:
+
+```jsx
+// Centered with constrained width
+<div
+  style={{
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '2rem',
+  }}
+>
+  <div style={{ maxWidth: '350px', width: '90%' }}>
+    <CustomAudioPlayer
+      title="Track Title"
+      audioSrc="/audio/track.mp3"
+    />
+  </div>
+</div>
+```
+
+> **Note:** For scroll-revealed presentations with image + description, see the [AudioWrapper module](#module-audiowrapper) below.
+
+### Props API
+
+| Prop       | Type     | Required | Description                                        |
+| ---------- | -------- | :------: | -------------------------------------------------- |
+| `title`    | `string` |   Yes    | Track title (visible and used in aria-labels)     |
+| `audioSrc` | `string` |   Yes    | URL or path to the audio file                     |
+
+### Internal State
+
+| State          | Type      | Initial | Purpose                                       |
+| -------------- | --------- | ------- | --------------------------------------------- |
+| `isPlaying`    | `boolean` | `false` | true when audio is playing                    |
+| `currentTime`  | `number`  | `0`     | Playback position in seconds                  |
+| `duration`     | `number`  | `0`     | Total track length (set on first play)        |
+| `volume`       | `number`  | `1`     | Current volume (0.00–1.00)                    |
+| `isMuted`      | `boolean` | `false` | Whether audio is muted                        |
+| `isDragging`   | `boolean` | `false` | True while user is scrubbing the timeline     |
+| `lastVolume`   | `number`  | `1`     | Remembers pre-mute volume for unmute restore  |
+| `announcement` | `string`  | `''`    | Live-region text for play/pause announcements |
+
+### Key Features
+
+**Dependencies**  
+- React (useState, useEffect, useRef, useCallback)  
+- Howler.js  
+- CSS Modules for styling  
+
+**Lifecycle & Effects**
+1. **First play**: Lazy-instantiate Howl with html5: true (avoids AudioContext warnings)
+2. **Sync volume & mute**: Updates Howl instance on state changes
+3. **Playhead updater**: rAF loop when playing and not dragging
+4. **Scrubbing**: Mouse and touch event handling for timeline
+5. **Announcements**: Live region updates for accessibility
+6. **Cleanup**: Unload Howl and cancel animations on unmount
+7. **audioSrc change**: Unloads existing Howl, resets state for new source  
+
+### Accessibility Features
+
+- **Container**: role=region, aria-label="Audio player"  
+- **Live region**: role=status, aria-live=polite  
+- **Play/Pause button**: Dynamic aria-label and aria-pressed  
+- **Timeline slider**: role=slider with value announcements  
+- **Volume slider**: Percentage-based value text  
+
+### CSS Module Classes
+
+**Core Classes** (from `CustomAudioPlayer.module.css`)
+
+| Class Category | Class Names                                                       |
+| -------------- | ----------------------------------------------------------------- |
+| Main Container | `audioPlayer`, `title`, `announcementVisible`                    |
+| Controls       | `controls`, `playPauseButton`, `volumeButton`                    |
+| Timeline       | `timelineContainer`, `timeline`, `timelineProgress`, `timelineCursor` |
+| Time & Volume  | `timeCounter`, `volumeContainer`, `volumeSlider`                 |  
+
+#### Styling Sample
+
+A concise extract from `AudioWrapper.module.css` showing animation, basic layout, and responsive behavior:
+
+```css
+/* AudioWrapper.module.css */
+
+/* 1) Scroll-in animation */
+.wrapper {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 1.5s ease, transform 1.5s ease;
+  margin-bottom: 5rem;
+}
+.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 2) Layout basics */
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+/* 3) Responsive at ≥730px */
+@media (min-width: 730px) {
+  .content {
+    flex-direction: row;
+    gap: 8rem;
+    max-width: 1000px;
+    margin: 0 auto;
+  }
+}
+```
+---
+<br />
+
+## Module: AudioWrapper
+
+<br />
+<CryptoMusicSection />
+
+### Overview
+
+`AudioWrapper` is a scroll-revealed media section that combines:
+1. **Headline** (h2)  
+2. **Image + Description**  
+3. **CustomAudioPlayer** component  
+
+This wrapper requires **two components**:
+1. The `AudioWrapper` itself (imported from the module)
+2. A separate component that uses `AudioWrapper` (like `CryptoMusicSection` shown above)
+
+On first scroll-into-view (40% threshold), the entire section fades up into place.
+
+### Component Structure
+
+```jsx
+// Step 1: Create your own component that uses AudioWrapper
+'use client';
+import React from 'react';
+import AudioWrapper from '@components/media/audio/AudioWrapper';
+
+export default function YourAudioSection() {
+  return (
+    <AudioWrapper
+      headline="Your Headline"
+      imageSrc="/path/to/image.jpg"
+      imageAlt="Description of image"
+      description={<>Your rich text description</>}
+      title="Audio Track Title"
+      audioSrc="/path/to/audio.mp3"
+    />
+  );
+}
+
+// Step 2: Import and use your component in MDX or pages
+import YourAudioSection from '@components/YourAudioSection';
+
+<YourAudioSection />
+```
+
+### Props API
+
+| Prop          | Type        | Required | Description                                                  |
+| ------------- | ----------- | :------: | ------------------------------------------------------------ |
+| `headline`    | `string`    |   Yes    | Section title, rendered as an `<h2>` above the image        |
+| `imageSrc`    | `string`    |   Yes    | URL for the display image                                    |
+| `imageAlt`    | `string`    |   Yes    | Accessible alt text for the image                           |
+| `description` | `ReactNode` |   Yes    | Caption or rich content below the image                     |
+| `title`       | `string`    |   Yes    | Label passed to the audio player (accessibility)            |
+| `audioSrc`    | `string`    |   Yes    | URL for the audio file (mp3, wav, etc.)                     |
+
+### Styling & Layout
+
+**Core Classes** (from `AudioWrapper.module.css`)
+
+| Class             | Effect                                                                 |
+| ----------------- | ---------------------------------------------------------------------- |
+| `.wrapper`        | Initial: `opacity: 0; transform: translateY(20px)` + 1.5s transition   |
+| `.visible`        | Active: `opacity: 1; transform: translateY(0)`                         |
+| `.headline`       | Centered, 3rem, uses `var(--accent-color)`                            |
+| `.content`        | Flex container (column to row at 730px+)                               |
+| `.left`, `.right` | Max-width: 400px constraint                                            |
+| `.image`          | Responsive, auto height, 10px border-radius                            |
+
+**Responsive Behavior**
+
+- Mobile (less than 730px): Stacked layout (image above player)
+- Desktop (730px and above): Side-by-side with 8rem gap
+- Max container width: 1000px centered
+
+### Scroll Animation
+
+- **IntersectionObserver**: 40% visibility threshold
+- **One-time trigger**: Disconnects after first activation
+
+### Example Implementation
+
+Here's the `CryptoMusicSection` component shown in the demo:
+
+```jsx
+'use client';
+import React from 'react';
+import AudioWrapper from '@components/media/audio/AudioWrapper';
+
+export default function CryptoMusicSection() {
+  return (
+    <AudioWrapper
+      headline="Crypto Music"
+      imageSrc="/images/music/altcoin-love-coverart-square.jpg"
+      imageAlt="Altcoin Love Cover Art"
+      description={
+        <>
+          An anthemic ode to altcoins by Rito Rhymes… <em>California Love</em> style
+        </>
+      }
+      title="Altcoin Love"
+      audioSrc="/audio/Altcoin_Love.mp3"
+    />
+  );
+}
+```
+
+### Usage Notes
+
+- Each instance creates its own IntersectionObserver
+- The `CustomAudioPlayer` is automatically included—no need to import separately
+- Supports JSX/ReactNode for rich `description` content
+- Animation runs once per page load (no retriggers on scroll)
+
+## Playground
+
+Use the full Storybook UI to explore the player and tweak controls in real time.
+
+<div style={{ width: '100%', height: 720, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/utilities-media-customaudioplayer--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Utilities/Media/CustomAudioPlayer - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>

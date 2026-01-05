@@ -1,0 +1,163 @@
+---
+title: Supertest Harness
+description: End-to-end coverage for the gated APIs, JWT flows, and MCP tools
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# Overview
+
+The Supertest harness (located in `dapp/e2e/supertest`) exercises the public-facing API routes using Vitest + Supertest. It currently ships four suites:
+
+- `api.test.ts` — covers the token gate surfaces (`/api/openapi`, `/api/token-status/:tokenId`, `/api/nonce`, `/api/gate-access`, `/api/form-submission-gate`) with both happy/sad wallet scenarios and optional OpenAPI validation.  
+- `jwt.test.ts` — drills into JWT issuance/consumption, SIWE vs legacy branches, payload shape, and abuse cases.  
+- `pinecone.test.ts` — runs the MCP JSON-RPC bridge (`/api/mcp`) including `tools/list`, `tools/call`, JWT gating, and Pinecone vector searches.
+- `zz-rateLimit.test.ts` — intentionally exhausts the `/api/gate-access` limiter and runs last to avoid consuming limits needed by the other suites.
+
+Every suite imports the shared `validateSupertestEnv` helper (`env.schema.ts`) so test runs fail fast when required configuration is missing.
+
+# Environment & Configuration
+
+Environment resolution is centralized in `vitest.config.supertest.ts`:
+
+1. Start with `process.env` (CI/job variables win).  
+2. Overlay `.env.supertest` if it exists in `dapp/`.  
+3. Fall back to `.env` only when `.env.supertest` is absent.  
+4. Validate the merged object with `supertestEnvSchema`.
+
+Key variables (see `dapp/.env.supertest.example`):
+
+<Table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`TEST_BASE_URL`</td>
+      <td>Target origin (default `http://localhost:3000`).</td>
+    </tr>
+    <tr>
+      <td>`PRIVATE_KEY` / `TOKEN_ID` / `CHAIN_ID`</td>
+      <td>Test wallet + token that owns a Colored Key on the configured chain.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_ENABLE_STATE_WORKER`</td>
+      <td>Logged for visibility; tests still probe `/api/nonce` to detect SIWE vs legacy.</td>
+    </tr>
+    <tr>
+      <td>`NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT`</td>
+      <td>Tells MCP tests whether a JWT is mandatory.</td>
+    </tr>
+    <tr>
+      <td>`MCP_ENDPOINT`</td>
+      <td>Path to the MCP JSON-RPC bridge (defaults to `/api/mcp`).</td>
+    </tr>
+  </tbody>
+</Table>
+
+`setup.ts` logs the resolved values (with masked secrets) before the first test so you can confirm the harness picked up the right environment.
+
+# Running the suites
+
+```bash
+pnpm vitest --config dapp/e2e/supertest/vitest.config.supertest.ts
+```
+
+Tips:
+
+- Suites run sequentially (`fileParallelism: false`) because they share IP-based rate limits.  
+- Keep `zz-rateLimit.test.ts` last so it can safely exhaust the `gateAccess` limiter without impacting earlier suites.  
+- The harness attempts to load `public/openapi.json`. If the file is missing in a given deployment, the OpenAPI validator quietly disables itself and tests continue.  
+- Output includes a summarized OpenAPI validation report plus JWT payload snippets to help debug server responses.
+
+# What each suite covers
+
+## `api.test.ts`
+
+- **OpenAPI surface** — Fetches `/api/openapi`, asserts version `3.0.3`, and (when available) validates the response against the generated schema via `openapi-validator.ts`.  
+- **Token lifecycle** — Runs `describe.each` happy/sad cases to hit `/api/token-status/:tokenId` (existing vs bogus token IDs) and `/api/nonce` (expects 200 with nonce when SIWE is enabled or 501 with RFC7807 payload otherwise).  
+- **Gate access** — Exercises `/api/gate-access` through SIWE or legacy envelopes depending on runtime config (detected via `/api/nonce`). Successful paths store any returned JWTs for reuse tests.  
+- **JWT reuse edge cases** — Sends valid/invalid/mismatched Bearer headers, tokenId body overrides, malformed headers, and concurrent requests to ensure the handler enforces strict matching.  
+- **Form submission** — Posts to `/api/form-submission-gate` with a properly signed legacy envelope, tolerating rate limits or backend 500s but asserting success/authorization codes otherwise.  
+- **Global assertions** — Waits between tests, prints structured logs, and emits the OpenAPI validation report in `afterAll`.
+
+## `jwt.test.ts`
+
+- **JWT minting** — Verifies that a successful SIWE or legacy gate access call returns an `accessToken` when the server is configured to issue JWTs.  
+- **Payload inspection** — Uses `jwtAssertions` to check `sub`, `tokenId`, `kind`, `scopes`, timestamp claims, SIWE projection (`siwe.*`), and the deterministic `siwe_hash`.  
+- **Authenticated reuse** — Replays stored tokens against `/api/gate-access` with/without `tokenId` in the body, expecting success or precise failures (401 on mismatched IDs, 403 when already used).  
+- **Bearer permutations** — Validates lower/upper/missing space variants as well as outright malformed tokens, mock JWTs, and invalid formats defined in `jwtScenarios`.  
+- **Rate limiting & uniqueness** — Drives bursts of Bearer calls to detect 429s and confirms new authentications mint unique JWT IDs (`jti`) and timestamps.  
+- **Introspection** — Parses TTL to ensure it falls within the expected 5 minutes–24 hours window and logs helpful debug information when a server declines to issue tokens.
+
+## `pinecone.test.ts`
+
+- **Protocol guards** — Ensures `/api/mcp` rejects GET (405), invalid JSON (400), and missing JWTs when `NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT` is true.  
+- **Tool discovery** — Calls `tools/list`, asserts the response contains `pinecone_search`, and inspects the tool’s schema.  
+- **Vector searches** — Issues multiple `tools/call` requests covering default topK, custom topK, metadata toggles, invalid index/namespace, missing params, empty query strings, and concurrent invocations.  
+- **JWT handling** — Acquires a JWT up front (via SIWE or legacy gate access) when required, then reuses it for the MCP calls; also checks invalid tokens and malformed Bearer headers return 401s.  
+- **Diagnostics** — Logs the JWT payload (when present) plus Pinecone content to simplify debugging remote responses.
+
+## `zz-rateLimit.test.ts`
+
+- **Limiter exhaustion** — Sends a burst of `/api/gate-access` requests to trigger 429 responses after the configured `gateAccess` limit.  
+- **Non-fatal behavior** — Logs when rate limiting is disabled and avoids failing the suite in that case.  
+- **Ordering** — Prefixed with `zz-` so it runs after the other suites.
+
+# Coverage map
+
+<Table>
+  <thead>
+    <tr>
+      <th>Endpoint / Surface</th>
+      <th>Supertest file</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`GET /api/openapi`</td>
+      <td>`api.test.ts`</td>
+      <td>Validates status, schema shape, and (optionally) OpenAPI compliance.</td>
+    </tr>
+    <tr>
+      <td>`GET /api/token-status/:tokenId`</td>
+      <td>`api.test.ts`</td>
+      <td>Happy/sad token IDs plus OpenAPI response validation.</td>
+    </tr>
+    <tr>
+      <td>`GET /api/nonce`</td>
+      <td>`api.test.ts`</td>
+      <td>Covers SIWE-enabled (200) and disabled (501 ProblemDetails) responses.</td>
+    </tr>
+    <tr>
+      <td>`POST /api/gate-access`</td>
+      <td>`api.test.ts`, `jwt.test.ts`, `zz-rateLimit.test.ts`</td>
+      <td>Legacy + SIWE auth, JWT minting, Bearer reuse, malformed headers, and explicit limiter exhaustion.</td>
+    </tr>
+    <tr>
+      <td>`POST /api/form-submission-gate`</td>
+      <td>`api.test.ts`</td>
+      <td>Legacy envelope validation, success/error handling, tolerates 429/500 noise.</td>
+    </tr>
+    <tr>
+      <td>`POST /api/mcp` (JSON-RPC)</td>
+      <td>`pinecone.test.ts`</td>
+      <td>GET guard, invalid JSON, JWT requirements, `tools/list`, `tools/call` permutations.</td>
+    </tr>
+  </tbody>
+</Table>
+
+<Callout type="warning">
+  `/api/chat` and `/api/quota-reset` do not have Supertest coverage yet; they rely on unit tests and manual verification. Additions here should be tracked as follow-up work.
+</Callout>
+
+# Extending the harness
+
+- Share helpers via `jwt.helpers.ts` or new modules instead of duplicating logic inside a test file.  
+- Keep rate-limit coverage isolated and running last (prefix with `zz-`) so it doesn’t burn limits needed by other suites.  
+- When you add a new endpoint to the tests, update this page (and the relevant API doc) so readers always know which specs are backed by automated coverage.  
+- If you introduce another OpenAPI slice, register its schema in `openapi-validator.ts` or extend the validator to support multiple specs.

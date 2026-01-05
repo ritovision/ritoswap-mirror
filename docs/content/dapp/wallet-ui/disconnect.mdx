@@ -1,0 +1,239 @@
+---
+title: "Disconnect Widget"
+description: "A wallet disconnection widget with animated exit visual feedback"
+---
+
+import { FileTree, Callout, Table, Tabs } from 'nextra/components'
+
+# DisconnectButton Widget
+
+<FileTree>
+  <FileTree.Folder name="wallet" defaultOpen>
+    <FileTree.Folder name="disconnectButton" defaultOpen>
+      <FileTree.File name="DisconnectButton.tsx" />
+      <FileTree.File name="DisconnectButton.module.css" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Overview
+
+The DisconnectButton widget provides users with a clear and accessible method to terminate their wallet connection within the RitoSwap interface. As part of the Wallet UI widget collection, this component represents one of the core connected-state widgets that automatically appears when a wallet connection is active. The widget implements a straightforward disconnection flow while maintaining visual consistency with the broader interface design language.
+
+For the complementary entry-point experience, see the [ConnectButton documentation](/dapp/wallet-ui/connectButton). Both widgets share the same responsive variant contract and are designed to hand off seamlessly as Wagmi connection state changes.
+
+<img 
+  src="/images/ui/disconnect.png" 
+  alt="DisconnectButton widget displaying exit icon" 
+  style={{ width: '100%', maxWidth: '100px', display: 'block', margin: '2rem auto' }} 
+/>
+
+Built on Wagmi v2's disconnection functionality, DisconnectButton demonstrates a simplified architectural approach compared to its connection counterpart. Unlike the ConnectButton, which splits its logic between wrapper and state components, DisconnectButton consolidates all functionality within a single component file. This architectural decision reflects the straightforward nature of disconnection—the component simply needs to invoke Wagmi's disconnect function without managing complex states or modal interactions.
+
+## Component Architecture
+
+The DisconnectButton's single-file architecture represents a deliberate design choice that aligns with the component's focused responsibility. While the ConnectButton requires separation between connection logic and modal presentation, disconnection is a single atomic action that requires no additional user interface beyond the button itself.
+
+This consolidated approach offers several advantages. The component remains self-contained, making it easier to understand and maintain. There is no need to navigate between multiple files to comprehend the full functionality. The direct integration with Wagmi's `useDisconnect` hook keeps the implementation transparent and reduces abstraction layers that might obscure the component's behavior.
+
+The architectural disparity between ConnectButton and DisconnectButton illustrates an important principle in component design: complexity should match functionality. Where ConnectButton manages modal states, provider selection, and connection flows, DisconnectButton performs a single action. The architecture reflects these different requirements appropriately.
+
+## Visual Design and Animation
+
+The DisconnectButton employs a universally recognized exit metaphor through its custom SVG icon. The design depicts a doorway rendered with three sides—top, bottom, and left—while the right side remains open. An arrow emerges from the interior, pointing outward through the open side, creating an intuitive visual representation of departure or disconnection.
+
+The icon utilizes a two-tone color scheme that enhances visual hierarchy. The doorway renders in the application's secondary color, providing a subtle background element, while the arrow displays in white, drawing attention to the action element. This color separation ensures the interactive element remains prominent while maintaining aesthetic coherence with the RitoSwap design system.
+
+The hover animation reinforces the exit concept through progressive arrow extension. When users hover over the button, the arrow extends further outward, creating a visual narrative of movement away from the enclosed space. This animation comprises three synchronized transformations that work together to create a cohesive effect. The arrow line remains static, serving as the base element. An arrow extension element scales from zero to full width, creating the illusion of the arrow growing longer. The arrowhead translates 4 pixels to the right, maintaining its position at the arrow's tip as it extends.
+
+## Technical Implementation
+
+### Wagmi v2 Hook Integration
+
+DisconnectButton leverages two essential hooks from Wagmi v2 to manage its functionality and visibility:
+
+**`useAccount`** provides real-time connection status through its `isConnected` property. The component monitors this value to control its visibility, ensuring it only appears when a wallet is actively connected. This automatic state management eliminates the need for parent components to conditionally render the button based on connection status.
+
+**`useDisconnect`** supplies the disconnection functionality through its `disconnect` function. This hook handles all the complexity of properly terminating wallet connections, clearing session data, and updating global state. The component simply invokes this function when clicked, delegating all disconnection logic to Wagmi's battle-tested implementation.
+
+### State Management Strategy
+
+Despite its apparent simplicity, DisconnectButton implements sophisticated state management to ensure smooth visual transitions during connection state changes:
+
+```tsx
+const [showButton, setShowButton] = useState(false);
+const [isLeaving, setIsLeaving] = useState(false);
+```
+
+The dual-state approach separates visibility control from opacity management. The `showButton` state determines whether the component renders at all, while `isLeaving` controls the opacity during disconnection. This separation enables the component to become immediately transparent upon disconnection, providing instant visual feedback, while maintaining its presence in the DOM momentarily to complete the transition.
+
+The component implements careful timing through multiple effect hooks. An initial 100-millisecond delay matches the timing of other wallet widgets, ensuring coordinated appearance across the interface. Upon disconnection, the component immediately sets opacity to zero before unmounting, preventing any visual lag that might confuse users about their connection status.
+
+#### Lifecycle Mount/Unmount Summary
+
+- **Mount Delay (100 ms)**  
+  Regardless of variant, the button waits 100 ms after detecting `isConnected === true` before rendering. This aligns its timing with the ConnectButton and prevents a flash of the disconnected state while Wagmi rehydrates from storage.
+
+- **Immediate Unmount & Fade on Disconnect**  
+  As soon as `isConnected` flips `false`, the component sets `isLeaving` (opacity → 0) and unmounts on the next tick, delivering instantaneous confirmation without leaving stale UI in place.
+
+## Props Reference
+
+<Table>
+  <thead>
+    <tr>
+      <th>Prop</th>
+      <th>Type</th>
+      <th>Default</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`variant`</td>
+      <td>`"topnav" | "bottomnav" | "no-nav"`</td>
+      <td>`"no-nav"`</td>
+      <td>Controls responsive visibility behavior. The `topnav` variant displays only above 1100px, `bottomnav` only below 1100px, and `no-nav` always displays. See the [Navbar System Guide](/dapp/navbars) for complete variant system documentation.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Variant System Behavior
+
+The variant prop controls CSS-based responsive visibility, which operates independently from the component's connection state logic. While connection state determines whether the component renders at all through conditional rendering, the variant system uses CSS classes to show or hide already-rendered components based on viewport width.
+
+<Table>
+  <thead>
+    <tr>
+      <th>Variant Value</th>
+      <th>Visible Range</th>
+      <th>Hidden Range</th>
+      <th>Use Case</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`"topnav"`</td>
+      <td>1100px and above</td>
+      <td>Below 1100px</td>
+      <td>Desktop navigation bars</td>
+    </tr>
+    <tr>
+      <td>`"bottomnav"`</td>
+      <td>Below 1100px</td>
+      <td>1100px and above</td>
+      <td>Mobile bottom navigation</td>
+    </tr>
+    <tr>
+      <td>`"no-nav"` (default)</td>
+      <td>Always visible</td>
+      <td>Never hidden</td>
+      <td>Standalone usage outside navigation</td>
+    </tr>
+    <tr>
+      <td>No prop provided</td>
+      <td>Always visible</td>
+      <td>Never hidden</td>
+      <td>Same as `"no-nav"`</td>
+    </tr>
+  </tbody>
+</Table>
+
+This CSS-based approach ensures smooth responsive behavior without the performance overhead of mounting and unmounting components during viewport changes. The component remains in the DOM regardless of variant visibility, maintaining its internal state across breakpoint transitions.
+
+## CSS Architecture
+
+The widget's visual behavior relies on carefully orchestrated CSS animations that create the signature exit effect while maintaining performance and accessibility standards.
+
+### Animation Implementation
+
+The hover animation leverages CSS transforms and transitions to create the arrow extension effect:
+
+```css
+.arrowExtension {
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: all 0.3s ease;
+}
+
+.button:hover .arrowExtension {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+.button:hover .arrowHead {
+  transform: translateX(4px);
+}
+```
+
+The arrow extension element begins with zero width and opacity, making it invisible in the default state. Setting the transform origin to "left center" ensures the scaling animation extends the arrow from its base rather than expanding from the center. The synchronized timing creates a cohesive animation where all elements move together, reinforcing the exit metaphor.
+
+### Visual Feedback Layers
+
+The button implements multiple layers of visual feedback to ensure accessibility across different user preferences and abilities. The background color transitions to a subtle blue overlay on hover, providing feedback for users who may not notice the arrow animation. The border styling remains consistent with other RitoSwap interface elements, maintaining visual cohesion while clearly delineating the interactive area.
+
+## Usage Examples
+
+### Basic Implementation
+
+```tsx
+import DisconnectButton from '@/components/wallet/disconnectButton/DisconnectButton';
+
+// Standalone usage anywhere in your application
+function CustomPanel() {
+  return (
+    <div className={styles.panel}>
+      <DisconnectButton />
+    </div>
+  );
+}
+```
+
+### Navigation Integration
+
+```tsx
+// Desktop navigation bar
+<div className={styles.topNav}>
+  <DisconnectButton variant="topnav" />
+</div>
+
+// Mobile bottom navigation
+<div className={styles.bottomNav}>
+  <DisconnectButton variant="bottomnav" />
+</div>
+```
+
+<img 
+  src="/images/ui/mobile-wallet-display-all.png" 
+  alt="DisconnectButton widget shown in mobile navigation alongside other wallet widgets" 
+  style={{ width: '100%', maxWidth: '500px', display: 'block', margin: '2rem auto' }} 
+/>
+
+## Best Practices
+
+When implementing DisconnectButton, ensure the component has access to Wagmi's configuration through your application's provider hierarchy. The widget manages its own visibility based on connection state, eliminating the need for conditional rendering logic in parent components.
+
+The component's immediate transparency effect upon disconnection provides essential user feedback. Avoid overriding the opacity management through external styles, as this could create confusion about connection status during the critical moment of disconnection.
+
+Consider the button's placement within your interface carefully. While the component adapts to various container sizes, positioning it consistently with other wallet widgets creates a predictable user experience. Users typically expect disconnection controls to appear alongside other wallet management functions.
+
+<Callout type="info">
+The DisconnectButton implements immediate visual feedback by setting opacity to zero the moment disconnection occurs, before the component unmounts. This design choice ensures users receive instant confirmation of their action, preventing any uncertainty about whether the disconnection was successful.
+</Callout>
+
+## Playground
+
+Use the full Storybook UI to explore the widget states and tweak controls in real time.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/wallet-disconnectbutton--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Wallet/DisconnectButton - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>

@@ -1,0 +1,80 @@
+---
+title: Goodbye Tool
+description: The chatbot's mechanism for enforcing consequences by reloading the browser session.
+---
+
+import { Callout, Cards, Tabs } from 'nextra/components'
+import { StorybookEmbed } from '@components/StorybookEmbed'
+
+# Goodbye Tool
+
+The `<goodbye>` tool is a specialized renderer that gives RapBotRito control over the user's browser session. It displays a countdown and then forces a hard page reload.
+
+## Purpose & Strategic Role
+
+This is not just a UI effect; it is a mechanism for **enforcing consequences**.
+
+The RitoSwap chat modal is protected by a [Token Gate](/dapp/tokengate). Access requires an active, "unused" Colored Key NFT. In high-stakes interactions—specifically **Rap Battles**—losing has a material cost:
+
+1. **The Loss:** If the user loses the battle, the chatbot calls an MCP tool to mark their NFT as "used" on-chain (or in the database).
+2. **The Lockout:** The chatbot immediately emits the `<goodbye>` tag.
+3. **The Consequence:** The page reloads. Because the user's NFT is now marked "used," the Token Gate rejects their re-entry. They are effectively locked out until they acquire a fresh key.
+
+## Usage
+
+The bot emits this tag when it decides the conversation is over (usually after a defeat).
+
+```html
+<!-- Default 10s countdown -->
+<goodbye />
+
+<!-- Custom duration and size -->
+<goodbye seconds="5" width="400" />
+```
+
+## Interactive Demos
+
+Submit a message to see the inline tool generated.
+
+<Tabs items={['Stubbed', 'Live']} storageKey="goodbye-demo">
+  <Tabs.Tab>
+    ### Stubbed
+
+    Send a message to receive a Goodbye response. This version won't refresh the page, see Live version for full functionality
+
+    <StorybookEmbed title="ChatBot/InlineTools" story="GoodbyeStubbed" height="640px" />
+  </Tabs.Tab>
+  <Tabs.Tab>
+    ### Live
+
+    Sending a message will trigger the live Goodbye response that refreshes the iframe
+
+    <StorybookEmbed title="ChatBot/InlineTools" story="GoodbyeLive" height="640px" />
+  </Tabs.Tab>
+</Tabs>
+
+## Architecture
+
+### The Renderer
+**File:** `dapp/components/chatBot/ChatMessages/renderers/GoodbyeRenderer.tsx`
+
+The component implements a "point of no return" logic:
+
+1. **Irreversibility:** Once mounted, it sets a `sessionStorage` flag (`ritoGoodbyeHardReloadAt`) with the target timestamp.
+2. **Persistence:** Even if the user tries to close the chat or unmount the component, the reload timer is checked against `sessionStorage` on re-mount.
+3. **Hard Reload:** It calls `window.location.reload()`, which forces the app to re-run all authentication and token gate checks.
+
+### Related Systems
+
+<Cards num={2}>
+  <Cards.Card title="Token Gate Architecture" href="/dapp/tokengate" icon="gate" arrow>
+    Understanding how the gate verifies NFT status on page load.
+  </Cards.Card>
+  <Cards.Card title="Mark Key Used (MCP)" href="#" icon="🛠️" arrow>
+    (Coming Soon) The tool that updates the NFT status before the reload fires.
+  </Cards.Card>
+</Cards>
+
+<Callout type="warning">
+  **Security Note:** This relies on client-side behavior for the *experience*, but the actual security comes from the **Token Gate**. The reload just forces the user to face the gate again. If they somehow blocked the reload, they would still be unable to perform any gated actions because their key is already invalidated on the backend.
+</Callout>

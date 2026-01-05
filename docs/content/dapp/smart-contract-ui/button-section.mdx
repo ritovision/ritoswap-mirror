@@ -1,0 +1,526 @@
+---
+title: "Button Section"
+description: "Adaptive action interface for NFT minting, burning, and token gate navigation"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+import {
+  ButtonSectionUI,
+  ButtonSectionShowcase,
+} from '@components/mockui/ButtonSectionUI'
+
+
+
+# ButtonSection
+
+The ButtonSection component serves as the primary action interface for all NFT-related operations in RitoSwap. This intelligent component adapts its presentation based on wallet connection status, NFT ownership, and token gate usage, providing users with contextually appropriate actions at each stage of their journey. Through sophisticated state management and transaction orchestration, it transforms complex blockchain operations into simple button clicks while maintaining comprehensive error handling and user feedback.
+
+## Component Architecture
+
+ButtonSection implements a reactive architecture that continuously adapts to changing blockchain state while delegating transaction orchestration to the `useMintBurn` hook. `useMintBurn` coordinates wagmi-based contract writes, mobile wallet nudges via `openWalletDeeplink`, and notifications; ButtonSection focuses on rendering the correct actions for each state, managing UI transitions and loading text, wiring `ProcessingModal`, and invoking refresh callbacks when transactions complete or are reset.
+
+### State-Based UI Adaptation
+
+The component renders different interfaces based on four primary states:
+
+<Table>
+  <thead>
+    <tr>
+      <th>State</th>
+      <th>Conditions</th>
+      <th>UI Elements</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Not Connected</td>
+      <td>`!isConnected`</td>
+      <td>ConnectWrapper (wallet connection button)</td>
+    </tr>
+    <tr>
+      <td>No NFT</td>
+      <td>`isConnected && !hasNFT`</td>
+      <td>Mint NFT button</td>
+    </tr>
+    <tr>
+      <td>Unused NFT</td>
+      <td>`isConnected && hasNFT && !hasUsedTokenGate`</td>
+      <td>Token Gate link + Burn button</td>
+    </tr>
+    <tr>
+      <td>Used NFT</td>
+      <td>`isConnected && hasNFT && hasUsedTokenGate`</td>
+      <td>Burn button only</td>
+    </tr>
+  </tbody>
+</Table>
+
+This adaptive approach ensures users only see relevant actions, reducing cognitive load and preventing invalid operations.
+
+### Interactive Demo
+
+<div style={{ marginTop: '2rem' }}>
+<ButtonSectionShowcase />
+</div>
+
+*Use the dropdown to change states*
+
+## Props and Interface
+
+ButtonSection exposes an optional refresh callback used to re-query NFT data after successful transactions:
+
+```typescript
+type ButtonSectionProps = {
+  onRefresh?: () => Promise<void> | void
+}
+
+export default function ButtonSection({ onRefresh }: ButtonSectionProps) {
+  // UI logic only; blockchain orchestration delegated to hooks
+}
+````
+
+In the app, `MintPageWrapper` provides `onRefresh` by passing `useNFTData().forceRefresh`.
+
+## Using useMintBurn
+
+ButtonSection delegates blockchain concerns to the `useMintBurn` hook, which handles:
+
+* Mobile wallet nudges on write actions when on mobile + WalletConnect
+* Transaction receipt tracking and success deduplication
+* Error formatting and notification dispatch
+
+Minimal consumption pattern in the UI:
+
+```typescript
+const { mint, burn, isProcessing, mintHash, burnHash } = useMintBurn({
+  onMintSuccess: async () => {
+    // Prevent stale processing text, then refresh UI data
+    setBlockProcessingText(true)
+    await onRefresh?.()
+    setLoading(false)
+  },
+  onBurnSuccess: async () => {
+    setBlockProcessingText(true)
+    await onRefresh?.()
+    setLoading(false)
+  },
+})
+
+// Event handlers
+const handleMint = () => { setBlockProcessingText(false); setLoading(true); mint() }
+const handleBurn = () => { setBlockProcessingText(false); setLoading(true); burn(tokenId) }
+```
+
+## Network Validation
+
+`useMintBurn` resets the dapp view chain to the active contract chain before each write, but it does not enforce wallet-chain correctness. If your flow requires wallet-chain validation, handle it at the page or wrapper level before calling `mint()` / `burn()`. For view-chain behavior, see [Dapp Chain State](/dapp/connectivity/dapp-chain-state).
+
+## Mobile Wallet Integration
+
+`useMintBurn` calls `openWalletDeeplink()` immediately after write actions when `isMobileDevice()` is true and the active connector is `walletConnect`. ButtonSection itself does not trigger the deeplink. See the dedicated guide in `docs/content/dapp/wc-deeplinking.mdx` for behavior details.
+
+## Playground
+
+Use the full Storybook UI to explore the button states and tweak controls in real time.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/mint-buttonsection--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Mint/ButtonSection - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Success Handling
+
+Success deduplication, notification timing, and hook resets are implemented in `useMintBurn`. ButtonSection handles the UI side-effects only:
+
+```typescript
+const handleMintSuccess = async () => {
+  setBlockProcessingText(true)
+  await onRefresh?.()
+  setLoading(false)
+}
+```
+
+### Success Flow
+
+<Steps>
+### Step 1: Transaction Confirmation
+Wait for blockchain confirmation via `useWaitForTransactionReceipt`.
+
+### Step 2: User Notification
+
+`useMintBurn` dispatches notifications (toast and optional browser) through the notifications facade.
+
+### Step 3: State Refresh Delay
+
+Wait 2 seconds to ensure blockchain state has propagated to RPC nodes.
+
+### Step 4: Force Data Refresh
+
+Call `onRefresh()` (provided by `MintPageWrapper`) to update NFT ownership data from blockchain.
+
+### Step 5: Reset Transaction State
+
+Clear loading state and reset wagmi hooks for future transactions. 
+</Steps>
+
+## Error Handling
+
+Errors are formatted by `formatMintError` / `formatBurnError` and surfaced via the notifications system, then the hook resets its state. The UI does not manually show toasts for these cases, avoiding duplicates.
+
+See `dapp/app/lib/client/mint.client.ts` and `docs/content/dapp/notifications.mdx` for details.
+
+## ProcessingModal Integration with Transaction Hash Passing
+
+During transactions, ButtonSection displays the ProcessingModal to guide users through the transaction process. A key feature of this integration is the ability to pass transaction hashes to the modal, enabling users to track their transactions on block explorers:
+
+```typescript
+// Mint-only state
+<ProcessingModal
+  isVisible={isProcessing}
+  onCancel={handleModalCancel}
+  transactionHash={mintHash}
+/>
+
+// Burn-related states
+<ProcessingModal
+  isVisible={isProcessing}
+  onCancel={handleModalCancel}
+  transactionHash={burnHash}
+/>
+```
+
+### Transaction Hash Management
+
+`useMintBurn` provides `isProcessing`, `mintHash`, and `burnHash`. ButtonSection passes `mintHash` in the mint-only state and `burnHash` in burn-related states. Hashes are available as soon as the write is dispatched.
+
+### Purpose of Transaction Hash Passing
+
+The transaction hash serves multiple important purposes in the user experience. It provides transparency by allowing users to see their transaction on a block explorer while waiting for confirmation. It enables debugging in development environments where Blockscout provides detailed transaction information. It offers reassurance to users who can verify their transaction is being processed by the network. Finally, it maintains context by keeping users informed without requiring them to leave the application.
+
+<Callout type="info">
+The transaction hash is passed as soon as it's available from the blockchain, typically within seconds of initiating the transaction. This immediate feedback transforms an opaque waiting period into a transparent process where users can track progress in real-time.
+</Callout>
+
+### Modal Cancel Functionality
+
+The modal's cancel button allows users to reset component state if transactions become stuck:
+
+```typescript
+const handleModalCancel = async () => {
+  resetAll() // resets both mint and burn states from the hook
+  setLoading(false)
+  setBlockProcessingText(true)
+  await onRefresh?.()
+}
+```
+
+<Callout type="warning">
+The cancel button doesn't actually cancel blockchain transactions - it only resets the UI state. Users must still clear pending transactions in their wallet if needed. The transaction will continue processing on the blockchain regardless of UI state.
+</Callout>
+
+## Animation and Styling
+
+ButtonSection implements sophisticated animations for smooth state transitions:
+
+### Button State Animations
+
+```css
+.mintButton.processing::before,
+.burnButton.processing::before {
+  content: '';
+  position: absolute;
+  animation: waveSlide 2s ease-in-out infinite;
+}
+```
+
+The wave animation provides visual feedback during transaction processing without being distracting.
+
+### Transition Effects
+
+```css
+.container {
+  opacity: 1;
+  transition: opacity 0.3s ease-in-out;
+}
+
+.container.transitioning {
+  opacity: 0;
+}
+```
+
+Fade transitions between states prevent jarring button swaps.
+
+## Hydration Safety
+
+The component implements careful hydration handling to prevent SSR mismatches:
+
+```typescript
+const [isHydrated, setIsHydrated] = useState(false)
+
+useEffect(() => {
+  const timer = setTimeout(() => setIsHydrated(true), 50)
+  return () => clearTimeout(timer)
+}, [])
+
+if (!isHydrated || renderState === 'loading') {
+  return (
+    <div className={styles.container} role="status" aria-live="polite">
+      <button
+        className={styles.loadingButton}
+        disabled
+        aria-label="Loading NFT actions"
+      >
+        Loading...
+      </button>
+    </div>
+  )
+}
+```
+
+This approach ensures consistent server and client rendering while providing immediate visual feedback.
+
+## Account Switching UX
+
+To avoid flicker and stale states when users switch accounts, the component:
+
+* Freezes UI transitions while `isSwitchingAccount` is true.
+* Uses a `blockProcessingText` guard to prevent showing “Processing…” after a state swap.
+
+This creates a smoother UX around account changes without confusing transient labels.
+
+## Accessibility
+
+ButtonSection applies a consistent accessibility layer:
+
+* Uses `role="status"` and `aria-live="polite"` during loading states.
+* Groups actions with `role="group"` and descriptive `aria-label`s.
+* Applies `aria-busy` to buttons while processing.
+
+These patterns improve screen reader clarity during asynchronous interactions.
+
+## Store Integration
+
+ButtonSection consumes only the state it needs and delegates blockchain orchestration:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Store/Hook</th>
+      <th>Data Used</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>useAccount</td>
+      <td>`isConnected`</td>
+      <td>Determines if wallet is connected</td>
+    </tr>
+    <tr>
+      <td>NFT Store</td>
+      <td>`hasNFT`, `hasUsedTokenGate`, `tokenId`, `setLoading`, `isLoading`, `isSwitchingAccount`</td>
+      <td>NFT ownership state and loading management</td>
+    </tr>
+    <tr>
+      <td>useMintBurn</td>
+      <td>`mint`, `burn`, `isProcessing`, `mintHash`, `burnHash`, `resetAll`</td>
+      <td>All blockchain write orchestration and notifications</td>
+    </tr>
+    <tr>
+      <td>onRefresh (prop)</td>
+      <td>`onRefresh()` provided by `MintPageWrapper`</td>
+      <td>Force data refresh after tx success or cancel</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Notification Integration
+
+Notifications (toast and optional browser) are dispatched by the hook via a shared facade; the component does not emit its own success/error toasts for mint/burn.
+
+See `docs/content/dapp/notifications.mdx` for configuration and behavior.
+
+## Performance Optimizations
+
+ButtonSection implements several performance optimizations:
+
+**Hydration Timer Cleanup** - The initial hydration timeout is properly cleaned up to prevent memory leaks during component unmount.
+
+**Conditional Rendering** - Components only render when in appropriate states, reducing React reconciliation work.
+
+**Transaction Deduplication** - Implemented in `useMintBurn`; ButtonSection remains stateless regarding tx IDs.
+
+**Store Subscriptions** - Components subscribe only to the specific store fields they need, minimizing re-renders when unrelated state changes.
+
+## Responsive Design
+
+The component adapts its layout for mobile devices:
+
+```css
+@media (max-width: 768px) {
+  .container {
+    flex-direction: column;
+    gap: 0.8rem;
+    min-height: 140px; /* Taller for vertical layout */
+  }
+  
+  .mintButton,
+  .gateButton,
+  .burnButton {
+    width: 100%;
+    max-width: 300px;
+  }
+}
+```
+
+Buttons stack vertically on mobile while maintaining appropriate touch targets.
+
+## Testing Strategies
+
+When testing ButtonSection, prefer mocking `useMintBurn` for UI behavior and keep wagmi-level contract mocks in hook unit tests. Key scenarios:
+
+* State transitions across connection and ownership states
+* Processing state and aria attributes while `isProcessing` is true
+* Passing the correct `transactionHash` to `ProcessingModal`
+* Cancel behavior: `resetAll()`, `onRefresh()`, and processing text guard
+
+## Common Integration Patterns
+
+ButtonSection is typically placed below the NFT visualization:
+
+```typescript
+function MintInterface() {
+  return (
+    <>
+      <TokenStatus />
+      <NFTScreen />
+      <ButtonSection /> {/* In app, MintPageWrapper supplies onRefresh */}
+    </>
+  )
+}
+```
+
+This arrangement creates a natural flow from status to visualization to actions.
+
+## Customization Options
+
+The component can be extended for additional functionality:
+
+### Additional Actions
+
+New buttons can be added for extended functionality:
+
+```typescript
+if (hasNFT && !isListed) {
+  return <button onClick={handleList}>List on Marketplace</button>
+}
+```
+
+### Custom Contract Functions
+
+The pattern can be extended to call other contract functions:
+
+```typescript
+const handleTransfer = () => {
+  executeWithNetworkCheck(() => {
+    transfer({
+      address: KEY_TOKEN_ADDRESS,
+      abi: fullKeyTokenAbi,
+      functionName: 'transferFrom',
+      args: [address, recipientAddress, tokenId]
+    })
+  })
+}
+```
+
+### Alternative Styling
+
+The modular CSS allows complete visual customization while maintaining functionality.
+
+## Best Practices
+
+When working with ButtonSection or similar transaction components:
+
+**Always Validate Network** - Ensure the user is on the intended chain before calling `mint()` / `burn()`; `useMintBurn` does not block wrong-chain writes.
+
+**Provide Clear Feedback** - Use both toast and modal feedback for transaction states, including transaction hashes for transparency.
+
+**Handle All Error Cases** - Implement error handling for every possible failure scenario.
+
+**Test Mobile Flows** - Always test wallet deep linking on actual mobile devices.
+
+**Respect Processing States** - Disable buttons during transactions to prevent double-spending attempts.
+
+**Pass Transaction Context** - Always forward transaction hashes to feedback components for user transparency.
+
+## Troubleshooting Guide
+
+<Table>
+  <thead>
+    <tr>
+      <th>Issue</th>
+      <th>Common Cause</th>
+      <th>Solution</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Buttons don't appear</td>
+      <td>Hydration mismatch</td>
+      <td>Ensure hydration safety logic</td>
+    </tr>
+    <tr>
+      <td>Transaction won't complete</td>
+      <td>Wrong network</td>
+      <td>Prompt a network switch before calling `mint()` / `burn()`</td>
+    </tr>
+    <tr>
+      <td>Multiple success toasts</td>
+      <td>Effect re-runs</td>
+      <td>Implement hash deduplication</td>
+    </tr>
+    <tr>
+      <td>State doesn't update after mint</td>
+      <td>Insufficient delay</td>
+      <td>Ensure `onRefresh()` is wired; allow brief propagation delay</td>
+    </tr>
+    <tr>
+      <td>No explorer link in modal</td>
+      <td>Hash not passed</td>
+      <td>Ensure transactionHash prop is set</td>
+    </tr>
+    <tr>
+      <td>UI flicker on account switch</td>
+      <td>State recompute during switch</td>
+      <td>Freeze UI while `isSwitchingAccount` is true</td>
+    </tr>
+    <tr>
+      <td>Stuck “Processing…” label</td>
+      <td>Render swap mid-transaction</td>
+      <td>Use `blockProcessingText` when transitions occur</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Faucet Link (Sepolia)
+
+On Sepolia, ButtonSection renders a faucet link to help users obtain test ETH. The link is gated by the active chain check and appears below the action area.
+
+## Cross-References
+
+* Hook: `dapp/app/hooks/useMintBurn.ts:1`
+* Client helpers: `dapp/app/lib/client/mint.client.ts:1`
+* Wrapper: `dapp/app/mint/components/MintPageWrapper.tsx:15`
+* Deeplinking Guide: `docs/content/dapp/wc-deeplinking.mdx`
+* Notifications: `docs/content/dapp/notifications.mdx`
+
+## Summary
+
+ButtonSection focuses on adaptive UI, accessibility, modal integration, and refresh actions. The `useMintBurn` hook owns blockchain writes, mobile wallet nudges via `openWalletDeeplink`, notifications, and success/error lifecycles. This separation keeps the UI simple and resilient while maintaining a polished transaction experience.

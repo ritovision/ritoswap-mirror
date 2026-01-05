@@ -1,0 +1,550 @@
+---
+title: "useMintBurn Hook"
+description: "Transaction orchestration for minting, burning, and notification lifecycles"
+---
+
+import { FileTree, Steps, Table, Callout, Cards } from 'nextra/components'
+
+# useMintBurn Hook
+
+The `useMintBurn` hook is the **write-side transaction orchestrator** for the Colored Key NFT. It wraps wagmi write/receipt hooks, mobile wallet nudges via `openWalletDeeplink`, and notification dispatch into a single cohesive API, so UI components can focus on **what to show** rather than **how to talk to the blockchain**.
+
+* **Source:** `dapp/app/hooks/useMintBurn.ts`
+* **Primary consumers:** components like [`ButtonSection`](/dapp/smart-contract-ui/button-section)
+* **Companion docs:**
+
+  * [`useNFTData` (read-side data hook)](/dapp/smart-contract-data/nft-data-hook)
+  * [`NFT Store` (Zustand state)](/dapp/smart-contract-data/nft-store)
+  * [`Notifications`](/dapp/notifications)
+  * [`WalletConnect Deeplinking`](/dapp/wc-deeplinking)
+
+At a high level, `useMintBurn`:
+
+* Sends mint and burn transactions.
+* Tracks confirmation status via `useWaitForTransactionReceipt`.
+* Deduplicates success handling per transaction hash.
+* Dispatches success and error notifications.
+* On mobile WalletConnect, calls `openWalletDeeplink()` after writes to nudge the wallet app.
+
+---
+
+## Hook API
+
+```ts
+export interface UseMintBurnOptions {
+  onMintSuccess?: () => Promise<void> | void
+  onBurnSuccess?: () => Promise<void> | void
+  onMintError?: (error: Error) => void
+  onBurnError?: (error: Error) => void
+  autoRefresh?: boolean
+  notificationDelay?: number
+}
+
+export interface UseMintBurnReturn {
+  // Actions
+  mint: () => void
+  burn: (tokenId: string | number | null) => void
+
+  // Aggregate state
+  isProcessing: boolean
+
+  // Fine-grained state
+  isMinting: boolean
+  isBurning: boolean
+  isMintConfirming: boolean
+  isBurnConfirming: boolean
+
+  // Transaction hashes
+  mintHash: `0x${string}` | undefined
+  burnHash: `0x${string}` | undefined
+
+  // Success flags
+  isMintSuccess: boolean
+  isBurnSuccess: boolean
+
+  // Error objects
+  mintError: Error | null
+  burnError: Error | null
+
+  // Reset helpers
+  resetMint: () => void
+  resetBurn: () => void
+  resetAll: () => void
+}
+
+export function useMintBurn(options?: UseMintBurnOptions): UseMintBurnReturn
+```
+
+> **Note**
+> `autoRefresh` exists in the options interface as a future extension point. In the current implementation, refresh behavior is driven by **caller-provided callbacks** (`onMintSuccess`, `onBurnSuccess`), not automatic polling inside the hook.
+
+---
+
+## Options (UseMintBurnOptions)
+
+Configuration knobs for the hook:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Option</th>
+      <th>Type</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>onMintSuccess</code></td>
+      <td><code>() =&gt; void | Promise&lt;void&gt;</code></td>
+      <td>
+        Called after a successful mint transaction, once the hook has seen a confirmed
+        receipt and waited for a brief propagation delay.
+      </td>
+    </tr>
+    <tr>
+      <td><code>onBurnSuccess</code></td>
+      <td><code>() =&gt; void | Promise&lt;void&gt;</code></td>
+      <td>
+        Same as <code>onMintSuccess</code>, but for burns.
+      </td>
+    </tr>
+    <tr>
+      <td><code>onMintError</code></td>
+      <td><code>(error: Error) =&gt; void</code></td>
+      <td>
+        Optional callback invoked after mint errors are formatted and surfaced via notifications.
+      </td>
+    </tr>
+    <tr>
+      <td><code>onBurnError</code></td>
+      <td><code>(error: Error) =&gt; void</code></td>
+      <td>
+        Optional callback invoked after burn errors are formatted and surfaced via notifications.
+      </td>
+    </tr>
+    <tr>
+      <td><code>notificationDelay</code></td>
+      <td><code>number</code></td>
+      <td>
+        Delay (ms) before firing success notification events like <code>NFT_MINTED</code> and
+        <code>NFT_BURNED</code>. Defaults to <code>100</code> in the hook.
+      </td>
+    </tr>
+    <tr>
+      <td><code>autoRefresh</code></td>
+      <td><code>boolean | undefined</code></td>
+      <td>
+        Reserved for future use. At present, the hook expects callers to refresh external
+        state (e.g. via <code>useNFTData().forceRefresh</code>) inside success callbacks.
+      </td>
+    </tr>
+  </tbody>
+</Table>
+
+In practice, most UI components only pass `onMintSuccess`, `onBurnSuccess`, and occasionally `notificationDelay`.
+
+---
+
+## Return Shape (UseMintBurnReturn)
+
+### Actions
+
+* **`mint()`**
+
+  * Wraps a write to the Colored Key NFT contract using `createMintAction()` and `useWriteContract`.
+  * Resets the dapp view chain to the active contract chain before requesting the write.
+  * On mobile with the WalletConnect connector, calls `openWalletDeeplink()` after sending the write.
+
+* **`burn(tokenId)`**
+
+  * Validates `tokenId` before attempting a burn.
+
+    * If `tokenId` is `null`, `undefined`, or an empty string, the hook sends a user-friendly error notification (`"No token ID available for burning"`) and **does not** attempt a write.
+  * Resets the dapp view chain to the active contract chain before requesting the write.
+  * Otherwise, wraps a burn write using `createBurnAction(tokenId)` and `useWriteContract`.
+  * Triggers the same mobile wallet nudge as `mint()` when on mobile + WalletConnect.
+
+### Transaction State Flags
+
+* **`isMinting` / `isBurning`**
+
+  * Mirror the `isPending` flags from the underlying `useWriteContract` calls.
+
+* **`isMintConfirming` / `isBurnConfirming`**
+
+  * Come from `useWaitForTransactionReceipt({ hash })`, and indicate that a transaction has been sent and is waiting for confirmation.
+
+* **`isProcessing`**
+
+  * Aggregate flag computed as:
+
+    * `isMinting || isBurning || isMintConfirming || isBurnConfirming`
+  * Recommended flag for showing global "Processing…" states in the UI.
+
+### Hashes and Success Flags
+
+* **`mintHash` / `burnHash`**
+
+  * Populated as soon as the corresponding `writeContract` calls succeed locally.
+  * Used by UIs (for example `ProcessingModal`) to render explorer links for pending transactions.
+
+* **`isMintSuccess` / `isBurnSuccess`**
+
+  * Become `true` when `useWaitForTransactionReceipt` reports success for the associated hash.
+
+### Errors and Reset Helpers
+
+* **`mintError` / `burnError`**
+
+  * Exposed raw error objects. Internally, the hook passes them to `formatMintError` / `formatBurnError`, which handle user-facing messaging and notification dispatch.
+
+* **`resetMint()` / `resetBurn()`**
+
+  * Clear wagmi's internal state for the respective write hooks via stable refs (`resetMintRef`, `resetBurnRef`).
+
+* **`resetAll()`**
+
+  * Calls both resets and clears internal hash-tracking refs (`lastMintHashRef`, `lastBurnHashRef`).
+  * Useful when a UI wants to "hard reset" the transaction state, e.g. when closing a modal.
+
+---
+
+## Core Responsibilities & Internal Design
+
+Internally, `useMintBurn` coordinates several concerns: contract writes, confirmation tracking, mobile wallet nudges, notifications, and success deduplication.
+
+### 1. Contract Writes & Receipts
+
+The hook maintains **two** write flows and **two** receipt trackers:
+
+* Mint write + receipt:
+
+  * `useWriteContract()` for mint actions.
+  * `useWaitForTransactionReceipt({ hash: mintHash })` for confirmations.
+* Burn write + receipt:
+
+  * `useWriteContract()` for burn actions.
+  * `useWaitForTransactionReceipt({ hash: burnHash })` for confirmations.
+
+`isProcessing` is derived from the union of these four flags and is the recommended signal for disabling UI buttons and showing processing labels.
+
+### 2. Network Considerations
+
+`useMintBurn` resets the dapp view chain to the active contract chain before each write, but it does not block wrong-chain wallet writes. If your flow requires wallet-chain validation, enforce it before calling `mint()` / `burn()` (for example, in the page wrapper or a dedicated guard). See [`docs/content/dapp/smart-contract-data/contract-config.mdx`](/dapp/smart-contract-data/contract-config) for how chains and addresses are configured. For view-chain behavior, see [Dapp Chain State](/dapp/connectivity/dapp-chain-state).
+
+### 3. Mobile Wallet Deeplink Helper
+
+To support mobile flows, the hook uses the lightweight deeplink helper:
+
+* After a write is initiated, if `isMobileDevice()` is true and the active connector id is `walletConnect`, the hook calls `openWalletDeeplink()`.
+* The helper is best-effort and does not persist session topics or sanitize URIs.
+
+### 4. Notifications & Error Formatting
+
+Success and error messaging is centralized via a small client-side facade plus helpers:
+
+* **Success notifications**
+
+  * `sendNotificationEvent('NFT_MINTED', { source: 'user' })`
+  * `sendNotificationEvent('NFT_BURNED', { source: 'user' })`
+
+* **Error formatting and notifications**
+
+  * `formatMintError(error)` and `formatBurnError(error)` map low-level wagmi/viem errors into user-friendly messages.
+  * These helpers also send notifications through `sendErrorNotification(...)`.
+
+This design means UI components (like `ButtonSection`) **do not** emit their own success/error toasts for mint/burn; they rely on the shared notifications layer instead, avoiding duplicates.
+
+### 5. Success Lifecycles & Deduplication
+
+To avoid double handling on rerenders, the hook tracks the last-seen hash for each flow:
+
+* `lastMintHashRef: Ref<string | null>`
+* `lastBurnHashRef: Ref<string | null>`
+
+When a transaction succeeds, the hook checks whether the hash has already been processed:
+
+<Steps>
+### Step 1: Transaction hash appears
+A write sets <code>mintHash</code> or <code>burnHash</code> when it is accepted by the client.
+
+### Step 2: Receipt confirms
+
+<code>useWaitForTransactionReceipt</code> flips <code>isMintSuccess</code> or <code>isBurnSuccess</code> to <code>true</code>.
+
+### Step 3: Dedup check
+
+The hook verifies that the hash is non-null and different from the last processed hash in <code>lastMintHashRef</code> or <code>lastBurnHashRef</code>.
+
+### Step 4: Notifications & callback
+
+It logs the transaction (<code>console.log('Mint transaction:', mintHash)</code> or <code>'Burn transaction:'</code>), schedules a success notification after <code>notificationDelay</code>, and schedules the appropriate success callback.
+
+### Step 5: Reset
+
+After the callback, the hook resets wagmi state for that flow, leaving the hash ref populated so the same hash isn't processed again on rerender. 
+</Steps>
+
+This dedup behavior is explicitly tested in `useMintBurn.test.tsx` to ensure that a confirmed transaction only triggers a single success event + callback per hash.
+
+### 6. Reset Helpers & Stable Refs
+
+The hook stores several values in refs to avoid identity issues:
+
+* `resetMintRef`, `resetBurnRef` wrap wagmi's `reset` functions.
+* `onMintSuccessRef`, `onBurnSuccessRef` wrap the callbacks passed in options.
+
+This allows the hook to use these callbacks safely inside effects and timers without invalidating dependencies or re-registering timers on every render.
+
+---
+
+## Usage Patterns
+
+### Basic Integration
+
+A minimal component that uses `useMintBurn` directly:
+
+```tsx
+import { useState } from 'react'
+import { useMintBurn } from '@/app/hooks/useMintBurn'
+
+function SimpleMintButton() {
+  const [isLoading, setLoading] = useState(false)
+
+  const { mint, isProcessing } = useMintBurn({
+    onMintSuccess: () => {
+      setLoading(false)
+      // e.g., trigger a visual celebration here
+    },
+  })
+
+  const handleClick = () => {
+    setLoading(true)
+    mint()
+  }
+
+  const label = isProcessing ? 'Processing…' : 'Mint NFT'
+
+  return (
+    <button onClick={handleClick} disabled={isProcessing} aria-busy={isProcessing}>
+      {label}
+    </button>
+  )
+}
+```
+
+### Working with the Smart Contract Data Layer
+
+In the actual app, `useMintBurn` is almost always paired with the smart-contract data system:
+
+* [`useNFTData`](/dapp/smart-contract-data/nft-data-hook) handles **reads** and state sync into the NFT store.
+* `useMintBurn` handles **writes** and transaction lifecycles.
+
+A common pattern is:
+
+1. `MintPageWrapper` calls `useNFTData()` and passes `forceRefresh` down as `onRefresh`.
+2. `ButtonSection` calls `useMintBurn({ onMintSuccess, onBurnSuccess })`.
+3. `onMintSuccess` / `onBurnSuccess` call `onRefresh()` and clear loading flags in the NFT store.
+
+```tsx
+function MintPageWrapper() {
+  const { forceRefresh } = useNFTData()
+
+  return (
+    <>
+      {/* ...status + visualization components... */}
+      <ButtonSection onRefresh={forceRefresh} />
+    </>
+  )
+}
+
+// Inside ButtonSection
+const handleMintSuccess = async () => {
+  setBlockProcessingText(true)
+  await onRefresh?.()
+  setLoading(false)
+}
+
+const handleBurnSuccess = async () => {
+  setBlockProcessingText(true)
+  await onRefresh?.()
+  setLoading(false)
+}
+
+const { mint, burn, isProcessing, mintHash, burnHash, resetAll } = useMintBurn({
+  onMintSuccess: handleMintSuccess,
+  onBurnSuccess: handleBurnSuccess,
+})
+```
+
+This separation keeps `useMintBurn` narrowly focused on transactions while the data layer remains responsible for reading and caching on-chain state.
+
+---
+
+## ButtonSection Integration
+
+[`ButtonSection`](/dapp/smart-contract-ui/button-section) is the canonical consumer of `useMintBurn`. It layers UX concerns on top of the hook:
+
+* State-based UI (`not-connected`, `no-nft`, `has-nft`, `used-gate`).
+* Hydration safety and account switching UX.
+* Accessibility roles and `aria-*` attributes.
+* Integration with `ProcessingModal`.
+* Responsive layout and animated transitions.
+
+`useMintBurn` provides the transaction brain; ButtonSection wires it into the interface:
+
+* Uses `isProcessing` plus store flags to compute a `busy` state, which drives button labels (`"Mint NFT"` vs `"Processing…"`), `disabled` state, and `aria-busy` attributes.
+* Chooses the correct hash to pass into `ProcessingModal`:
+
+  * In the latest implementation, ButtonSection passes `mintHash` or `burnHash` based on which action is active. Earlier docs show a `mintHash || burnHash` pattern; see the ButtonSection docs for current JSX.
+* Invokes `resetAll()` and refresh callbacks from the modal's cancel button to reset transaction state and avoid stuck UIs.
+
+<Callout>
+ButtonSection owns <strong>what the user sees</strong> (buttons, labels, transitions, modal), while <code>useMintBurn</code> owns <strong>what the blockchain does</strong> (writes, confirmations, notifications, mobile wallet nudges). This separation makes it safe to reuse the hook in alternate UIs without duplicating transaction logic.
+</Callout>
+
+---
+
+## Testing
+
+`useMintBurn` has a dedicated unit test suite that validates its behavior in isolation from the UI:
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name="app">
+      <FileTree.Folder name="hooks">
+        <FileTree.Folder name="__tests__" defaultOpen>
+          <FileTree.File name="useMintBurn.test.tsx" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+Key behaviors covered in `useMintBurn.test.tsx`:
+
+* **Mint flow**
+
+  * Writes the expected mint action (`{ kind: 'MINT_ACTION' }`).
+  * Calls `openWalletDeeplink()` on mobile when the connector id is `walletConnect`.
+  * On confirmed success, the hook:
+
+    * Logs the transaction (`"Mint transaction:"`, hash).
+    * Dispatches `sendNotificationEvent('NFT_MINTED', { source: 'user' })`.
+    * Invokes the `onMintSuccess` callback once.
+    * Calls the mint `reset` function.
+  * Success handling is **deduplicated per hash**; rerenders with the same hash do not re-fire logs or notifications.
+
+* **Burn flow**
+
+  * `burn(null)` (or an empty token ID) sends an error notification (`"No token ID available for burning"`) and does **not** call `writeContract`.
+  * For a valid token ID, on confirmed success, the hook:
+
+    * Logs the burn transaction.
+    * Dispatches `sendNotificationEvent('NFT_BURNED', { source: 'user' })`.
+    * Invokes `onBurnSuccess` once.
+    * Calls the burn `reset` function.
+
+* **Error handling**
+
+  * When `mintError` or `burnError` are injected into the mocked wagmi hooks, the test asserts that:
+
+    * `formatMintError` / `formatBurnError` are called.
+    * `sendErrorNotification` is called with the formatted message (e.g. `"Mint failed: boom mint"`).
+    * `onMintError` / `onBurnError` callbacks are invoked.
+    * The corresponding `reset` functions are called exactly once.
+
+* **WalletConnect behavior**
+
+  * When the connector id is not `walletConnect`, the hook skips `openWalletDeeplink()` for both mint and burn.
+  * When `isMobileDevice()` returns false, the hook skips `openWalletDeeplink()` for both mint and burn.
+
+These tests are built with `@testing-library/react`'s `renderHook`, plus explicit mocks for:
+
+* `useWriteContract` and `useWaitForTransactionReceipt` from `wagmi`.
+* `isMobileDevice` and `openWalletDeeplink`.
+* The notifications facade and client helpers in `@lib/client/mint.client`.
+
+Together, they verify that `useMintBurn` implements the contract promised by this documentation.
+
+---
+
+## Related Documentation
+
+<Cards>
+  <Cards.Card
+    title="ButtonSection"
+    href="/dapp/smart-contract-ui/button-section"
+  >
+    Adaptive action interface that consumes <code>useMintBurn</code> for mint, burn, and token gate navigation.
+  </Cards.Card>
+
+<Cards.Card
+title="useNFTData Hook"
+href="/dapp/smart-contract-data/nft-data-hook"
+
+>
+
+
+Read-side data orchestration for NFT ownership, colors, and token usage, paired with <code>useMintBurn</code> for a full read/write pipeline.
+
+
+</Cards.Card>
+
+<Cards.Card
+title="NFT Store"
+href="/dapp/smart-contract-data/nft-store"
+
+>
+
+
+Zustand store for NFT UI state, including loading flags and account switching used by both <code>useNFTData</code> and ButtonSection.
+
+
+</Cards.Card>
+
+<Cards.Card
+title="Smart Contract Data Overview"
+href="/dapp/smart-contract-data"
+
+>
+
+
+High-level overview of the smart contract data system that <code>useMintBurn</code> plugs into.
+
+
+</Cards.Card>
+
+<Cards.Card
+title="Notifications"
+href="/dapp/notifications"
+
+>
+
+Centralized notification facade used by <code>useMintBurn</code> for success and error messaging.
+
+
+</Cards.Card>
+
+<Cards.Card
+title="WalletConnect Deeplinking"
+href="/dapp/wc-deeplinking"
+
+>
+
+Architecture for mobile wallet deeplinking that <code>useMintBurn</code> taps into via <code>openWalletDeeplink</code>.
+
+
+</Cards.Card> </Cards>
+
+---
+
+## Summary
+
+`useMintBurn` is the transaction brain for the Colored Key mint/burn flow:
+
+* It encapsulates wagmi writes, transaction receipts, notifications, and mobile wallet nudges.
+* It exposes a small, stable API (`mint`, `burn`, `isProcessing`, hashes, reset helpers) that can be consumed by any UI.
+* It pairs with `useNFTData` and the NFT store to form a complete read/write pipeline for on-chain NFT state.
+
+By centralizing transaction logic in this hook, RitoSwap keeps components like ButtonSection focused on UX, while ensuring consistent, well-tested behavior across all transaction entry points.

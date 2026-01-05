@@ -1,0 +1,28 @@
+/* app/mint/components/MintPageWrapper.module.css */
+.container {
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 2rem;
+  background: transparent;
+  margin-top: 2rem;
+}
+
+.content {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 1rem;
+    margin-bottom: 5rem;
+    min-height: auto;
+    
+    
+  }
+}

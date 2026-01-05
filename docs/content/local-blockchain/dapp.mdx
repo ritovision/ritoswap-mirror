@@ -1,0 +1,449 @@
+---
+title: Walkthrough for dApp Setup
+description: Complete guide for setting up local blockchain, deploying contracts, and running the dApp
+---
+
+import { FileTree, Steps, Cards, Callout } from 'nextra/components'
+
+# Complete Walkthrough: Local Blockchain → Smart Contract → dApp
+
+This walkthrough guides you through connecting all three workspaces to create a complete local development environment. While this documentation assumes you have reviewed the individual workspace guides, we provide key information here for a self-contained experience, with references to more detailed documentation where needed.
+
+<Callout type="warning">
+**Prerequisites**: This guide assumes you have already installed Docker, Node.js (v20.18.1+), and are using `pnpm` as your package manager. Using `npm` will cause dependency conflicts in this monorepo structure.
+</Callout>
+
+## Overview
+
+<Steps>
+### Set up Local Blockchain and Explorer
+Configure and launch your local Hyperledger Besu QBFT validator with the Blockscout explorer stack
+
+### Deploy Smart Contract
+Use Hardhat to deploy the Colored Keys smart contract to your local blockchain
+
+### Configure and Run dApp
+Set up the RitoSwap dApp to interact with your deployed contract on the local blockchain
+</Steps>
+
+<Callout type="error">
+**Critical Terminology**: Throughout this documentation, **"Ritonet"** is the branded name for the local blockchain. Ritonet does not exist as a separate network - it is simply an alias for `local-blockchain`. All references to Ritonet mean local-blockchain.
+</Callout>
+
+<Callout type="info">
+**Chain ID Consistency**: The `LOCAL_CHAIN_ID` environment variable must be identical across all three workspaces (local-blockchain, colored-keys, and dapp). This ensures proper network identification and transaction routing. Default value: `90999999`.
+</Callout>
+
+## Project Structure
+
+Understanding the workspace structure is crucial for this setup:
+
+<FileTree>
+  <FileTree.Folder name="ritoswap" defaultOpen>
+    <FileTree.Folder name="local-blockchain" defaultOpen>
+      <FileTree.File name=".env" />
+      <FileTree.File name=".env.example" />
+      <FileTree.File name="package.json" />
+      <FileTree.Folder name="config">
+        <FileTree.File name="genesis.json" />
+        <FileTree.File name="keys/validator.key" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="colored-keys" defaultOpen>
+      <FileTree.File name=".env" />
+      <FileTree.File name=".env.example" />
+      <FileTree.File name="hardhat.config.ts" />
+      <FileTree.File name="package.json" />
+    </FileTree.Folder>
+    <FileTree.Folder name="dapp" defaultOpen>
+      <FileTree.File name=".env" />
+      <FileTree.File name=".env.example" />
+      <FileTree.File name="package.json" />
+      <FileTree.Folder name="prisma">
+        <FileTree.File name="schema.prisma" />
+      </FileTree.Folder>
+    </FileTree.Folder>
+    <FileTree.Folder name="ContractAddresses">
+      <FileTree.File name="local_blockchain.json" />
+      <FileTree.File name="mainnet.json" />
+      <FileTree.File name="sepolia.json" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Step 1: Setting Up Your Local Blockchain
+
+First, we'll establish the foundation—a local Hyperledger Besu QBFT validator with the Blockscout explorer stack.
+
+### Configuration
+
+Navigate to the local-blockchain workspace and seed your environment:
+
+```bash
+cd local-blockchain
+cp .env.example .env
+```
+
+Edit `.env` with the values you want shared across every workspace:
+
+```env
+# Network Configuration - MUST MATCH ACROSS WORKSPACES
+LOCAL_CHAIN_ID=90999999
+NETWORK_NAME=RitoSwap Localnet
+SUBNETWORK=Local
+COIN_NAME=RITO
+COIN_SYMBOL=RITO
+BLOCK_TIME=5
+
+# Ports
+RPC_PORT=8545
+RPC_WS_PORT=8546
+P2P_PORT=30303
+BLOCKSCOUT_PORT=4000
+
+# Blockscout (set to LAN IP for mobile access)
+BLOCKSCOUT_PUBLIC_HOST=localhost
+
+# Prefunded test account
+TEST_ACCOUNT=0xYourWalletAddressHere
+TEST_ACCOUNT_BALANCE=10000000000000000000000
+```
+
+<Callout type="info">
+`TEST_ACCOUNT` (and optional `TEST_ACCOUNT_PRIVATE_KEY`) is pre-funded in genesis. Set this to the wallet you plan to use when deploying contracts and testing the dApp.
+</Callout>
+
+### Initialize and Launch
+
+```bash
+# Install dependencies (from repo root)
+pnpm install
+
+# Generate validator key, genesis, and clone Blockscout
+pnpm --filter local-blockchain run setup
+
+# Start Besu + Blockscout (or use start:node for Besu only)
+pnpm --filter local-blockchain run start
+
+# Optional: Tail validator logs
+pnpm --filter local-blockchain run logs:node
+```
+
+Your local network is now running at:
+- **RPC Endpoint**: `http://localhost:8545`
+- **WebSocket**: `ws://localhost:8546`
+- **Block Explorer**: `http://<BLOCKSCOUT_PUBLIC_HOST>:4000` (default `http://localhost:4000`)
+
+<Cards num={2}>
+  <Cards.Card
+    title="Running the Network"
+    href="/local-blockchain/runningit"
+    arrow
+  >
+    Commands for managing your blockchain
+  </Cards.Card>
+  <Cards.Card
+    title="Managing Credentials"
+    href="/local-blockchain/credentials"
+    arrow
+  >
+    Optional: Access validator key for advanced use
+  </Cards.Card>
+</Cards>
+
+### Verify Operation
+
+Test your blockchain connection:
+
+```bash
+curl -X POST -H "Content-Type: application/json" \
+  --data '{"jsonrpc":"2.0","method":"eth_blockNumber","params":[],"id":1}' \
+  http://localhost:8545
+```
+
+## Step 2: Deploy the Smart Contract
+
+With your blockchain running, deploy the Colored Keys smart contract.
+
+### Configure Hardhat
+
+Navigate to the colored-keys workspace:
+
+```bash
+cd ../colored-keys
+cp .env.example .env
+```
+
+Edit your `.env` file:
+
+```env
+# Use YOUR wallet's private key (the one you set as TEST_ACCOUNT)
+PRIVATE_KEY=0xYourWalletPrivateKey
+
+# Local blockchain configuration (MUST match local-blockchain settings)
+LOCAL_BLOCKCHAIN_RPC=http://localhost:8545
+LOCAL_CHAIN_ID=90999999
+
+# Blockscout configuration
+BLOCKSCOUT_URL=http://localhost:4000
+BLOCKSCOUT_API_URL=http://localhost:4000/api
+```
+
+<Callout type="warning">
+Use the private key for the wallet address you specified as `TEST_ACCOUNT` in the local-blockchain setup. This account has the ETH needed for deployment.
+</Callout>
+
+<Callout type="info">
+**Optional**: If you need to use the validator account instead, you can retrieve its private key by running `pnpm reveal:key` in the local-blockchain workspace. However, using your own wallet is recommended for standard development.
+</Callout>
+
+### Deploy Contract
+
+```bash
+# Install dependencies
+pnpm install
+
+# Compile the smart contract
+pnpm compile
+
+# Deploy to local blockchain
+pnpm deploy:local-blockchain
+```
+
+The deployment script automatically saves the contract address to `ContractAddresses/local_blockchain.json`. This file is shared across workspaces.
+
+### Verify Deployment
+
+```bash
+# Check supply and holder status
+pnpm check-supply:local-blockchain
+
+# Verify on Blockscout (optional)
+pnpm verify:local-blockchain
+```
+
+You can also view your deployed contract in Blockscout at `http://localhost:4000`.
+
+<Cards num={2}>
+  <Cards.Card
+    title="Smart Contract Details"
+    href="/colored-keys"
+    arrow
+  >
+    Complete contract documentation
+  </Cards.Card>
+  <Cards.Card
+    title="Contract Testing"
+    href="/colored-keys/testing"
+    arrow
+  >
+    Testing and security analysis
+  </Cards.Card>
+</Cards>
+
+## Step 3: Configure and Run the dApp
+
+Now we'll set up RitoSwap to interact with your deployed contract. The dApp requires extensive infrastructure configuration including database setup, authentication services, API integrations, and various third-party services for full functionality.
+
+<Callout type="warning">
+The dApp configuration process involves numerous infrastructure components and external services that cannot be adequately covered in this single guide. You must follow the comprehensive documentation to properly configure all required services, API keys, and infrastructure components. This walkthrough provides only the minimal steps to connect to your local blockchain.
+</Callout>
+
+<Cards.Card
+  title="Complete dApp Configuration"
+  href="/dapp#requirements-walkthrough"
+  arrow
+>
+  Full requirements checklist and setup guide for all features
+</Cards.Card>
+
+### Environment Configuration
+
+Navigate to the dapp workspace and configure your environment:
+
+```bash
+cd ../dapp
+cp .env.example .env
+```
+
+Configure your `.env` file with these essential settings:
+
+```env
+# Database (requires PostgreSQL - see full configuration guide)
+DATABASE_URL="postgresql://user:password@host:5432/dbname"
+
+# Select active chain
+NEXT_PUBLIC_ACTIVE_CHAIN=ritonet
+
+# Ritonet Configuration (MUST match local-blockchain settings)
+NEXT_PUBLIC_LOCAL_CHAIN_ID=90999999
+NEXT_PUBLIC_LOCAL_BLOCKCHAIN_NAME=RitoNet
+NEXT_PUBLIC_LOCAL_BLOCKCHAIN_RPC=http://localhost:8545
+NEXT_PUBLIC_LOCAL_BLOCKCHAIN_WSS=ws://localhost:8546
+NEXT_PUBLIC_LOCAL_BLOCKCHAIN_EXPLORER_URL=http://localhost:4000
+NEXT_PUBLIC_LOCAL_BLOCKCHAIN_EXPLORER_NAME=RitoNet Explorer
+
+# Other required settings (minimal config)
+NEXT_PUBLIC_ENABLE_STATE_WORKER=false
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your-project-id
+NEXT_PUBLIC_APP_NAME=RitoSwap Local
+# JWT configuration (required for local auth)
+JWT_ISS=http://localhost:3000
+JWT_SECRET=run-pnpm-secret:jwt-to-generate
+```
+
+<Callout type="warning">
+`JWT_ISS` and `JWT_SECRET` are mandatory even for local development (see `dapp/app/config/server.env.ts`). Run `pnpm secret:jwt` to generate a secure secret and keep the issuer URL aligned with the domain you access (e.g., `http://localhost:3000`).
+</Callout>
+
+<Callout type="info">
+The dApp requires extensive configuration for full functionality. This minimal configuration will allow basic smart contract interaction. For complete setup including token-gating, portfolio viewing, email notifications, and all other features, refer to the comprehensive configuration guide.
+</Callout>
+
+<Cards.Card
+  title="Complete dApp Configuration"
+  href="/dapp"
+  arrow
+>
+  Full requirements checklist and setup guide for all features
+</Cards.Card>
+
+### Initialize and Launch
+
+```bash
+# Install dependencies
+pnpm install
+
+# Start the dApp in Ritonet (local blockchain) mode
+pnpm dev:ritonet
+```
+
+<Callout type="warning">
+**Important**: Keep your local blockchain node and Blockscout explorer running while using the dApp. The dApp requires active blockchain connectivity to function properly.
+</Callout>
+
+The dApp will be available at `http://localhost:3000` (or `http://0.0.0.0:3000` for network access).
+
+## Wallet Configuration
+
+### Add Ritonet to Your Wallet
+
+Before using the dApp, configure your wallet to connect to the local blockchain.
+
+In MetaMask or your preferred wallet:
+
+1. Click network dropdown → "Add Network Manually"
+2. Enter these details:
+
+| Field | Value |
+|-------|-------|
+| Network Name | RitoNet |
+| RPC URL | `http://localhost:8545` |
+| Chain ID | `90999999` |
+| Currency Symbol | ETH |
+| Block Explorer URL | `http://localhost:4000` |
+
+<Callout type="error">
+The Chain ID must exactly match the `LOCAL_CHAIN_ID` used across all workspaces. Mismatched Chain IDs will prevent wallet connections and transactions.
+</Callout>
+
+<Callout type="info">
+If testing from another device on your network, replace `localhost` with your machine's local IP address (e.g., `192.168.1.100`) in all URLs.
+</Callout>
+
+### Import Your Funded Account
+
+Import the private key for the wallet address you used as `TEST_ACCOUNT` in the local-blockchain setup. This account has 10,000 ETH for testing.
+
+<Cards.Card
+  title="Detailed Wallet Setup"
+  href="/local-blockchain/wallet"
+  arrow
+>
+  Complete wallet configuration guide
+</Cards.Card>
+
+## Using the Complete System
+
+With everything running:
+
+1. **Ensure Prerequisites**: Local blockchain and Blockscout are running
+2. **Access the dApp**: Navigate to `http://localhost:3000`
+3. **Connect Wallet**: Select RitoNet network and connect your funded account
+4. **Mint NFTs**: Visit the Mint page to create Colored Keys
+5. **Monitor Transactions**: View all activity in Blockscout at `http://localhost:4000`
+
+## Stopping Services
+
+When finished with development:
+
+```bash
+# Stop the dApp (Ctrl+C in terminal)
+
+# Stop blockchain and explorer
+cd ../local-blockchain
+pnpm stop
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**"Wrong Network" Errors**
+- Verify Chain ID (`90999999`) matches exactly in all three workspaces
+- Ensure wallet is switched to RitoNet before connecting
+- Clear wallet cache and re-add network if needed
+
+**Contract Not Found**
+- Confirm contract deployment succeeded
+- Check `ContractAddresses/local_blockchain.json` exists
+- Verify `NEXT_PUBLIC_ACTIVE_CHAIN=ritonet` in dApp `.env`
+
+**No Balance Showing**
+- Ensure blockchain is running: `pnpm status` in local-blockchain
+- Verify you imported the correct wallet (TEST_ACCOUNT)
+- Check that your address was included in genesis allocation
+
+**Configuration Issues**
+- Ensure all required services are configured per the full setup guide
+- Verify environment variables are properly set
+- Check that all necessary API keys are valid
+
+### Getting Help
+
+For detailed information about each component:
+
+<Cards>
+  <Cards.Card
+    title="dApp Overview"
+    href="/dapp"
+    arrow
+  >
+    Complete feature documentation
+  </Cards.Card>
+  <Cards.Card
+    title="Local Blockchain Documentation"
+    href="/local-blockchain"
+    arrow
+  >
+    Blockchain setup and management
+  </Cards.Card>
+  <Cards.Card
+    title="Smart Contract Documentation"
+    href="/colored-keys"
+    arrow
+  >
+    Contract details and interactions
+  </Cards.Card>
+</Cards>
+
+## Next Steps
+
+Now that your local development environment is running, you can:
+
+- Modify and redeploy the smart contract
+- Develop new dApp features with instant feedback
+- Test wallet integrations across different devices
+- Explore the full token lifecycle: minting, transferring, and burning
+
+Remember to stop all services when not in use to free up system resources.

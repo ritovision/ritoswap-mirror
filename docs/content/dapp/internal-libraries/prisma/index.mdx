@@ -1,0 +1,166 @@
+---
+title: "Prisma Database Layer"
+description: "Multichain token tracking with Prisma Accelerate in the RitoSwap ecosystem"
+---
+
+import { FileTree, Steps, Table, Tabs } from 'nextra/components'
+
+# Prisma Database Layer
+
+The RitoSwap dApp employs Prisma as its database abstraction layer to track Colored Key NFT usage across multiple blockchain networks. This sophisticated setup enables token-gated access control while maintaining network isolation and performance through Prisma Accelerate's edge caching capabilities.
+
+## Overview
+
+RitoSwap's architecture requires tracking token usage states that exist outside the blockchain. While the smart contract manages token ownership and transfers, the database layer tracks whether tokens have been used to access gated content. This hybrid approach delivers gas-free usage tracking while preserving the immutability and ownership guarantees of the blockchain.
+
+### Why Separate Database Tables?
+
+The multichain nature of RitoSwap presents unique challenges. A single Colored Key NFT with ID #42 might exist on Ethereum mainnet, Sepolia testnet, and your local RitoNet simultaneously, each representing completely different tokens owned by different addresses. To maintain clarity and prevent cross-network confusion, the database architecture implements complete network isolation through separate tables.
+
+This design decision provides several critical benefits:
+
+1. **Data Integrity** - Network-specific tables prevent accidental cross-chain data pollution
+2. **Query Performance** - Smaller, focused tables enable faster lookups and indexing
+3. **Operational Clarity** - Database administrators can immediately identify which network's data they're examining
+4. **Migration Safety** - Network-specific schema changes can be tested in isolation
+
+### The Prisma Accelerate Advantage
+
+RitoSwap leverages Prisma Accelerate to enhance database performance through global edge caching. This is particularly crucial for token status checks, which may be queried hundreds of times per minute during active minting sessions. Accelerate provides:
+
+- **Edge Caching** - Frequently accessed token records are cached at edge locations globally
+- **Connection Pooling** - Efficient database connection management prevents exhaustion
+- **Query Optimization** - Automatic query analysis and optimization for common patterns
+- **Reduced Latency** - Sub-millisecond response times for cached queries
+
+## Architecture Components
+
+The Prisma layer consists of three primary components working in harmony:
+
+<FileTree>
+  <FileTree.Folder name="prisma" defaultOpen>
+    <FileTree.File name="schema.prisma" />
+    <FileTree.Folder name="migrations" defaultOpen>
+      <FileTree.File name="20250620072037_init" />
+      <FileTree.File name="20250621141052_add_network_tables" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+  <FileTree.Folder name="app/lib/prisma" defaultOpen>
+    <FileTree.File name="prisma.ts" />
+    <FileTree.File name="prismaNetworkUtils.ts" />
+    <FileTree.File name="prismaNetworkUtils.test.ts" />
+  </FileTree.Folder>
+</FileTree>
+
+### Core Files
+
+**schema.prisma**  
+Defines the database structure with network-specific token tables. Each table tracks token ID, usage status, the address that used it, and timestamp of usage.
+
+**prisma.ts**  
+Initializes the Prisma client with Accelerate extension and proper logging configuration. Implements singleton pattern to prevent connection leaks in serverless environments.
+
+**prismaNetworkUtils.ts**  
+Provides unified interface for network-aware database operations. Automatically routes queries to the correct table based on the current chain configuration.
+
+## Token Tracking Model
+
+Each network maintains its own token tracking table with identical structure:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Type</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`tokenId`</td>
+      <td>Integer (Primary Key)</td>
+      <td>The unique identifier of the Colored Key NFT</td>
+    </tr>
+    <tr>
+      <td>`used`</td>
+      <td>Boolean</td>
+      <td>Whether this token has been used to access gated content</td>
+    </tr>
+    <tr>
+      <td>`usedBy`</td>
+      <td>String (nullable)</td>
+      <td>Ethereum address that used the token for gating</td>
+    </tr>
+    <tr>
+      <td>`usedAt`</td>
+      <td>DateTime (nullable)</td>
+      <td>Timestamp when the token was used</td>
+    </tr>
+  </tbody>
+</Table>
+
+This structure enables comprehensive usage tracking while maintaining simplicity. The nullable fields allow tokens to exist in the database before being used, supporting pre-population strategies and usage analytics.
+
+## Integration with API Endpoints
+
+The Prisma layer serves as the foundation for multiple API endpoints in the RitoSwap ecosystem:
+
+### Token Status Endpoint
+Queries token existence and usage status for real-time UI updates. Implements automatic synchronization between blockchain and database states.
+
+### Gate Access Endpoint
+Validates token ownership and marks tokens as used when accessing gated content. Ensures single-use semantics for exclusive experiences.
+
+### Form Submission Endpoint
+Records user messages and feedback while updating token usage records. Maintains audit trail for token-gated interactions.
+
+## Network Configuration Flow
+
+Understanding how RitoSwap determines which database table to use is crucial for developers:
+
+<Steps>
+### Step 1: Environment Detection
+The system reads `NEXT_PUBLIC_ACTIVE_CHAIN` (`ethereum`, `sepolia`, or `ritonet`) from the validated public env.
+
+### Step 2: Chain ID Resolution
+The `getTargetChainId()` function returns the appropriate chain ID based on environment configuration.
+
+### Step 3: Model Selection
+The `getTokenModel()` function returns a unified interface that internally routes to the correct Prisma model.
+
+### Step 4: Query Execution
+Database operations execute against the network-specific table transparently to the calling code.
+</Steps>
+
+This flow ensures that developers can write network-agnostic code while the infrastructure handles proper routing behind the scenes.
+
+## Development Considerations
+
+When working with the Prisma layer in RitoSwap, keep these best practices in mind:
+
+### Connection Management
+The Prisma client implements a singleton pattern to prevent connection exhaustion in serverless environments. Always import from the centralized client rather than creating new instances.
+
+### Error Handling
+Network-specific queries may fail for various reasons. Implement proper error boundaries and provide meaningful fallbacks for database connectivity issues.
+
+### Migration Strategy
+Database migrations must account for all three network tables. Test migrations thoroughly on development databases before applying to production.
+
+### Performance Monitoring
+Monitor query performance across networks, as usage patterns may vary significantly between mainnet and testnets. Leverage Prisma Accelerate's analytics to identify optimization opportunities.
+
+## Testing Approach
+
+The comprehensive test suite for prismaNetworkUtils demonstrates proper testing patterns for network-aware database code. Key testing strategies include:
+
+- **Mock Isolation** - Complete mocking of Prisma client prevents test database dependencies
+- **Network Routing Verification** - Confirms correct table selection for each network
+- **Error Scenario Coverage** - Tests behavior with invalid chain IDs and database failures
+- **Type Safety** - Leverages TypeScript to ensure mock accuracy
+
+## Summary
+
+The Prisma database layer forms a critical component of RitoSwap's hybrid architecture, bridging the gap between immutable blockchain state and mutable application requirements. Through careful design with network isolation, performance optimization via Accelerate, and comprehensive testing, it provides a robust foundation for token-gated experiences across multiple blockchain networks.
+
+The unified interface exposed through prismaNetworkUtils enables developers to focus on business logic rather than infrastructure concerns, while the underlying architecture ensures data integrity and performance at scale.

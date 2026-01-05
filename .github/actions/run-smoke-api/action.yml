@@ -1,0 +1,59 @@
+name: Run Smoke API
+description: Runs Supertest API tests against live deployed site (post-deployment smoke test)
+
+inputs:
+  working-directory:
+    description: 'Working directory'
+    required: false
+    default: './dapp'
+  base-url:
+    description: 'Base URL of the deployed API'
+    required: true
+  private-key:
+    description: 'Private key for API auth'
+    required: true
+  token-id:
+    description: 'Token ID for tests'
+    required: true
+  chain-id:
+    description: 'Blockchain chain ID'
+    required: true
+  enable-state-worker:
+    description: 'Enable state worker'
+    required: false
+    default: 'false'
+  ai-chat-requires-jwt:
+    description: 'AI chat requires JWT'
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Verify required environment variables
+      shell: bash
+      env:
+        PRIVATE_KEY: ${{ inputs.private-key }}
+        TOKEN_ID: ${{ inputs.token-id }}
+        CHAIN_ID: ${{ inputs.chain-id }}
+        TEST_BASE_URL: ${{ inputs.base-url }}
+        NEXT_PUBLIC_ENABLE_STATE_WORKER: ${{ inputs.enable-state-worker }}
+        NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT: ${{ inputs.ai-chat-requires-jwt }}
+      run: |
+        : "${PRIVATE_KEY:?PRIVATE_KEY not set}"
+        : "${TOKEN_ID:?TOKEN_ID not set}"
+        : "${CHAIN_ID:?CHAIN_ID not set}"
+        : "${TEST_BASE_URL:?TEST_BASE_URL not set}"
+
+    - name: Run API E2E tests (Supertest)
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        NODE_ENV: test
+        PRIVATE_KEY: ${{ inputs.private-key }}
+        TOKEN_ID: ${{ inputs.token-id }}
+        CHAIN_ID: ${{ inputs.chain-id }}
+        TEST_BASE_URL: ${{ inputs.base-url }}
+        NEXT_PUBLIC_ENABLE_STATE_WORKER: ${{ inputs.enable-state-worker }}
+        NEXT_PUBLIC_AI_CHAT_REQUIRES_JWT: ${{ inputs.ai-chat-requires-jwt }}
+      run: pnpm run supertest:e2e

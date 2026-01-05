@@ -1,0 +1,197 @@
+---
+title: Testing Stack Overview
+description: How Vitest, Supertest, Postman, and Playwright work together to test the RitoSwap dapp.
+---
+
+import { Callout, Cards } from 'nextra/components'
+
+# Testing Stack Overview
+
+RitoSwap’s dapp ships with a **multi-layered automated test stack** because of the project’s **scale, complexity, and security requirements** — token-gated access, JWT/SIWE auth, MCP tools, on-chain reads/writes, and wallet UX all have to behave predictably.
+
+This page is a **map of the testing ecosystem**, not a full tutorial. It explains:
+
+- **What each test stack is responsible for.**
+- **Which tools and versions back it.**
+- **When to reach for Vitest, Supertest, Postman, or Playwright.**
+
+Each section links to a dedicated page with architecture details, directory layouts, and how-to guides.
+
+<Callout type="info">
+  If you know <strong>what you changed</strong> but not <strong>which tests to run</strong>, start here, then jump into the stack-specific pages via the cards below.
+</Callout>
+
+## At a glance
+
+- [**Vitest**](/dapp/vitest) – In-process unit, component, API route, and OpenAPI contract tests for both DOM and API behaviour.
+- [**Supertest**](/dapp/supertest) – API-level end-to-end harness for gated endpoints, JWT flows, and MCP tools against a running Next.js server.
+- [**Postman**](/dapp/postman) – OpenAPI-driven Newman suite that validates live deployments over real HTTP, CDNs, and workers.
+- [**Storybook**](/dapp/storybook) – Mocked UI reference states for components and pages; used for visual QA and docs embeds, not automated tests.
+- [**Playwright**](/dapp/playwright) – Browser E2E tests for critical user journeys in the dapp and AI system, with both mocked and real on-chain modes.
+
+---
+
+## Vitest – Unit, Integration & Contract Tests
+
+Vitest is the **foundation of the test stack**. It runs fast, in-process tests that cover:
+
+- **Unit & store logic** – Zustand state, business rules, and invariants.
+- **Component behaviour** – Wallet UX, ENS handling, modals, and DOM interactions.
+- **API route behaviour** – Next.js route handlers (e.g. `/api/gate-access`, `/api/token-status`) via `NextRequest`.
+- **API contracts** – OpenAPI-backed contract tests for the core token-gate endpoints using `public/openapi.json`.
+
+Vitest-based tests intentionally **prioritize security-critical and user-visible flows** (auth, token gating, rate limiting, JWT/SIWE decisions, wallet UX) rather than chasing 100% line coverage.
+
+**Primary tools & versions (test layer):**
+
+- `vitest@3.2.4` (runner) and `@vitest/ui@3.2.4`
+- `@testing-library/react@16.3.0` and `@testing-library/jest-dom@6.6.3`
+- `happy-dom@18.0.1` for a browser-like DOM
+- `msw@2.10.3` for HTTP mocking
+- Config and coverage are pinned in `dapp/package.json` and `vitest.config.ts`; check those files for canonical versions.
+
+**Use Vitest when you:**
+
+- Change **Zustand stores**, shared business logic, or derived state.
+- Modify **wallet or chain UI components**, ENS presentation, or modal flows.
+- Update **Next.js API routes** or payload shapes.
+- Adjust the **OpenAPI spec** for `/api/nonce`, `/api/gate-access`, `/api/token-status/{tokenId}`, or `/api/form-submission-gate`.
+
+Vitest is the first line of defense: if a behaviour can be tested in-process, it should live here before it ever reaches the heavier stacks.
+
+<Cards.Card
+  title="Vitest Test Architecture"
+  href="/dapp/vitest"
+  arrow
+/>
+
+---
+
+## Supertest – API E2E Harness
+
+Supertest owns **end-to-end coverage of the gated APIs** against a running Next.js server, while still executing inside Node. The harness under `dapp/e2e/supertest` focuses on:
+
+- **Token gate surfaces** – `/api/openapi`, `/api/token-status/:tokenId`, `/api/nonce`, `/api/gate-access`, `/api/form-submission-gate`.
+- **JWT flows** – Issuance, reuse, mismatched token IDs, malformed Bearer headers, and rate-limited bursts.
+- **MCP tools** – `/api/mcp` JSON-RPC bridge, tool discovery, Pinecone searches, and JWT requirements.
+
+Every suite shares a **validated environment** via `vitest.config.supertest.ts` and `.env.supertest`, so misconfigured runs fail fast instead of producing flaky results.
+
+**Primary tools & versions:**
+
+- `vitest@3.2.4` for orchestration
+- `supertest@7.1.4` for HTTP calls into the running app
+- `ajv@8.17.1` and `ajv-formats@3.0.1` powering OpenAPI-based schema validation
+- `dotenv@17.2.0` for environment loading
+
+**Use Supertest when you:**
+
+- Change **auth, JWT, SIWE, or rate-limiting logic** on the gated endpoints.
+- Touch the **MCP bridge** or its interaction with JWT requirements.
+- Want to verify **real HTTP responses** (status codes, headers, Problem Details bodies) from the Next.js runtime, not just handler logic.
+
+Supertest sits between Vitest’s unit/route tests and Postman: it gives you strong API-level confidence against a running server **before** you hit a remote deployment.
+
+<Cards.Card
+  title="Supertest Harness"
+  href="/dapp/supertest"
+  arrow
+/>
+
+---
+
+## Postman – Live OpenAPI Contract Checks
+
+The Postman suite turns the generated **OpenAPI spec into a runnable contract test** for live environments. Under `dapp/postman/collection`, OpenAPI is converted to a Postman collection, patched with signing scripts, and executed via Newman:
+
+- Tests run over **real HTTP** against whatever `TEST_BASE_URL` points to (local, staging, preview, production).
+- Requests exercise the same **signing envelopes, nonces, JWT minting, and rate limits** that real wallets experience.
+- Assertions confirm that the deployed server still matches `public/openapi.json` for the gated surface.
+
+Where Supertest runs inside the app’s process, Postman + Newman is explicitly about **edge behaviour**: middleware, CDN headers, Cloudflare workers, cookies, and rate limiting as seen by external clients.
+
+**Primary tools & versions:**
+
+- `newman@6.2.1` for collection execution
+- `newman-reporter-htmlextra@1.23.1` for HTML reports
+- `openapi-to-postmanv2@5.0.1` for converting `openapi.json` into a collection
+
+**Use Postman when you:**
+
+- Suspect or want to guard against **contract drift** between docs and deployed behaviour.
+- Change **OpenAPI schemas, DTOs, or generation scripts**.
+- Modify **middleware, headers, or edge routing** that Supertest cannot see.
+- Need a **pre-release audit** or HTML report tied to a change request.
+
+Postman extends the same contracts that Vitest and Supertest enforce, but proves them against a **real HTTP edge**.
+
+<Cards.Card
+  title="Postman Contract Tests"
+  href="/dapp/postman"
+  arrow
+/>
+
+---
+
+## Storybook – Visual QA & UI Reference
+
+Storybook captures **mocked UI states** for components and pages. It is **not** part of the automated test suite; it exists to document UI behavior and power docs embeds.
+
+- Local dev: `pnpm sb`
+- Build for standalone hosting: `pnpm build-sb` → `dapp/storybook-static`
+- Build for docs embeds: `pnpm build-sb:docs` → `docs/public/storybook-static`
+- Hosted at: `https://ui.ritoswap.com`
+
+<Cards.Card
+  title="Storybook Setup"
+  href="/dapp/storybook"
+  arrow
+/>
+
+---
+
+## Playwright – Browser E2E Journeys
+
+Playwright owns **browser-based end-to-end tests** for the hosted dapp and docs under `/dapp/e2e/playwright`. These specs:
+
+- Exercise real **user journeys**: wallet connect, minting, token gates, portfolio views, swap widget behaviour, AI chat, music player, and core marketing pages.
+- Use a **custom wallet harness** that can inject a provider, control accounts, and toggle between **mocked** and **real** on-chain behaviour.
+- Attach **diagnostics and mocks** (AI provider, portfolio data, signing helpers) so failures are debuggable, not opaque.
+
+Playwright supports two modes:
+
+- **Mock mode** – No private key; signatures, receipts, AI responses, and portfolio data are deterministic and cost-free.
+- **Real mode** – Private key present; `viem` signs and sends real transactions (e.g. on Sepolia) so on-chain flows can be verified end-to-end.
+
+**Primary tools & versions:**
+
+- `@playwright/test@1.53.2` as the E2E runner
+- Custom wallet harness and helpers under `dapp/e2e/playwright/wallet` and `dapp/e2e/playwright/utils`
+- Mocks for AI and chain portfolios under `dapp/e2e/playwright/mocks`
+
+**Use Playwright when you:**
+
+- Change **wallet UX**, connection flows, or token-gated page behaviour.
+- Modify **core user journeys** (home page, mint/burn flows, portfolio, swap widget, AI chat, music player).
+- Need confidence that **real users in a browser** can complete the flows your docs describe.
+
+Where Vitest and Supertest keep implementation details honest, Playwright proves that a user with a wallet can actually do the thing on-screen.
+
+<Cards.Card
+  title="Playwright E2E Suite"
+  href="/dapp/playwright"
+  arrow
+/>
+
+---
+
+## Choosing the right stack
+
+When in doubt, map your change to one (or more) of these:
+
+- **Logic or UI only** (stores, components, simple routes) → start with **Vitest**.
+- **Auth, JWT, rate limits, MCP bridge, or gated endpoints** → **Vitest + Supertest**.
+- **OpenAPI or edge/infra behaviour (CDN, workers, headers)** → **Vitest + Supertest + Postman**.
+- **Wallet UX or critical user journey** changes → **Vitest + Playwright** (and Supertest/Postman if gated APIs are involved).
+
+Use this page as your routing layer: pick the stack(s) that match what changed, then follow the cards into the detailed guides for implementation patterns and examples.

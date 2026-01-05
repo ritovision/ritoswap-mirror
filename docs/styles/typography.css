@@ -1,0 +1,50 @@
+/* docs/styles/typography.css */
+/* 2. Declare your custom fonts (served from public/fonts) */
+@font-face {
+  font-family: 'AgencyB';
+  src: url('/fonts/AGENCYB.woff') format('woff'),
+       url('/fonts/AGENCYB.TTF') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Michroma';
+  src: url('/fonts/Michroma-Regular.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --font-primary: 'AgencyB', sans-serif;
+  --font-body: 'Michroma', sans-serif;
+}
+/* 3. Apply them site-wide */
+body {
+  font-family: var(--font-body-);;
+}
+
+p {
+  color: white;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'AgencyB', sans-serif;
+  letter-spacing: 0.03em;
+  color: white;
+}
+
+blockquote {
+  color: white;
+  border-left: 4px solid var(--secondary-color);
+  border-radius: 2px;
+  padding: 1px 0px;
+}
+
+/*  — add a little extra letter-spacing to all of those sidebar anchors — */
+html a.x\:break-words {
+  letter-spacing: 0.07em;
+}
+

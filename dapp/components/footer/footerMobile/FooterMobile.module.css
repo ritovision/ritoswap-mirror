@@ -1,0 +1,27 @@
+.footer {
+    background-color: var(--primary-color); 
+    text-align: center;
+    position: relative;
+    z-index: 1500;
+    width: 100%; 
+    display: flex;
+    justify-content: center; 
+    align-items: center; 
+    flex-direction: column; 
+    padding-top: 2rem;
+}
+
+.logoContainer {
+    display: block; 
+    text-align: center; 
+}
+
+.logo {
+    display: inline-block; 
+    width: 80%;
+    max-width: 400px; 
+    height: auto; 
+    border-radius: 10px; 
+    margin-bottom: 5vw;
+}
+

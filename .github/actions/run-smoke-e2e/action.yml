@@ -1,0 +1,46 @@
+name: Run Smoke E2E
+description: Runs Playwright tests against live deployed site (post-deployment smoke test)
+
+inputs:
+  working-directory:
+    description: 'Working directory'
+    required: false
+    default: './dapp'
+  test-pattern:
+    description: 'Test pattern to run (e.g., "hp-tokengate")'
+    required: false
+    default: 'hp-tokengate'
+  project:
+    description: 'Playwright project (browser)'
+    required: false
+    default: 'chrome'
+  workers:
+    description: 'Number of workers'
+    required: false
+    default: '1'
+  base-url:
+    description: 'Base URL of the deployed site'
+    required: true
+  private-key:
+    description: 'Private key for wallet tests'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Playwright browsers
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: pnpm playwright install ${{ inputs.project }}
+
+    - name: Run Playwright E2E tests
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        PRIVATE_KEY: ${{ inputs.private-key }}
+        TEST_BASE_URL: ${{ inputs.base-url }}
+        BASE_URL: ${{ inputs.base-url }}
+      run: |
+        pnpm playwright test ${{ inputs.test-pattern }} \
+          --project=${{ inputs.project }} \
+          --workers=${{ inputs.workers }}

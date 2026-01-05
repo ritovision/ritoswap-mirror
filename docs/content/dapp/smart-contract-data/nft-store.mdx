@@ -1,0 +1,458 @@
+---
+title: "NFT Store"
+description: "Centralized state management for Colored Key NFT data"
+---
+
+import { FileTree, Steps, Table, Tabs, Callout } from 'nextra/components'
+
+# NFT Store
+
+The NFT store serves as the centralized state‑management solution for all Colored Key NFT data within RitoSwap. Built with Zustand, this store maintains real‑time token information, manages account‑switching scenarios, and persists critical data across browser sessions. The store acts as the single source of truth for NFT‑related UI state throughout the application.
+
+## Store Architecture
+
+The NFT store implements a state‑management pattern that balances reactivity, persistence, and performance. By leveraging Zustand's lightweight architecture, the store provides immediate state updates to subscribed components while maintaining a clean, predictable API.
+
+### Core State Structure
+
+```typescript
+interface NFTState {
+  // Core NFT data
+  hasNFT: boolean
+  tokenId: number | null
+  backgroundColor: string | null
+  keyColor: string | null
+
+  // UI state
+  isLoading: boolean
+  error: string | null
+
+  // Token gate tracking
+  hasUsedTokenGate: boolean
+
+  // Wallet state
+  currentAddress: Address | null
+
+  // Account switching
+  isSwitchingAccount: boolean
+  previousData: {
+    hasNFT: boolean
+    tokenId: number | null
+    backgroundColor: string | null
+    keyColor: string | null
+  } | null
+}
+```
+
+Each field serves a specific purpose in maintaining the application's state consistency and enabling smooth user experiences across various scenarios.
+
+### State Field Purposes
+
+<Table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Purpose</th>
+      <th>Persistence</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>`hasNFT`</td>
+      <td>Indicates current NFT ownership status</td>
+      <td>No – Fetched fresh each session</td>
+    </tr>
+    <tr>
+      <td>`tokenId`</td>
+      <td>The owned token's unique identifier</td>
+      <td>No – Blockchain source of truth</td>
+    </tr>
+    <tr>
+      <td>`backgroundColor`</td>
+      <td>Algorithmically generated background color</td>
+      <td>No – Derived from token ID</td>
+    </tr>
+    <tr>
+      <td>`keyColor`</td>
+      <td>Algorithmically generated key color</td>
+      <td>No – Derived from token ID</td>
+    </tr>
+    <tr>
+      <td>`isLoading`</td>
+      <td>Global loading spinner flag primarily used by explicit refresh flows</td>
+      <td>No – Transient UI state</td>
+    </tr>
+    <tr>
+      <td>`error`</td>
+      <td>UI‑friendly error message for higher‑level flows (not set automatically by data hooks)</td>
+      <td>No – Transient UI state</td>
+    </tr>
+    <tr>
+      <td>`hasUsedTokenGate`</td>
+      <td>Whether user has accessed gated content</td>
+      <td>Yes – Persists across sessions</td>
+    </tr>
+    <tr>
+      <td>`currentAddress`</td>
+      <td>Currently connected wallet address for the active session</td>
+      <td>No – Wallet connection state only</td>
+    </tr>
+    <tr>
+      <td>`isSwitchingAccount`</td>
+      <td>Flag set while the store is coordinating an account switch reset</td>
+      <td>No – Temporary UI/state coordination flag</td>
+    </tr>
+    <tr>
+      <td>`previousData`</td>
+      <td>Snapshot of NFT data captured when an account switch is detected (available to components that need the prior state during the transition)</td>
+      <td>No – Cleared as part of the switch/reset cycle</td>
+    </tr>
+  </tbody>
+</Table>
+
+<Callout type="info">
+`isLoading` and `error` are **UI‑only helpers**. They reset to their default values on every page load and are never persisted. In the current implementation, `isLoading` is driven by explicit flows such as `forceRefresh` in `useNFTData`, while the hook also exposes its own derived `isLoading` value based on contract and API calls. Additionally, `useNFTData` turns the store's global loading flag off when contract reads and token‑usage checks are idle, to keep UI state consistent.
+</Callout>
+
+## Action Methods
+
+The store exposes a complete set of actions for manipulating state. These actions map one‑to‑one with Zustand setters defined in `nftStore.ts`.
+
+### Basic State Updates
+
+```typescript
+setHasNFT: (hasNFT: boolean) => void
+
+setTokenData: (
+  tokenId: number | null,
+  backgroundColor: string | null,
+  keyColor: string | null
+) => void
+
+setLoading: (isLoading: boolean) => void
+setError: (error: string | null) => void
+```
+
+### Token Gate Management
+
+```typescript
+setHasUsedTokenGate: (hasUsed: boolean) => void
+```
+
+### Account Management
+
+```typescript
+setCurrentAddress: (address: Address | null) => void
+setIsSwitchingAccount: (isSwitching: boolean) => void
+```
+
+Note: `currentAddress` is typically set by UI flows (e.g., `GatePageWrapper`) based on wagmi's `useAccount()` value to coordinate transitions and content reset. The `useNFTData` hook does not set `currentAddress`.
+
+### Account Switching Flow
+
+```typescript
+startAccountSwitch: () => void
+completeAccountSwitch: () => void
+```
+
+### State Reset
+
+```typescript
+resetState: () => void
+```
+
+#### All Actions Reference
+
+<Table>
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>`setHasNFT`</td><td>Toggle ownership flag and trigger UI refresh</td></tr>
+    <tr><td>`setTokenData`</td><td>Atomically update tokenId & colors and recompute `hasNFT`</td></tr>
+    <tr><td>`setLoading`</td><td>Control a global loading spinner for NFT‑related flows (e.g., manual refresh)</td></tr>
+    <tr><td>`setError`</td><td>Set/clear a UI‑friendly error message for higher‑level flows</td></tr>
+    <tr><td>`setHasUsedTokenGate`</td><td>Persist gate usage across sessions</td></tr>
+    <tr><td>`setCurrentAddress`</td><td>Track the connected wallet address for the active session</td></tr>
+    <tr><td>`setIsSwitchingAccount`</td><td>Manually toggle the account‑switch flag when needed</td></tr>
+    <tr><td>`startAccountSwitch`</td><td>Snapshot current data & enter switch/reset mode</td></tr>
+    <tr><td>`completeAccountSwitch`</td><td>Clear snapshot & explicitly exit switch mode</td></tr>
+    <tr><td>`resetState`</td><td>Clear all transient data while preserving gate usage + address for the current session</td></tr>
+  </tbody>
+</Table>
+
+---
+
+## Account Switching Flow
+
+The account‑switching behavior is coordinated between `useNFTStore` and `useNFTData`. In the current implementation, switches are handled by briefly entering a switching state, capturing a snapshot, and then clearing NFT‑specific fields so the new account can load fresh data.
+
+<Steps>
+### Step 1: Detection
+The application detects a wallet account change through wagmi's account‑change events in `useNFTData`. In gate flows, `GatePageWrapper` also coordinates address changes and may call `startAccountSwitch()` and `forceRefresh()` to drive a smooth UI transition.
+
+### Step 2: State Snapshot & Switch Flag
+`startAccountSwitch()` captures current NFT data in `previousData` and sets `isSwitchingAccount` to `true`, giving components a chance to inspect the prior state during the transition if they need it.
+
+<Callout type="info">
+To prevent stale token‑usage data, `useNFTData` proactively clears the TanStack Query cache for the `token-status` key during account switches and on disconnect. This ensures fresh usage information for the new account.
+</Callout>
+
+### Step 3: Reset for New Account
+`useNFTData` immediately clears NFT‑specific fields for the new account (e.g., by calling `setTokenData(null, null, null)` and resetting `hasNFT` and token‑gate usage). Because this call happens while `isSwitchingAccount` is `true`, the store both applies the reset and clears `isSwitchingAccount`/`previousData` in one atomic update. In practice, the UI will typically show an empty/"no NFT" state while the new account's data is loading.
+
+### Step 4: Data Refresh
+Background processes fetch new account data from the blockchain and token‑status API while the cleared state remains visible. When the data arrives, `useNFTData` updates the store via `setHasNFT`, `setTokenData`, and `setHasUsedTokenGate` using the normal (non‑switching) code path.
+
+### Step 5: Completion
+By the time the new token data is written, the switch flags have already been cleared as part of the reset in Step 3. Components that need to build richer transition behavior can still use `isSwitchingAccount` and `previousData` at the moment the switch is detected, but the default UX is a clean reset followed by the new account's data. As a safety, `useNFTData` may also call `completeAccountSwitch()` shortly after new data is set; this is mostly redundant but harmless.
+</Steps>
+
+## Persistence Strategy
+
+The store implements selective persistence using Zustand's `persist` middleware. This approach balances data freshness with user experience:
+
+```typescript
+persist(
+  (set, get) => ({
+    // ... store implementation
+  }),
+  {
+    name: 'nft-storage',
+    partialize: (state) => ({
+      // Only persist token gate usage
+      hasUsedTokenGate: state.hasUsedTokenGate,
+    }),
+  }
+)
+```
+
+The persistence configuration ensures that only non‑sensitive, user‑experience data persists across sessions. Token ownership and metadata always refresh from the blockchain to maintain accuracy.
+
+### Persistence Rationale
+
+The decision to persist only `hasUsedTokenGate` reflects careful consideration of security and user experience:
+
+**Security** – Token ownership must always reflect current blockchain state to prevent displaying incorrect ownership information after transfers or burns.
+
+**User Experience** – Remembering token‑gate usage improves the experience for returning users by maintaining their progression through gated content even after browser restarts.
+
+**Performance** – Minimal persistence reduces storage overhead and speeds up state hydration on application load.
+
+## Component Integration Patterns
+
+Components integrate with the NFT store through various patterns depending on their requirements:
+
+### Read-Only Components
+
+```typescript
+function NFTDisplay() {
+  const { hasNFT, tokenId, backgroundColor, keyColor } = useNFTStore();
+  
+  if (!hasNFT) return <EmptyState />;
+  
+  return (
+    <div style={{ backgroundColor }}>
+      <KeyIcon color={keyColor} />
+      <span>Token #{tokenId}</span>
+    </div>
+  );
+}
+```
+
+### Interactive Components
+
+```typescript
+function MintButton() {
+  const { setLoading } = useNFTStore();
+  const { writeContract } = useWriteContract();
+  
+  const handleMint = async () => {
+    setLoading(true);
+    try {
+      await writeContract({
+        address: KEY_TOKEN_ADDRESS,
+        abi: fullKeyTokenAbi,
+        functionName: 'mint'
+      });
+      // State updates are coordinated by useNFTData
+    } catch (error) {
+      setLoading(false);
+    }
+  };
+  
+  return <button onClick={handleMint}>Mint NFT</button>;
+}
+```
+
+### Account-Aware Components
+
+```typescript
+function NFTScreen() {
+  const {
+    hasNFT,
+    backgroundColor,
+    keyColor,
+    isSwitchingAccount,
+    previousData
+  } = useNFTStore();
+  
+  // In the current implementation, the switching window is very short and the
+  // UI typically shows the cleared/empty state while new data loads. Components
+  // that need the previous state during a switch can still read `previousData`
+  // synchronously when `isSwitchingAccount` is true.
+  const displayData = isSwitchingAccount && previousData
+    ? previousData
+    : { hasNFT, backgroundColor, keyColor };
+  
+  return <NFTVisualization {...displayData} />;
+}
+```
+
+## State Update Coordination
+
+The NFT store coordinates with the `useNFTData` hook to maintain consistency between blockchain state and UI state. This coordination follows a specific pattern:
+
+**Blockchain Query** – The `useNFTData` hook queries the blockchain for current token ownership and metadata using wagmi's `useReadContract`.
+
+**API Synchronization** – The hook checks token usage status through the Token Status API, which synchronizes blockchain and database state.
+
+**Usage Fetch Strategy** – To ensure timely updates (especially during account switches), the hook uses both TanStack Query and direct `fetch` calls to read token usage. This dual path avoids stale results and speeds up switch transitions.
+
+**Store Updates** – The hook updates the NFT store with fresh data (ownership, colors, and token‑gate usage), triggering re‑renders in subscribed components.
+
+**Error Handling** – Failed queries are logged and surfaced via the hook's `tokenUsageError`/return values. The store's `error` field is available for higher‑level UI flows that choose to propagate those errors into global state, but `useNFTData` does not set it automatically.
+
+This separation of concerns keeps the store focused on state management while delegating data fetching and error handling to specialized hooks.
+
+## Performance Optimization
+
+The NFT store implements several optimizations to ensure smooth performance:
+
+### Selective Subscriptions
+
+Zustand's subscription model ensures components only re-render when their specific subscribed fields change:
+
+```typescript
+// Only re-renders when hasNFT changes
+const hasNFT = useNFTStore(state => state.hasNFT);
+
+// Re-renders for any color change
+const colors = useNFTStore(state => ({
+  backgroundColor: state.backgroundColor,
+  keyColor: state.keyColor
+}));
+```
+
+### Atomic Updates
+
+The `setTokenData` method updates multiple fields atomically, preventing intermediate states that could cause visual glitches:
+
+```typescript
+// Single update prevents multiple re-renders
+setTokenData(tokenId, backgroundColor, keyColor);
+
+// Avoid: separate sequential updates that set each field individually.
+// Prefer batching via setTokenData to avoid intermediate states and extra re-renders.
+```
+
+### Debounced Loading States
+
+When consuming the `isLoading` flag returned from `useNFTData` or the store's global loading flag, components can debounce rapid loading state changes to prevent UI flashing:
+
+```typescript
+const [debouncedLoading] = useDebounce(isLoading, 200);
+```
+
+### Polling Behavior During Switches
+
+To accelerate turnover during account transitions, `useNFTData` shortens contract polling while `isSwitchingAccount` is `true` (for example, refetch interval ~1000ms vs ~2000ms normally). This helps new ownership/color data settle faster after a switch.
+
+## Testing Strategies
+
+Testing the NFT store requires understanding its interaction with external systems:
+
+### Unit Testing
+
+Test store actions in isolation using Zustand's testing utilities:
+
+```typescript
+import { renderHook, act } from '@testing-library/react';
+import { useNFTStore } from '@/app/store/nftStore';
+
+test('account switching preserves data snapshot before reset', () => {
+  const { result } = renderHook(() => useNFTStore());
+  
+  // Set initial state
+  act(() => {
+    result.current.setTokenData(1, '#FF0000', '#00FF00');
+  });
+  
+  // Start account switch
+  act(() => {
+    result.current.startAccountSwitch();
+  });
+  
+  // Verify snapshot is captured while switching is active
+  expect(result.current.isSwitchingAccount).toBe(true);
+  expect(result.current.previousData).toEqual({
+    hasNFT: true,
+    tokenId: 1,
+    backgroundColor: '#FF0000',
+    keyColor: '#00FF00'
+  });
+});
+```
+
+### Integration Testing
+
+Test the store's interaction with the data fetching layer:
+
+```typescript
+import { renderHook, waitFor } from '@testing-library/react';
+import { useNFTStore } from '@/app/store/nftStore';
+import { useNFTData } from '@/app/hooks/useNFTData';
+
+// Mock the blockchain queries
+vi.mock('wagmi', () => ({
+  useReadContract: vi.fn(() => ({
+    data: [BigInt(42), true],
+    isLoading: false
+  }))
+}));
+
+// Test the complete flow
+test('NFT data updates store correctly', async () => {
+  renderHook(() => useNFTData());
+  
+  await waitFor(() => {
+    expect(useNFTStore.getState().tokenId).toBe(42);
+    expect(useNFTStore.getState().hasNFT).toBe(true);
+  });
+});
+```
+
+## Common Patterns and Anti‑Patterns
+
+### Recommended Patterns
+
+**Use Selective Subscriptions** – Subscribe only to the fields your component needs to minimize re-renders.
+
+**Coordinate Through Hooks** – Let the `useNFTData` hook manage store updates rather than updating directly from components.
+
+**Handle Loading States** – Use loading flags (either from the store or `useNFTData`) during async operations to provide user feedback and avoid flicker.
+
+### Anti‑Patterns to Avoid
+
+**Direct Blockchain Queries in Components** – Use the established data flow through hooks rather than querying contracts directly.
+
+**Multiple Rapid Updates** – Batch related updates using `setTokenData` rather than calling individual setters.
+
+**Ad-hoc Account Switch Logic** – When building behaviors around account transitions, rely on `useNFTData` and the store's `isSwitchingAccount`/`previousData` contract instead of duplicating switch detection and reset logic in every component.
+
+## Summary
+
+The NFT store represents a carefully designed state‑management solution that balances reactivity, persistence, and performance. Through its account‑switching coordination, selective persistence strategy, and clean API, it provides a robust foundation for NFT‑related features throughout RitoSwap. The store's integration with blockchain queries through the `useNFTData` hook ensures that UI state remains synchronized with on‑chain reality while providing predictable, flicker‑free user experiences during refreshes and data updates.

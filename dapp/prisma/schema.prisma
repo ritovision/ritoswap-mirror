@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model TokenRitonet {
+  tokenId  Int       @id
+  used     Boolean   @default(false)
+  usedBy   String?   
+  usedAt   DateTime?
+  
+  @@map("token_ritonet")
+}
+
+model TokenSepolia {
+  tokenId  Int       @id
+  used     Boolean   @default(false)
+  usedBy   String?   
+  usedAt   DateTime?
+  
+  @@map("token_sepolia")
+}
+
+model TokenEthereum {
+  tokenId  Int       @id
+  used     Boolean   @default(false)
+  usedBy   String?   
+  usedAt   DateTime?
+  
+  @@map("token_ethereum")
+}

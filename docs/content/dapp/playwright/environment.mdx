@@ -1,0 +1,108 @@
+import { Callout, Steps, Table } from 'nextra/components'
+
+# Environment & Secrets
+
+All Playwright specs read from `dapp/e2e/playwright/env.ts`. The file loads `.env.playwright`, validates it with Zod, derives the wallet address using `viem`, and exposes two exports:
+
+- `e2eEnv` — the normalized environment (network, chainId, RPC URL, wallet metadata, MCP endpoint).
+- `walletConfigFromEnv` — a subset tailored for `setupTest()` and the wallet flows.
+
+If `.env.playwright` is missing, the suite falls back to `process.env`, but **tests will fail** unless the variables below are defined. The sample file `dapp/.env.playwright.example` now lists only these keys.
+
+## Required variables
+
+<Table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Required?</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>PRIVATE_KEY</code></td>
+      <td>Yes</td>
+      <td>Hex string (with or without 0x). <code>env.ts</code> trims quotes, removes zero-width chars, pads to 64 nibbles, and derives the wallet address.</td>
+    </tr>
+    <tr>
+      <td><code>NETWORK</code></td>
+      <td>No (defaults to Sepolia)</td>
+      <td>One of <code>Ethereum</code>, <code>Sepolia</code>, <code>Ritonet</code>. Used to infer <code>chainId</code> when custom network info is absent.</td>
+    </tr>
+    <tr>
+      <td><code>CHAIN_ID</code></td>
+      <td>Yes when <code>NETWORK=Ritonet</code></td>
+      <td>Numeric ID. Optional for mainnet/Sepolia because defaults exist (1 / 11155111).</td>
+    </tr>
+    <tr>
+      <td><code>RPC_URL</code></td>
+      <td>No</td>
+      <td>Custom RPC endpoint for the wallet bridge. When omitted, <code>test-setup.ts</code> picks a public Sepolia node.</td>
+    </tr>
+    <tr>
+      <td><code>TEST_BASE_URL</code></td>
+      <td>No</td>
+      <td>Overrides the origin Playwright hits. Leave empty to use <code>playwright.config</code>'s default.</td>
+    </tr>
+    <tr>
+      <td><code>WALLET_NAME</code></td>
+      <td>No</td>
+      <td>Label shown inside wallet modals and logs. Defaults to <q>MetaMask</q>.</td>
+    </tr>
+    <tr>
+      <td><code>TX_DELAY_MS</code></td>
+      <td>No</td>
+      <td>Upper-bounded (60s) delay that the mock wallet uses before mining synthetic transactions.</td>
+    </tr>
+    <tr>
+      <td><code>MCP_ENDPOINT</code></td>
+      <td>No (defaults to <code>/api/mcp</code>)</td>
+      <td>AI MCP endpoint. AI mocks respect this allowlist so real MCP requests are never intercepted.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## `.env.playwright` workflow
+
+<Steps>
+  <h3>1. Copy the sample</h3>
+  Duplicate <code>.env.playwright.example</code> (or create a fresh file) and fill in the variables above. Keep it <strong>outside</strong> version control.
+
+  <h3>2. Normalize the key (optional but recommended)</h3>
+  Run <code>npx tsx dapp/e2e/playwright/debug-key.ts</code>. The script logs each normalization step and confirms the derived address. Fix any errors before running tests.
+
+  <h3>3. Verify load paths</h3>
+  <code>env.ts</code> searches <code>dapp/.env.playwright</code> first, then the cwd. Confirm the file lives in the <code>dapp</code> root or exported environment variables are set during <code>pnpm test:e2e</code>.
+
+  <h3>4. Inspect the runtime log</h3>
+  Specs usually call <code>logE2eEnvOnce()</code> (<code>env.ts:205</code>). The console output confirms the network, chain, wallet name, derived address, tx delay, and MCP endpoint. Treat it as a quick sanity check.
+</Steps>
+
+```ini
+# .env.playwright
+PRIVATE_KEY="0xfeed...beef"
+NETWORK=Sepolia
+CHAIN_ID=11155111 # Optional unless NETWORK=Ritonet
+RPC_URL=https://rpc.sepolia.org
+TEST_BASE_URL=https://preview.ritoswap.com
+WALLET_NAME=Test Wallet
+TX_DELAY_MS=2500
+MCP_ENDPOINT=/api/mcp
+```
+
+<Callout type="info" emoji="☁️">
+The CI workflow (<code>.github/workflows/playwright-e2e.yml</code>) injects the same variables via secrets:<br/>
+<code>PRIVATE_KEY</code> comes from <code>secrets.PRIVATE_KEY_PLAYWRIGHT</code>, while <code>TEST_BASE_URL</code> and <code>BASE_URL</code> are pulled from repository/environment variables. Keep the sample file in sync so local runs mirror CI.
+</Callout>
+
+## Address safety checks
+
+- <code>env.ts</code> derives the address via <code>privateKeyToAccount</code>. If the provided <code>address</code> in <code>walletConfig</code> mismatches the derivation, <code>test-setup.ts:120-131</code> throws before any page interaction.
+- <code>wallet/test-setup.ts</code> exposes an explicit bridge for RPC, transactions, <code>signMessage</code>, and <code>signTypedData</code>. Real mode only begins when <code>privateKey</code> passes the validation above.
+
+<Callout type="warning" emoji="🧪">
+Use a throwaway Sepolia key. The real-mode specs mint and burn NFTs on-chain (<code>hp-mint-burn.spec.ts</code>, <code>hp-tokengate.spec.ts</code>).
+</Callout>
+
+Armed with a valid `.env.playwright`, you can now focus on the wallet harness that injects those credentials into the browser context.

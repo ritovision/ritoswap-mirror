@@ -1,0 +1,87 @@
+---
+title: MCP Tool · mark_key_used
+description: Records token-gate usage inside Prisma with JWT-injected identity.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# `mark_key_used`
+
+Stored in `dapp/app/lib/mcp/tools/mark-key-used.ts`, this tool lets the chatbot flag a colored-key NFT as “used” for the active chain. It is JWT-gated to ensure only authenticated users can consume their access.
+
+## Handler Behavior
+
+- **JWT extraction** — Uses the injected `__jwt.address` to determine which wallet owns the key, falling back to `jwt`, `sub`, or session fields if needed.
+- **Prisma model** — `getTokenModel(prisma)` selects the chain-aware table (Sepolia, Mainnet, RitoNet) via `prismaNetworkUtils`.
+- **Atomic update** — Calls `updateMany` with `used: false` in the `where` clause, ensuring concurrent calls cannot mark the same token twice.
+- **Verification** — After the update, fetches the record again to confirm `used=true` and returns metadata (token ID, chain name, usedAt timestamp).
+
+```ts
+// dapp/app/lib/mcp/tools/mark-key-used.ts
+const tool: Tool<Params> = {
+  name: 'mark_key_used',
+  requiresJwt: true,
+  inputSchema: InputSchema,
+  async handler(params) {
+    const { address, tokenId } = extractJwt(params);
+    if (!address) fail('Not signed in');
+    if (!Number.isFinite(tokenId)) fail('Missing or invalid tokenId');
+    const Token = getTokenModel(prisma);
+    const updated = await Token.updateMany({ where: { tokenId, used: false }, data: { used: true, usedBy: address, usedAt: new Date() } });
+    if (!updated.count) return errorResultShape('Token already used or not found');
+    const record = await Token.findUnique({ where: { tokenId } });
+    const text = textResult(`Marked key #${tokenId} as used on ${formatChainName(canonicalChain)}`);
+    const json = jsonResult({ tokenId, chainName: formatChainName(canonicalChain), address, usedAt: record?.usedAt });
+    return { content: [...text.content, ...json.content] };
+  },
+};
+```
+
+## Presenter
+
+`dapp/components/chatBot/ToolActivity/catalog/presenters/mark_key_used.presenter.ts` emphasizes the token details:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Output</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>pending</td>
+      <td>`Marking Key as Used` (no body text).</td>
+    </tr>
+    <tr>
+      <td>success</td>
+      <td>`Key #123 on Sepolia by 0xABCD… at 03/14/2025 09:15:00` (using `formatUsedAtForUser`).</td>
+    </tr>
+    <tr>
+      <td>error</td>
+      <td>Detects wallet/auth issues and suggests reconnecting when JWT data is missing.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Playground Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--mark-key-used-interactive&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Mark Key Used (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Notes
+
+<Callout type="info">
+The tool does not mark the NFT as “used” on-chain. Instead, it modifies the access-control row inside Prisma so the rest of the dapp can recognize who has consumed their gated content.
+</Callout>

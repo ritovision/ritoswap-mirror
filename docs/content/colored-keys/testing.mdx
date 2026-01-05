@@ -1,0 +1,309 @@
+---
+title: Testing & Analysis
+description: Test coverage, security analysis, and validation of the Colored Keys smart contracts
+---
+
+import { Callout, Table, Cards } from 'nextra/components'
+
+# Testing & Analysis
+
+The Colored Keys contracts undergo comprehensive testing through unit tests, integration tests, gas profiling, and multiple security analysis tools. This document details the testing approach, coverage metrics, and validation results.
+
+## Test Commands
+
+Execute tests using pnpm with Hardhat:
+
+```bash
+pnpm test              # Complete test suite
+pnpm test:gas          # Tests with gas consumption reporting
+pnpm test:coverage     # Code coverage analysis
+pnpm coverage:gas      # Combined coverage and gas reporting
+pnpm test:key          # Base KeyToken tests
+pnpm test:one          # OnePerWalletKeyToken tests
+pnpm test:color        # ColorGenerator library tests
+pnpm test:libs         # All library integration tests
+```
+
+## Test Architecture
+
+The test suite validates both standard ERC-721 compliance and custom functionality through 96 test cases that finish in roughly 12 seconds on a local Hardhat network.
+
+### Contract-Specific Testing
+
+**OnePerWalletKeyToken (21 tests)**
+The production contract tests focus on the one-token-per-wallet restriction:
+
+- Minting restriction: Validates that second mint attempts fail with appropriate error
+- Transfer restriction: Ensures transfers fail when recipient already owns a token
+- Self-transfer allowance: Confirms transfers to same address are permitted
+- Burn and re-mint: Verifies addresses can mint after burning their token
+- Batch mint override: Confirms mintBatch enforces quantity=1
+
+**KeyToken (41 tests)**
+Base contract tests cover standard NFT operations and on-chain generation:
+
+- Token minting with sequential IDs starting from 1
+- Color generation and storage
+- SVG generation and Base64 encoding
+- Metadata construction and URI generation
+- Token enumeration and ownership queries
+
+**Libraries (12 tests)**
+Library tests validate color and SVG generation:
+
+- Deterministic color generation from seeds
+- Hex string conversion
+- Color equality detection (exact match only)
+- Color inversion for contrast
+- SVG element construction
+
+**ColorGeneratorDetailed (13 tests)**  
+Edge‐case tests for hex‐to‐uint8 boundaries, uppercase‐hex panic, overflow panic, and color‐inversion logic.
+
+**GasProfiling (9 tests)**  
+Profiles gas for mint, batch mint, transfer (incl. safe), approvals, burns, composite scenarios and summary statistics.
+
+## Coverage Analysis
+
+### Overall Coverage Metrics
+
+<Table>
+  <thead>
+    <tr>
+      <th>Contract</th>
+      <th>Statements</th>
+      <th>Branches</th>
+      <th>Functions</th>
+      <th>Lines</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>OnePerWalletKeyToken.sol</td>
+      <td>100%</td>
+      <td>100%</td>
+      <td>100%</td>
+      <td>100%</td>
+    </tr>
+    <tr>
+      <td>KeyToken.sol</td>
+      <td>95.83%</td>
+      <td>100%</td>
+      <td>88.89%</td>
+      <td>96.15%</td>
+    </tr>
+    <tr>
+      <td>SVGGenerator.sol</td>
+      <td>100%</td>
+      <td>0%</td>
+      <td>100%</td>
+      <td>100%</td>
+    </tr>
+    <tr>
+      <td>ColorGenerator.sol</td>
+      <td>57.89%</td>
+      <td>16.67%</td>
+      <td>66.67%</td>
+      <td>62.5%</td>
+    </tr>
+    <tr style={{ fontWeight: 'bold' }}>
+      <td>Overall System</td>
+      <td>83.64%</td>
+      <td>68.75%</td>
+      <td>85%</td>
+      <td>84.38%</td>
+    </tr>
+  </tbody>
+</Table>
+
+### Coverage Analysis
+
+The production contract (OnePerWalletKeyToken) achieves 100% coverage, ensuring complete validation of the ownership restriction mechanism. `SVGGenerator` shows 0% branch coverage simply because the library contains straight-line rendering helpers with no conditional logic. Lower coverage in `ColorGenerator` reflects the private utility functions that are reached through helper contracts; reverting branches (uppercase hex inputs, extreme seeds) are intentionally exercised via expect-revert tests instead of full execution.
+
+## Test Helpers
+
+### ColorGeneratorTestHelper
+
+This helper contract surfaces the otherwise-private logic inside `ColorGenerator.sol` so tests can hit both happy paths and revert branches:
+
+```solidity
+contract ColorGeneratorTestHelper {
+    function testGenerateColor(uint256 seed1, uint256 seed2, address seed3)
+        public pure returns (string memory);
+    function testGenerateColorPair(uint256 tokenId, address minter)
+        public view returns (string memory backgroundColor, string memory keyColor);
+    function testColorInversionLogic(uint256 seed1, uint256 seed2, address seed3)
+        public view returns (string memory color1, string memory color2, bool wereSimilar, string memory finalColor2);
+    function invertColorPublic(string memory color) public pure returns (string memory);
+    function testHexCharConversion(string memory hexPair) public pure returns (uint8);
+    function forceGenerateSimilarColors()
+        public view returns (string memory backgroundColor, string memory keyColor, bool invertedApplied);
+}
+```
+
+<Callout type="info">
+The helper enables testing of color equality detection (which only checks for exact matches rather than visual similarity), hex parsing boundaries, and the contrast-inversion fallback without exposing those utilities in production code.
+</Callout>
+
+### EchidnaOnePerWalletKeyToken
+
+The Echidna harness implements invariants for property-based testing:
+
+```solidity
+contract EchidnaOnePerWalletKeyToken is OnePerWalletKeyToken {
+    function echidna_one_token_per_wallet() public view returns (bool) {
+        // Validates no address holds more than one token
+    }
+    
+    function echidna_token_ownership() public view returns (bool) {
+        // Ensures ownership consistency
+    }
+}
+```
+
+## Security Analysis
+
+The contracts undergo analysis with three security tools:
+
+<Cards num={3}>
+  <Cards.Card
+    title="Slither Analysis"
+    href="/colored-keys/security/slither"
+  />
+  <Cards.Card
+    title="Mythril Analysis"
+    href="/colored-keys/security/mythril"
+  />
+  <Cards.Card
+    title="Echidna Fuzzing"
+    href="/colored-keys/security/echidna"
+  />
+</Cards>
+
+Security analysis results are documented in their respective pages.
+
+## Gas Profiling
+
+Gas consumption measured on Hardhat network with optimizer enabled (200 runs):
+
+<Table>
+  <thead>
+    <tr>
+      <th>Operation</th>
+      <th>Gas Used</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Contract Deployment</td>
+      <td>4,127,918</td>
+      <td>OnePerWalletKeyToken</td>
+    </tr>
+    <tr>
+      <td>Mint (first)</td>
+      <td>~247,500</td>
+      <td>Cold storage initialization</td>
+    </tr>
+    <tr>
+      <td>Mint (subsequent)</td>
+      <td>~247,500</td>
+      <td>Consistent per token</td>
+    </tr>
+    <tr>
+      <td>MintBatch(1)</td>
+      <td>~245,300</td>
+      <td>Slightly lower than direct mint</td>
+    </tr>
+    <tr>
+      <td>TransferFrom</td>
+      <td>~78,000-83,000</td>
+      <td>Includes balance check overhead</td>
+    </tr>
+    <tr>
+      <td>SafeTransferFrom</td>
+      <td>~83,000</td>
+      <td>To EOA address</td>
+    </tr>
+    <tr>
+      <td>Burn</td>
+      <td>~47,300</td>
+      <td>Token destruction</td>
+    </tr>
+    <tr>
+      <td>Approve (first)</td>
+      <td>~49,100</td>
+      <td>Cold storage</td>
+    </tr>
+    <tr>
+      <td>Approve (update)</td>
+      <td>~27,000</td>
+      <td>Changing existing approval</td>
+    </tr>
+    <tr>
+      <td>SetApprovalForAll</td>
+      <td>~46,000</td>
+      <td>Operator approval</td>
+    </tr>
+  </tbody>
+</Table>
+
+The one-token-per-wallet restriction adds approximately 5,000 gas to transfer operations due to the additional balance check. Comprehensive gas profiling tests are available in `test/GasProfiling.test.ts`.
+
+## Critical Test Scenarios
+
+### Ownership Restriction Tests
+
+The test suite validates the one-token-per-wallet restriction through multiple scenarios:
+
+**Direct Minting Prevention**: Attempting to mint a second token fails with `AlreadyOwnsToken` error.
+
+**Transfer Prevention**: Transfers to addresses that already own a token fail with `WouldExceedMaxTokensPerWallet` error.
+
+**Self-Transfer Allowance**: Transfers where from equals to are permitted since they don't change token count.
+
+**Burn and Re-mint Flow**: After burning a token, the same address can mint a new one, confirming the restriction is based on current state.
+
+### Edge Cases
+
+The tests cover several non-obvious scenarios:
+
+- Approved transfers respect the one-token restriction
+- Batch minting is properly restricted to quantity=1
+- Empty owner queries return appropriate empty arrays
+- Color generation produces valid hex strings for all inputs
+
+## Test Execution
+
+### Running Tests
+
+Standard test execution:
+```bash
+# Run all tests
+pnpm test
+
+# Run specific test file
+pnpm test test/OnePerWalletKeyToken.test.ts
+
+# Run with gas reporting
+pnpm test:gas
+```
+
+### Coverage Generation
+
+Generate and view coverage reports:
+```bash
+# Generate coverage
+pnpm test:coverage
+
+# View HTML report
+open coverage/index.html
+```
+
+## Continuous Integration
+
+Tests run automatically on GitHub Actions for pull requests and direct pushes to the main branch. The CI pipeline validates that all tests pass successfully.
+
+## Summary
+
+The Colored Keys contracts demonstrate comprehensive test coverage with particular focus on the production contract's one-token-per-wallet restriction. The combination of unit tests, property-based testing, and security analysis provides strong assurance of contract reliability. While some library functions show lower coverage metrics, all critical functionality is thoroughly validated through both direct and indirect testing approaches.

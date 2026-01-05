@@ -1,0 +1,281 @@
+---
+title: Cloudflare Worker Overview
+description: Overview of the RitoSwap Cloudflare worker, its Durable Object state engine, email relay, environment configuration, and testing setup.
+---
+
+import { FileTree, Table, Cards } from 'nextra/components'
+
+# RitoSwap Cloudflare Worker
+
+The RitoSwap Cloudflare Worker is a dedicated edge service that backs all durable state for the dapp and relays gated messages via email. It is intentionally isolated from the Next.js app so worker-only dependencies and Cloudflare-specific types never leak into the main bundle.
+
+This worker gives the dapp a small, consistent **state engine** and **email relay** that live at the edge:
+
+- **Durable state** for nonces, rate limits, and quotas (via a Durable Object instead of Redis).
+- **Email relay** to Brevo for token-gated messages.
+- **Vitest** test suite to guard core behavior.
+- **Wrangler**-driven deploys and migrations.
+
+<Cards num={2}>
+  <Cards.Card
+    title="Durable State API"
+    href="/dapp/cloudflare/state"
+    arrow
+  >
+    Internal JSON API for nonces, rate limits, and quotas backed by a Durable Object.
+  </Cards.Card>
+
+  <Cards.Card
+    title="Email Relay API"
+    href="/dapp/cloudflare/email"
+    arrow
+  >
+    Internal endpoint that forwards token-gated messages to Brevo via the Cloudflare worker.
+  </Cards.Card>
+</Cards>
+
+---
+
+## Architecture at a glance
+
+The worker source lives under `dapp/cloudflare` and is structured around a single entrypoint with two routes and one Durable Object.
+
+<FileTree>
+  <FileTree.File name="package.json" />
+  <FileTree.File name="wrangler.toml" />
+  <FileTree.File name="tsconfig.json" />
+  <FileTree.File name="vitest.config.ts" />
+  <FileTree.Folder name="src" defaultOpen>
+    <FileTree.File name="index.ts" />
+    <FileTree.Folder name="routes" defaultOpen>
+      <FileTree.File name="state.ts" />
+      <FileTree.File name="email.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="durable" defaultOpen>
+      <FileTree.File name="state.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="__tests__">
+      <FileTree.File name="state.test.ts" />
+      <FileTree.File name="email.test.ts" />
+    </FileTree.Folder>
+    <FileTree.Folder name="types">
+      <FileTree.File name="global.d.ts" />
+    </FileTree.Folder>
+    <FileTree.File name="types.ts" />
+  </FileTree.Folder>
+</FileTree>
+
+At runtime, the worker behaves as:
+
+- `src/index.ts` is the Wrangler entrypoint and router.
+- Any path starting with `"/state"` is handled by `src/routes/state.ts`.
+- All other requests are treated as email relay calls handled by `src/routes/email.ts`.
+- `src/durable/state.ts` implements `StateDurableObject`, the durable state engine.
+
+---
+
+## Endpoints at a glance
+
+<Table>
+  <thead>
+    <tr>
+      <th>Endpoint</th>
+      <th>Method</th>
+      <th>Purpose</th>
+      <th>Docs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>/state</code></td>
+      <td><code>POST</code></td>
+      <td>Internal JSON API for nonces, rate limits, and quotas backed by the Durable Object.</td>
+      <td><a href="/dapp/cloudflare/state">Durable State API</a></td>
+    </tr>
+    <tr>
+      <td>Any non-<code>/state</code> path</td>
+      <td><code>POST</code></td>
+      <td>Email relay endpoint that forwards gated messages to Brevo.</td>
+      <td><a href="/dapp/cloudflare/email">Email Relay API</a></td>
+    </tr>
+  </tbody>
+</Table>
+
+The Cloudflare routes configuration decides which external paths map into this worker. Inside the worker, the routing logic is simple: `/state` goes to the state engine, everything else goes to the email handler.
+
+---
+
+## Runtime & tooling
+
+### Wrangler & worker config
+
+This worker is managed with Wrangler and a single Durable Object binding:
+
+- **Wrangler**: `wrangler` `^4.47.0`.
+- **Worker name**: `ritoswap-state-worker`.
+- **Entry file**: `src/index.ts`.
+- **Compatibility date**: `2024-12-01`.
+- **Durable Object binding**: `STATE_STORE` bound to the `StateDurableObject` class.
+- **Migrations**: migration tag `"v1"` defines `StateDurableObject` as a SQLite-backed Durable Object class.
+
+Wrangler handles deploying the worker, provisioning the Durable Object storage, and applying migrations.
+
+### TypeScript & types
+
+The project is written in TypeScript and configured for the Workers runtime:
+
+- **TypeScript**: `typescript` `^5.8.3`.
+- **Workers types**: `@cloudflare/workers-types` `^4.20241205.0`.
+- **Key compiler options**:
+  - `target: es2022`
+  - `lib: ["es2022", "webworker"]`
+  - `module: "esnext"`
+  - `moduleResolution: "bundler"`
+  - `strict: true`
+  - `types: ["vitest/globals"]` for the test suite
+
+This keeps the worker aligned with the current Workers platform while enabling strict type checking and modern JavaScript features.
+
+### Scripts
+
+From the `cloudflare` directory, the main scripts are:
+
+- `pnpm dev` – run `wrangler dev` with the worker and Durable Object locally.
+- `pnpm deploy` – deploy the worker via Wrangler (requires a configured Cloudflare account and binding).
+- `pnpm test` – run the Vitest suite.
+- `pnpm check` – TypeScript typecheck (`tsc --noEmit`).
+- `pnpm secret:*` – helper commands for managing Cloudflare secrets (see **Environment & secrets** below).
+
+---
+
+## Durable Object as the state engine (Redis replacement)
+
+Instead of connecting the dapp to a separate Redis cluster, this worker uses a single Cloudflare Durable Object as a KV-like state engine:
+
+- **Nonces** – ephemeral values for authentication flows (set, get, and consume with TTL).
+- **Rate limits** – sliding-window rate limits keyed by limiter and identifier.
+- **Quotas** – configurable windows that track `limit`, `used`, and `resetAt` per key.
+
+All of this logic lives in `StateDurableObject` under `src/durable/state.ts`.
+
+Key advantages over an external Redis setup:
+
+- **No extra infrastructure** – state lives inside Cloudflare, no separate Redis instance to provision or secure.
+- **Lower latency** – the worker and its Durable Object execute in the same environment, avoiding cross-network calls.
+- **Built-in expiration** – Durable Object storage supports key expiration, so nonce and rate-limit entries naturally age out.
+- **Simpler deployment** – deploying the worker and applying migrations is handled via Wrangler, with no extra hosting provider.
+
+Conceptually, the Durable Object behaves like a small, strongly-consistent KV + quota engine colocated with your API.
+
+---
+
+## Environment & secrets
+
+Runtime configuration is provided via Cloudflare secrets and the Durable Object binding.
+
+### Environment variables
+
+These variables are defined by the `Env` interface and must be configured in Cloudflare:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Variable</th>
+      <th>Used by</th>
+      <th>Purpose</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>BREVO_API_KEY</code></td>
+      <td>Email relay</td>
+      <td>API key for Brevo (used to send outbound emails).</td>
+    </tr>
+    <tr>
+      <td><code>SENDER_EMAIL</code></td>
+      <td>Email relay</td>
+      <td>From-address for gated message emails.</td>
+    </tr>
+    <tr>
+      <td><code>RECEIVER_EMAIL</code></td>
+      <td>Email relay</td>
+      <td>Destination inbox for gated message emails.</td>
+    </tr>
+    <tr>
+      <td><code>STATE_SERVICE_AUTH_TOKEN</code></td>
+      <td><code>/state</code> route</td>
+      <td>Shared bearer token between the dapp and the state endpoint.</td>
+    </tr>
+  </tbody>
+</Table>
+
+The Durable Object binding is provided via Wrangler, not as an environment variable:
+
+- **Durable Object binding**: `STATE_STORE` – the Durable Object namespace for `StateDurableObject`.
+
+All secrets can be set via Wrangler from the `cloudflare` directory:
+
+- `pnpm secret:brevo` – sets `BREVO_API_KEY`.
+- `pnpm secret:sender` – sets `SENDER_EMAIL`.
+- `pnpm secret:receiver` – sets `RECEIVER_EMAIL`.
+- `pnpm secret:state` – sets `STATE_SERVICE_AUTH_TOKEN`.
+- `pnpm secret:all` – runs all of the above in sequence.
+
+`STATE_SERVICE_AUTH_TOKEN` must match the corresponding value in the Next.js app environment so authenticated calls to `/state` succeed.
+
+---
+
+## Testing (Vitest)
+
+The worker includes a Vitest suite that exercises both the Durable Object logic and the email relay behavior.
+
+- **Vitest**: `vitest` `^3.2.4`.
+- **Test environment**: `node`.
+- **Test files**: all `src/**/*.{test,spec}.ts` files.
+- **Coverage**: text summary in the terminal plus an HTML coverage report.
+
+What is covered:
+
+- `src/__tests__/state.test.ts`
+  - Nonce lifecycle: `set` → `get` → `consume` returns the expected value and clears storage.
+  - Rate limiting: repeated `ratelimit:check` calls with a fixed limit and window verify the sliding-window logic.
+- `src/__tests__/email.test.ts`
+  - HTTP interface: non-POST requests to the email route are rejected with status `405`.
+  - Brevo integration: `fetch` is stubbed to simulate both success and failure responses from the Brevo API, and the worker responds with `200` or `502` accordingly.
+  - Validation: requests with missing or empty fields result in a `400` response.
+
+To run the tests locally from the `cloudflare` directory:
+
+- `pnpm test`
+
+No test code is exposed in this documentation; the goal is to describe test coverage and how to run it, not mirror the implementation.
+
+---
+
+## Local development & deployment
+
+From the `cloudflare` directory:
+
+1. Install dependencies:
+   - `pnpm install`
+2. Set the required secrets (at minimum `STATE_SERVICE_AUTH_TOKEN` and the Brevo credentials):
+   - `pnpm secret:all`
+3. Start local development:
+   - `pnpm dev`
+4. Run tests while iterating:
+   - `pnpm test`
+5. Deploy to Cloudflare:
+   - `pnpm deploy`
+
+Wrangler will use `wrangler.toml` to apply the Durable Object migration (`v1`) and bind `STATE_STORE` to `StateDurableObject`.
+
+---
+
+## Related docs
+
+For details on each route, see:
+
+- **Durable State API** – contract for the `/state` endpoint, actions, and response shapes.
+- **Email Relay API** – request payload, validation, and error handling for the Brevo email relay.
+
+These pages build on this overview and focus on the HTTP contracts for each route.

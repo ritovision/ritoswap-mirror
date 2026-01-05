@@ -1,0 +1,296 @@
+---
+title: "Connect Modal"
+description: "Composable wallet connection system with shared triggers, state-machine views, and first-class accessibility support"
+---
+
+import { FileTree, Callout, Cards } from 'nextra/components'
+
+# Connect Modal
+
+<FileTree>
+  <FileTree.Folder name="wallet" defaultOpen>
+    <FileTree.Folder name="connectModal" defaultOpen>
+      <FileTree.File name="ConnectModal.tsx" />
+      <FileTree.File name="WalletModalHost.tsx" />
+      <FileTree.File name="connectModalBridge.ts" />
+      <FileTree.Folder name="components" defaultOpen>
+        <FileTree.File name="ModalWrapper.tsx" />
+        <FileTree.File name="WalletButton.tsx" />
+      </FileTree.Folder>
+      <FileTree.Folder name="hooks" defaultOpen>
+        <FileTree.File name="useWalletConnection.ts" />
+        <FileTree.File name="useFocusTrap.ts" />
+        <FileTree.File name="useAutoCloseOnRoute.ts" />
+        <FileTree.File name="useSwipeToClose.ts" />
+      </FileTree.Folder>
+      <FileTree.Folder name="views" defaultOpen>
+        <FileTree.File name="DefaultView.tsx" />
+        <FileTree.File name="QrView.tsx" />
+        <FileTree.File name="ConnectingView.tsx" />
+        <FileTree.File name="ErrorView.tsx" />
+        <FileTree.File name="CanceledView.tsx" />
+        <FileTree.File name="GetWalletView.tsx" />
+      </FileTree.Folder>
+      <FileTree.Folder name="styles">
+        <FileTree.File name="ModalWrapper.module.css" />
+        <FileTree.File name="WalletList.module.css" />
+        <FileTree.File name="ConnectingStates.module.css" />
+        <FileTree.File name="QrView.module.css" />
+        <FileTree.File name="GetWalletView.module.css" />
+        <FileTree.File name="Logo.module.css" />
+      </FileTree.Folder>
+      <FileTree.Folder name="__tests__" />
+    </FileTree.Folder>
+    <FileTree.Folder name="connectButton">
+      <FileTree.File name="ConnectWrapper.tsx" />
+      <FileTree.File name="ConnectState.tsx" />
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+## Overview
+
+The Connect Modal is the entry-point experience for any wallet connection inside RitoSwap. It centralizes connector discovery, WalletConnect QR flows, mobile deep-linking, and error recovery behind a single surface that can be summoned from anywhere—navigation, widgets, automation, or programmatic workflows. The system is composed of discrete layers for triggers, modal chrome, state management, and view rendering so each part can evolve without duplicating connection logic.
+
+<img
+  src="/images/ui/connectModalDefault.png"
+  alt="Connect Modal default view showing wallet list and get-wallet link"
+  style={{ width: '100%', maxWidth: '460px', display: 'block', margin: '2rem auto' }}
+/ >
+
+### What this system provides
+
+- Automatic Wagmi/EIP-6963 connector ordering with brand metadata and default fallbacks.
+- A dedicated state machine with typed states (`default`, `walletconnect-qr`, `connecting`, `error`, `canceled`, `get-wallet`) that drives every view.
+- A singleton opener bridge so only one modal instance exists, yet any feature can request it.
+- Mobile-first gestures (swipe-to-close, WalletConnect deep link handoff) and desktop niceties (focus trap, Escape, portal rendering).
+- Built-in a11y affordances: `role="dialog"`, labelled regions per view, polite live regions for status updates, and route-change cleanup.
+
+<Cards>
+  <Cards.Card title="WalletConnect Deep Linking Guide" href="/dapp/wc-deeplinking" />
+  <Cards.Card title="ConnectButton Widget" href="/dapp/wallet-ui/connectButton" />
+  <Cards.Card title="Disconnect Widget" href="/dapp/wallet-ui/disconnect" />
+</Cards>
+
+## Architecture at a glance
+
+### Trigger & hosting surfaces
+
+The system intentionally separates *who* asks for the modal from *how* the modal behaves:
+
+- `ConnectState.tsx` (documented on the [ConnectButton page](/dapp/wallet-ui/connectButton)) renders the CTA and calls `openWalletConnectModal()` on click.
+- `connectModalBridge.ts` exports `openWalletConnectModal()` plus `registerWalletConnectOpener()` / `useRegisterWalletConnectOpener()`. Only one opener exists at a time, and the **most recently registered** handler wins.
+- `WalletModalHost.tsx` mounts near the app root and registers an opener during bootstrap. If another surface later registers and then unmounts, no fallback is automatically restored, so keep at least one opener mounted to keep `openWalletConnectModal()` functional.
+
+<img
+  src="/images/ui/connect-wallet-mobile.png"
+  alt="Connect button triggering the modal on a mobile layout"
+  style={{ width: '100%', maxWidth: '420px', display: 'block', margin: '1.5rem auto' }}
+/>
+
+This split keeps modal orchestration reusable without duplicating Wagmi awareness in every surface.
+
+### Modal shell & platform hooks
+
+`ConnectModal.tsx` focuses on viewport management and a11y:
+
+- Creates a portal attached to `document.body`, adds a semantic backdrop, and wraps children with `ModalWrapper` (`role="dialog"`, `aria-modal`, and optional `aria-labelledby`).
+- Installs effect-driven helpers:
+  - `useAutoCloseOnRoute` closes the modal if Next.js navigation changes while the modal is open.
+  - `useFocusTrap` traps Tab/Shift+Tab, captures the previously focused element, and restores focus after close. It also listens for `Escape`.
+  - `useSwipeToClose` wires left-swipe gestures (50px threshold) for touch users.
+- Observes Wagmi’s `useAccount` state so an in-flight `connecting` state automatically closes the dialog once the user is connected.
+
+Modal chrome classes (`styles/ModalWrapper.module.css`) expose two size presets (`modal` vs `modalLoading`) to visually differentiate list views from loading/error surfaces.
+
+## Connection state machine
+
+`useWalletConnection.ts` is the heart of the system. It encapsulates everything the modal needs to render meaningful UI without exposing Wagmi primitives to the component tree.
+
+### State & data
+
+- `ui.state`: `"default" | "walletconnect-qr" | "connecting" | "error" | "canceled" | "get-wallet"`.
+- `ui.qrUri`: WalletConnect URI, propagated to both the QR view and mobile deep-link openers.
+- `ui.copied`: toggles the “Copy to clipboard” CTA label for two seconds.
+- `ui.connectingWallet`: `{ name, icon, isWalletConnect }`, so every view (connecting/error/canceled) can show accurate branding even if connectors lack icons.
+- Internal guards: `pendingConnector` prevents double-click races, while `abortConnection()` resets UI state and only resets wagmi when we are **not** mid-connection.
+
+### Transitions
+
+1. **Connector click** (`actions.handleConnectorClick`):
+   - Injected wallets set `connectingWallet`, move to `connecting`, and await `connectAsync`. If called again while pending, the state just re-enters `connecting` for clarity.
+   - WalletConnect connectors attach a `display_uri` listener. Desktop users see the QR view; mobile users get redirected immediately via `window.location.href = uri` while the UI shows the connecting view.
+2. **Success** resets pending state and returns to `default`. `ConnectModal` then closes when `useAccount().isConnected` flips true.
+3. **Errors** inspect the message to distinguish “User rejected” (canceled) from everything else (error). Both states automatically return to `default` after 1.5s.
+4. **Actions** exposed to views:
+   - `backToDefault()` clears QR state and terms view.
+   - `cancelConnecting()` calls `abortConnection()` to clear UI state and only resets wagmi when the user is **not** mid-approval.
+   - `copyQr()` writes to the clipboard and manages the success toast label.
+   - `openWallet()` navigates to the **current** `qrUri` (no persistence across reloads).
+
+Because the hook owns connector ordering (injected first, WalletConnect last), DefaultView can stay dumb and simply render `data.allConnectors`.
+
+## View surfaces
+
+Each view lives in `views/` with its own CSS module so we can iterate on layout or animation independently:
+
+#### DefaultView
+
+Shows the brand logo, wallet list (`WalletButton` entries with accessible labels), and the “I don’t have a wallet” CTA leading to Get Wallet view. Terms copy is outside the scroll region so it stays visible on small heights.
+
+<img
+  src="/images/ui/connectModalDefault.png"
+  alt="Default Connect Modal view with wallet list and terms text"
+  style={{ width: '100%', maxWidth: '420px', display: 'block', margin: '1.5rem auto' }}
+/>
+
+#### QrView
+
+Renders a placeholder until `qrUri` arrives, then swaps to `react-qr-code`. The QR canvas uses custom colors, embeds the Rito logo, and offers a copy-to-clipboard CTA with `aria-label` feedback.
+
+<img
+  src="/images/ui/connectModalQR.png"
+  alt="QR view with fallback placeholder and copy-to-clipboard control"
+  style={{ width: '100%', maxWidth: '420px', display: 'block', margin: '1.5rem auto' }}
+/>
+
+#### ConnectingView
+
+Loops animated dots, shows wallet brand art, surfaces a Cancel button, and conditionally exposes “Open Wallet” when a WalletConnect URI exists on mobile. Status text uses `role="status"` + `aria-live="polite"`.
+
+<img
+  src="/images/ui/connectModalConnecting.png"
+  alt="Connecting state showing spinner dots and wallet brand art"
+  style={{ width: '100%', maxWidth: '320px', display: 'block', margin: '1.5rem auto' }}
+/>
+
+#### ErrorView & CanceledView
+
+Share the loading layout but change the copy so analytics can distinguish failures from user-initiated cancellations. `role="alert"` communicates urgency to assistive tech.
+
+<div style={{ display: 'flex', flexWrap: 'wrap', gap: '1rem', justifyContent: 'center', margin: '1.5rem 0' }}>
+  <img
+    src="/images/ui/connectModalUnsuccessful.png"
+    alt="Error state with message 'Connection Unsuccessful'"
+    style={{ width: '100%', maxWidth: '220px', display: 'block' }}
+  />
+  <img
+    src="/images/ui/connectModalCancel.png"
+    alt="Canceled state with message 'Connection canceled by user'"
+    style={{ width: '100%', maxWidth: '220px', display: 'block' }}
+  />
+</div>
+
+#### GetWalletView
+
+Educational panel with checklist items, each treated as `role="listitem"`, plus an external link to Ethereum’s wallet finder that opens in a new tab.
+
+<img
+  src="/images/ui/connectModalGetWallet.png"
+  alt="Get Wallet educational view with checklist of wallet benefits"
+  style={{ width: '100%', maxWidth: '420px', display: 'block', margin: '1.5rem auto' }}
+/>
+
+Drop-in styles in `styles/ConnectingStates.module.css`, `styles/QrView.module.css`, etc., keep animation and layout logic isolated from React code.
+
+## Playground
+
+Use the full Storybook UI to explore the modal states and tweak controls in real time.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/wallet-connectmodal--playground&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="Wallet/ConnectModal - Playground"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Accessibility & interaction contract
+
+Even though the modal is manually assembled, it ships with a robust ARIA story:
+
+- `ModalWrapper` sets `role="dialog"`, `aria-modal="true"`, and takes an optional `aria-labelledby` so headings describe the surface when applicable.
+- `useFocusTrap` captures the previously focused element, loops focus inside the modal, and responds to `Escape`.
+- Every view defines its own labelled region (`role="region"` + heading IDs) or status role to ensure screen reader announcements are meaningful.
+- Live feedback is provided through polite regions (connecting text) or alerts (errors). The QR placeholder announces “Generating QR Code…” until data is ready.
+- Touch gestures are optional: swipe left to close, backdrop click to close, Cancel button, Escape key, or programmatic `onClose`.
+- `useAutoCloseOnRoute` guarantees we never strand the dialog when client-side routing occurs (e.g., nav clicks, app-level redirects).
+
+Call out these guarantees when coordinating with a11y reviewers so regressions can be caught during PR review rather than exploratory testing.
+
+## Usage patterns
+
+### Basic embedding
+
+```tsx
+import ConnectModal from '@/components/wallet/connectModal/ConnectModal';
+
+function Page() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)}>Connect</button>
+      <ConnectModal isOpen={open} onClose={() => setOpen(false)} />
+    </>
+  );
+}
+```
+
+Use this pattern sparingly—most product surfaces should rely on `ConnectState` (from ConnectButton) so the CTA and modal feel identical everywhere. Still, having a direct embed API helps testing, storybook usage, or bespoke admin screens.
+
+### Programmatic opening
+
+```tsx
+import { openWalletConnectModal } from '@/components/wallet/connectModal/connectModalBridge';
+
+export function RequireWalletGate({ children }) {
+  const { isConnected } = useAccount();
+
+  if (!isConnected) {
+    return (
+      <button onClick={() => openWalletConnectModal()}>
+        Connect to use this feature
+      </button>
+    );
+  }
+
+  return children;
+}
+```
+
+Any module can import `openWalletConnectModal()` as long as an opener is registered (usually via `WalletModalHost` or `useRegisterWalletConnectOpener`). If no opener has registered yet, the bridge retries up to five zero-delay timeouts before giving up silently.
+
+### Always-available host
+
+Add `WalletModalHost` near the app root (before layout children) so an opener exists during initial load. If some other trigger later registers and then unmounts, you must re-register a handler (e.g., by keeping `ConnectState` mounted in a hidden container or by toggling a keyed `WalletModalHost`) because the host does not automatically reclaim ownership.
+
+```tsx
+// dapp/app/layout.tsx
+export default function RootLayout({ children }) {
+  return (
+    <html lang="en">
+      <body>
+        <WalletModalHost />
+        {children}
+      </body>
+    </html>
+  );
+}
+```
+
+This host integrates with the bridge automatically so QA scripts, LI.FI widgets, or form gates have an opener during boot. If those flows run after another trigger unregisters, make sure you re-register an opener (mount `ConnectState`, remount the host, or call `useRegisterWalletConnectOpener` from the relevant surface) before invoking `openWalletConnectModal()`.
+
+## Scope & related docs
+
+- The [ConnectButton documentation](/dapp/wallet-ui/connectButton) covers the disconnected-state widget, variant contract, and how `ConnectState` triggers the modal.
+- The [Disconnect widget](/dapp/wallet-ui/disconnect) describes the connected-state CTA that hands users a way out after the modal succeeds. Reference it whenever you mention wallet lifecycle handoffs.
+- Use this Connect Modal page for everything that happens *inside* the modal shell—state machine behavior, view details, bridge APIs, and accessibility rules. Avoid duplicating Wagmi primer content; instead link to the Wagmi or WalletConnect resources if engineers need protocol-level depth.
+
+<Callout type="info">
+Need to extend the modal? Add new state-machine transitions or views next to the existing ones, document the motivation here, and circulate the update to product and a11y reviewers before merging so we keep the UX consistent across every wallet entry point.
+</Callout>

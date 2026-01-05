@@ -1,0 +1,104 @@
+/* BigAccordion.module.css */
+.accordionRoot {
+    border: var(--default-border);
+    border-radius: 10px;
+    overflow: hidden;
+    width: 95%;
+    margin: 0 auto;
+}
+  
+.accordionItem:not(:first-child) {
+    border-top: var(--default-border);
+}
+  
+.accordionHeader {
+    margin: 0;
+}
+  
+.accordionTrigger {
+    all: unset;
+    width: 100%;
+    height: 200px;
+    display: flex;
+    background: transparent;
+    cursor: pointer;
+    position: relative;
+}
+  
+/* Adjust trigger height on smaller screens */
+@media (max-width: 400px) {
+    .accordionTrigger {
+      height: 150px;
+    }
+}
+  
+.headerWrapper {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+  
+.title {
+    color: white;
+    font-size: 2.5rem;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    margin: 0;
+    z-index: 1;
+    pointer-events: none;
+}
+  
+/* At viewport widths of 400px or less, adjust the title's font-size using clamp */
+@media (max-width: 400px) {
+    .title {
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      text-align: center;
+    }
+}
+  
+.icon {
+    position: absolute;
+    right: 40px;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+  
+.iconLine {
+    position: absolute;
+    width: 100%;
+    height: 2px;
+    background: white;
+    transition: all 0.3s ease;
+}
+  
+.iconLine:first-child {
+    transform: rotate(90deg);
+}
+  
+.underline {
+    position: absolute;
+    bottom: 35%;
+    left: 30%;
+    right: 30%;
+    height: 2px;
+    background: white;
+    transform-origin: center left;
+    margin: 0 auto;
+}
+  
+.contentWrapper {
+    overflow: hidden;
+    padding: 0 2rem;
+    will-change: transform;
+}
+  
+.contentWrapper > div {
+    padding: 2rem 0;
+}

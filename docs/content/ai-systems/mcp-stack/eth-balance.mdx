@@ -1,0 +1,88 @@
+---
+title: MCP Tool · get_eth_balance
+description: Direct RPC balance checks with presenter feedback.
+---
+
+import { Callout, Table } from 'nextra/components'
+
+# `get_eth_balance`
+
+`dapp/app/lib/mcp/tools/eth-balance.ts` provides a raw JSON-schema tool (no zod) that fetches native balances on any supported chain.
+
+## Implementation Highlights
+
+- **Validation** — Ensures the `address` matches `0x…40` and `chain` is one of the enumerated values (`mainnet`, `sepolia`, `polygon`, etc.).
+- **RPC selection** — `getRpcUrl` pulls from `public.env.ts`/Alchemy for public chains and the local config for `ritonet`.
+- **Result shape** — Emits both a helpful sentence and a JSON blob containing wei/ETH values, chain metadata, and the detected symbol.
+
+```ts
+// dapp/app/lib/mcp/tools/eth-balance.ts
+const ethBalanceTool: Tool<EthBalanceParams> = {
+  name: 'get_eth_balance',
+  description: 'Get the native token balance of an address on various EVM chains.',
+  inputSchema: EthBalanceInputSchema,
+  async handler({ address, chain = 'mainnet' }) {
+    if (!isValidAddress(address)) fail('Invalid Ethereum address format');
+    if (!isSupportedChain(chain)) fail(`Unsupported chain: ${chain}`);
+    const rpcUrl = getRpcUrl(chain);
+    const balanceWei = await getBalance(rpcUrl, address);
+    const balanceEth = formatEther(balanceWei);
+    const text = textResult(`Address ${address} on ${formatChainName(chain)} has a balance of ${balanceEth} ${getTokenSymbol(chain)}`);
+    const json = jsonResult({ address, chain, chainName: formatChainName(chain), balanceWei: balanceWei.toString(), balanceEth, symbol: getTokenSymbol(chain) });
+    return { content: [...text.content, ...json.content] };
+  },
+};
+```
+
+## Presenter Integration
+
+`dapp/components/chatBot/ToolActivity/catalog/presenters/eth_balance.presenter.ts` keeps chips terse:
+
+<Table>
+  <thead>
+    <tr>
+      <th>Status</th>
+      <th>Label</th>
+      <th>Logic</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>pending</td>
+      <td>`Fetching Balance`</td>
+      <td>Shows no body text so the chip stays compact.</td>
+    </tr>
+    <tr>
+      <td>success</td>
+      <td>`Fetched Balance.`</td>
+      <td>Displays `X ETH on Chain`, pulling the symbol from the JSON payload, falling back to the text stream if needed.</td>
+    </tr>
+    <tr>
+      <td>error</td>
+      <td>`Failed to Fetch Balance.`</td>
+      <td>Special-cases wallet errors (“Your wallet must be connected…”) via regex.</td>
+    </tr>
+  </tbody>
+</Table>
+
+## Playground Demo
+
+Submit message to see the tool use process simulated.
+
+<div style={{ width: '100%', height: 820, margin: '2rem 0' }}>
+  <iframe
+    src="/storybook-static/index.html?path=/story/chatbot-toolchips-inchat--get-eth-balance-interactive&nav=0"
+    width="100%"
+    height="100%"
+    style={{ border: '1px solid rgba(255,255,255,0.1)', borderRadius: '10px' }}
+    title="ChatBot/ToolChips/InChat - Get ETH Balance (Playground)"
+    loading="lazy"
+    tabIndex={-1}
+  />
+</div>
+
+## Notes
+
+<Callout type="info">
+`get_eth_balance` is available to both `rapBattle` and `freestyle` modes. Only rap battles impose the “use once per battle” restriction (`rapBattleConfig` enforces it in the system instructions) while freestyle sessions can call it whenever the runtime allows.
+</Callout>

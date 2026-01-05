@@ -1,0 +1,89 @@
+/* Confirmation Modal Overlay - positioned absolutely within parent modal */
+.confirmOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  z-index: 100;
+  touch-action: none;
+}
+
+/* Confirmation Modal Container */
+.confirmModal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: calc(100% - 64px);
+  max-width: 320px;
+  background-color: var(--primary-color);
+  border: var(--default-border);
+  border-radius: 12px;
+  padding: 24px;
+  z-index: 101;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* Message Text */
+.confirmMessage {
+  margin: 0;
+  color: #FFFFFF;
+  font-family: 'Michroma', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* Button Container */
+.confirmButtons {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Base Button Style */
+.confirmButton {
+  flex: 1;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: var(--default-border);
+  padding: 0 16px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  font-family: 'Michroma', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #FFFFFF;
+}
+
+/* Primary/Confirm Button (Yes) */
+.confirmButtonPrimary {
+  border-color: var(--utility-green);
+}
+
+.confirmButtonPrimary:hover {
+  background-color: rgba(17, 192, 69, 0.1);
+}
+
+/* Cancel Button (Red Outline) */
+.cancelButton {
+  background-color: transparent;
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+}
+
+.cancelButton:hover {
+  background-color: var(--accent-color);
+  color: #FFFFFF;
+}

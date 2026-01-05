@@ -1,0 +1,110 @@
+---
+title: "Portfolio"
+description: "Multichain, multi-wallet portfolio viewer"
+---
+
+import { FileTree, Callout, Cards } from 'nextra/components'
+import ViewPage from '@components/utilities/viewpage/viewpage'
+
+# Portfolio Page
+
+The Portfolio page is a multichain, multi-wallet portfolio viewer. It supports nine included EVM chains simultaneously for native token balances, ERC-20s (well-established ones only) and ERC-721 and ERC-1155 assets with image and meta data property display. To conserve resources, this setup is designed for users looking at their own assets, it is **NOT** a public look up for any other users' addresses; users must sign in and connect their own addresses to search their assets. Users can experience their assets in a RitoVision Blade Runner–esque branded vibe with some classic crypto music!
+<ViewPage
+  mainnetUrl="https://ritoswap.com/portfolio"
+  testnetUrl="https://testnet.ritoswap.com/portfolio"
+/>
+
+<Callout type="warning">
+Users must connect their wallet addresses to view portfolios; public lookup of addresses not owned by the user is, by design, not supported.
+</Callout>
+
+## File Paths
+
+<FileTree>
+  <FileTree.Folder name="dapp" defaultOpen>
+    <FileTree.Folder name="app" defaultOpen>
+      <FileTree.Folder name="portfolio" defaultOpen>
+        <FileTree.File name="PortfolioClient.tsx" />
+        <FileTree.File name="page.tsx" />
+        <FileTree.File name="page.module.css" />
+        <FileTree.File name="metadata.ts" />
+        <FileTree.Folder name="jsonld" />
+        <FileTree.Folder name="hooks" defaultOpen>
+          <FileTree.File name="useAssets.ts" />
+        </FileTree.Folder>
+        <FileTree.Folder name="components" defaultOpen>
+          <FileTree.Folder name="assets">
+            <FileTree.File name="AssetDisplay.tsx" />
+            <FileTree.File name="AssetsGrid.tsx" />
+            <FileTree.File name="NativeBalance.tsx" />
+            <FileTree.File name="TokenAccordionContent.tsx" />
+            <FileTree.Folder name="__tests__">
+              <FileTree.File name="alchemyHandlers.ts" />
+              <FileTree.File name="AssetDisplay.test.tsx" />
+              <FileTree.File name="AssetsGrid.test.tsx" />
+              <FileTree.File name="NativeBalance.test.tsx" />
+            </FileTree.Folder>
+          </FileTree.Folder>
+          <FileTree.Folder name="selection">
+            <FileTree.File name="SelectToken.tsx" />
+            <FileTree.File name="SelectChain.tsx" />
+            <FileTree.File name="SelectAccount.tsx" />
+            <FileTree.File name="AccountDropdown.tsx" />
+          </FileTree.Folder>
+          <FileTree.Folder name="organize">
+            <FileTree.File name="ChainAccordion.tsx" />
+            <FileTree.File name="ChainWrapper.tsx" />
+            <FileTree.File name="Placeholder.tsx" />
+            <FileTree.File name="TokenAccordion.tsx" />
+          </FileTree.Folder>
+          <FileTree.Folder name="music">
+            <FileTree.File name="Music.tsx" />
+          </FileTree.Folder>
+        </FileTree.Folder>
+        <FileTree.Folder name="__tests__">
+          <FileTree.File name="Content.unit.test.tsx" />
+          <FileTree.File name="metadata.unit.test.ts" />
+          <FileTree.File name="page.integration.test.tsx" />
+          <FileTree.File name="PortfolioClient.integration.test.tsx" />
+        </FileTree.Folder>
+      </FileTree.Folder>
+    </FileTree.Folder>
+  </FileTree.Folder>
+</FileTree>
+
+---
+
+## Components of Note
+| Component                | Location                                                                   | Purpose                                                                                                  |
+|--------------------------|----------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
+| **AssetDisplay**         | `app/portfolio/components/assets/AssetDisplay.tsx`                         | Renders a card for a single token or NFT, showing its image, name, and balance or metadata.             |
+| **AssetsGrid**           | `app/portfolio/components/assets/AssetsGrid.tsx`                           | Arranges all your fetched assets into a neat grid, with friendly messages when loading or when no assets are found. |
+| **NativeBalance**        | `app/portfolio/components/assets/NativeBalance.tsx`                        | Displays your wallet’s balance of the network’s native currency in a clear, formatted way.               |
+| **TokenAccordionContent**| `app/portfolio/components/assets/TokenAccordionContent.tsx`                | Shows a collapsible panel that lists your tokens for a chosen network and lets you load more as needed.  |
+| **Music**                | `app/portfolio/components/music/Music.tsx`                                 | Embeds the “Hodeler” track for portfolio-checking ambiance.                                              |
+| **ChainWrapper**         | `app/portfolio/components/organize/ChainWrapper.tsx`                       | Wraps each chain’s asset list with headers and styling.                                                 |
+| **ChainAccordion**       | `app/portfolio/components/organize/ChainAccordion.tsx`                     | Groups assets by blockchain chain into collapsible sections.                                             |
+| **Placeholder**          | `app/portfolio/components/organize/Placeholder.tsx`                        | Displays a loading or empty-state placeholder.                                                           |
+| **TokenAccordion**       | `app/portfolio/components/organize/TokenAccordion.tsx`                     | Manages expand/collapse behavior for token lists.                                                        |
+| **AccountDropdown**      | `app/portfolio/components/selection/AccountDropdown.tsx`                   | Lets the user view their connected wallet addresses or connect a new wallet via a simple dropdown.       |
+| **SelectAccount**        | `app/portfolio/components/selection/SelectAccount.tsx`                     | Handles showing the account dropdown and opening the wallet connect modal when no address is selected.   |
+| **SelectChain**          | `app/portfolio/components/selection/SelectChain.tsx`                       | Displays a list of supported blockchains as selectable items so users can choose which networks to include. |
+| **SelectToken**          | `app/portfolio/components/selection/SelectToken.tsx`                       | Presents checkboxes for ERC-20, ERC-721, and ERC-1155 so users can filter by token type.                 |
+| **useAssets**            | `app/portfolio/hooks/useAssets.ts`                                         | Retrieves and paginates token assets for a wallet.                                                       |
+| **PortfolioClient**      | `app/portfolio/PortfolioClient.tsx`                                        | Coordinates the account, chain, and token selectors and displays the resulting portfolio.                |
+
+---
+
+## Music
+
+This page features **“Hodeler”**, Rito Rhymes’ parody remix of Kanye West’s *Gold Digger*. It’s an anthemic track about relationships with crypto traders and hodling; it's perfect ambiance for checking your portfolio.
+
+---
+
+<Cards.Card
+  title="Portfolio UI Overview"
+  href="/dapp/portfolio-ui"
+  arrow
+>
+  `docs/content/dapp/portfolio-ui/index.mdx` — Overview explaining the structure of the portfolio page’s components.
+</Cards.Card>

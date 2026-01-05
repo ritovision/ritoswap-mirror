@@ -1,0 +1,404 @@
+[
+  {
+    "id": "gif_0001",
+    "text": "woman makes a flamethrower with a lighter by blowing the flame; DIY fire trick; wild stunt; chaotic energy",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/Mi7q91b9ppEAAAAd/nbgetsme-stan-twitter.gif",
+      "source": "tenor",
+      "tags": ["flame","lighter","blow","flamethrower","fire","stunt","wild","wow","reaction"],
+      "reaction": "wow",
+      "mood": "intense",
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0002",
+    "text": "Bitcoin Pac-Man chomps through a line of altcoins; crypto dominance; arcade meme; bullish vibe",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/uCp62jbo-OEAAAAd/good-morning.gif",
+      "source": "tenor",
+      "tags": ["bitcoin","pacman","altcoins","crypto","dominance","arcade","eat","bullish","market"],
+      "reaction": "win",
+      "mood": "confident",
+      "coins": ["BTC"],
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0003",
+    "text": "Doge head on office worker tossing papers like a deck of cards; dismissive flex; chaotic office meme",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/-9Gb0lDJbzQAAAAd/dogecoin-notkdk3.gif",
+      "source": "tenor",
+      "tags": ["doge","papers","throw","cards","office","dismiss","flex","meme"],
+      "reaction": "throw",
+      "mood": "sassy",
+      "coins": ["DOGE"],
+      "characters": ["Doge"]
+    }
+  },
+  {
+    "id": "gif_0004",
+    "text": "Doge meme twirling and dancing in a loop; hype celebration; party energy",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/oUBstqaKvYQAAAAd/dogecoin-doge.gif",
+      "source": "tenor",
+      "tags": ["doge","dance","spin","twirl","celebration","party","loop","meme"],
+      "reaction": "celebration",
+      "mood": "happy",
+      "coins": ["DOGE"],
+      "characters": ["Doge"]
+    }
+  },
+  {
+    "id": "gif_0005",
+    "text": "Doge as Salt Bae sprinkling salt and dropping a Dogecoin; chef flair; stylish sprinkle meme",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/mFxdMmWsRikAAAAd/dogecoin-tweet-dogecoin.gif",
+      "source": "tenor",
+      "tags": ["doge","salt bae","sprinkle","chef","dogecoin","style","flair","meme"],
+      "reaction": "flex",
+      "mood": "playful",
+      "coins": ["DOGE"],
+      "characters": ["Doge","Salt Bae"]
+    }
+  },
+  {
+    "id": "gif_0006",
+    "text": "Cute Pepe the Frog dancing side to side; wholesome loop; happy frog meme",
+    "metadata": {
+      "url": "media.tenor.com/0BiOymmlteoAAAAj/pepe-the-frog.gif",
+      "source": "tenor",
+      "tags": ["pepe","dance","cute","happy","loop","frog","meme"],
+      "reaction": "celebration",
+      "mood": "happy",
+      "characters": ["Pepe"]
+    }
+  },
+  {
+    "id": "gif_0007",
+    "text": "Pepe the Frog crying with hands up; meltdown moment; frustration and sadness",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/USVKtXwWCfsAAAAd/why-cry-why-pepe-why.gif",
+      "source": "tenor",
+      "tags": ["pepe","crying","hands up","sad","frustration","meltdown","frog","meme"],
+      "reaction": "cry",
+      "mood": "sad",
+      "characters": ["Pepe"]
+    }
+  },
+  {
+    "id": "gif_0008",
+    "text": "B-Boy Pepe making it rain cash with stock arrow up; stonks; bullish money flex",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/3J931JpqS8QAAAAd/make-it-rain-pepe.gif",
+      "source": "tenor",
+      "tags": ["pepe","make it rain","cash","stonks","arrow up","bullish","money","dance","meme"],
+      "reaction": "money",
+      "mood": "hyped",
+      "characters": ["Pepe"]
+    }
+  },
+  {
+    "id": "gif_0009",
+    "text": "Monkey kisses the camera; cute smooch; playful animal close-up",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/N57Xg6F8-vYAAAAd/monke.gif",
+      "source": "tenor",
+      "tags": ["monkey","kiss","smooch","camera","cute","animal","closeup"],
+      "reaction": "kiss",
+      "mood": "affectionate",
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0010",
+    "text": "Cartoon guy on phone; a hand reaches out of the screen to slap him; surprise smack meme",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/MrhME3n9Z2UAAAAd/dungeong.gif",
+      "source": "tenor",
+      "tags": ["cartoon","phone","hand","slap","surprise","smack","social","meme"],
+      "reaction": "slap",
+      "mood": "shocked",
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0011",
+    "text": "Classic Batman slaps Robin comic panel; shut down take; iconic smack meme",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/ynUUTM_81PoAAAAd/batman-robin.gif",
+      "source": "tenor",
+      "tags": ["batman","robin","slap","comic","classic","meme","shutdown"],
+      "reaction": "slap",
+      "mood": "decisive",
+      "characters": ["Batman","Robin"]
+    }
+  },
+  {
+    "id": "gif_0012",
+    "text": "Pudgy penguin lassos a golden Ethereum logo and pulls it in; capture the coin; playful crypto meme",
+    "metadata": {
+      "url": "media.tenor.com/62DW1SkdvScAAAAj/stake-staking.gif",
+      "source": "tenor",
+      "tags": ["penguin","lasso","rope","ethereum","logo","pull","crypto","meme"],
+      "reaction": "grab",
+      "mood": "playful",
+      "coins": ["ETH"],
+      "characters": ["Penguin"]
+    }
+  },
+  {
+    "id": "gif_0013",
+    "text": "Kim Kardashian tossing Dogecoins like a deck of cards; make-it-rain celebrity crypto flex",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/AeY3_tiuDGcAAAAd/dogecoin-spend-your-dogecoins.gif",
+      "source": "tenor",
+      "tags": ["kim kardashian","dogecoin","throw","cards","make it rain","celebrity","crypto","meme"],
+      "reaction": "money",
+      "mood": "flashy",
+      "coins": ["DOGE"],
+      "characters": ["Kim Kardashian"]
+    }
+  },
+  {
+    "id": "gif_0014",
+    "text": "Skeleton model topples over onto the floor; collapse; instant fail gag",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/swGklh-cW8EAAAAd/skeletano-fall.gif",
+      "source": "tenor",
+      "tags": ["skeleton","fall","collapse","fail","topple","gag"],
+      "reaction": "fail",
+      "mood": "defeated",
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0015",
+    "text": "Man falls from the sky spinning with smoke; chaotic tumble; dramatic fail",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/8XVaeMVOdGgAAAAd/dave-blunts-dave.gif",
+      "source": "tenor",
+      "tags": ["fall","spin","smoke","tumble","fail","chaos","air"],
+      "reaction": "fail",
+      "mood": "chaotic",
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0016",
+    "text": "Woman tries to toss a heavy garbage bag over shoulder; weight yanks her down; slapstick fail",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/CWr-SB4UrpgAAAAd/poubelle-force.gif",
+      "source": "tenor",
+      "tags": ["woman","garbage bag","heavy","fall","fail","oops","slapstick"],
+      "reaction": "fail",
+      "mood": "embarrassed",
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0017",
+    "text": "Cat mean-mugging the camera; intense stare down; WTF energy",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/4aCkAvBWvxIAAAAd/cat.gif",
+      "source": "tenor",
+      "tags": ["cat","stare","mean mug","wtf","judging","animal","look"],
+      "reaction": "wtf",
+      "mood": "annoyed",
+      "characters": ["Cat"]
+    }
+  },
+  {
+    "id": "gif_0018",
+    "text": "The Big Lebowski (The Dude) stirs a White Russian and makes a WTF face; caption says WTF",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/wqirNJF--_MAAAAd/confused-what.gif",
+      "source": "tenor",
+      "tags": ["the big lebowski","the dude","white russian","wtf","confused","meme"],
+      "reaction": "wtf",
+      "mood": "confused",
+      "characters": ["The Dude"]
+    }
+  },
+  {
+    "id": "gif_0019",
+    "text": "Samuel L. Jackson with a hard WTF look; caption reads WTF; intense reaction",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/JR4GwJy0kVEAAAAd/wtf-really.gif",
+      "source": "tenor",
+      "tags": ["samuel l jackson","wtf","reaction","intense","confused"],
+      "reaction": "wtf",
+      "mood": "annoyed",
+      "characters": ["Samuel L. Jackson"]
+    }
+  },
+  {
+    "id": "gif_0020",
+    "text": "Steve Harvey reacting with 'wait what?'; stunned host face; confused moment",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/C9KQyQWnGysAAAAd/what-why.gif",
+      "source": "tenor",
+      "tags": ["steve harvey","wait what","confused","reaction","host"],
+      "reaction": "confused",
+      "mood": "surprised",
+      "characters": ["Steve Harvey"]
+    }
+  },
+  {
+    "id": "gif_0021",
+    "text": "SpongeBob creates a rainbow with his hands; IMAGINATION meme; whimsical sparkle",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/S-TQKsUL38YAAAAd/rainbow-spongebob.gif",
+      "source": "tenor",
+      "tags": ["spongebob","rainbow","imagination","wholesome","sparkle","meme"],
+      "reaction": "imagination",
+      "mood": "whimsical",
+      "characters": ["SpongeBob"]
+    }
+  },
+  {
+    "id": "gif_0022",
+    "text": "SpongeBob shoulder-presses a barbell of stuffed animals; struggle; gym fail gag",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/ZFUJ2eZcm2IAAAAd/work-out-excercise.gif",
+      "source": "tenor",
+      "tags": ["spongebob","barbell","stuffed animals","gym","lift","struggle","fail","meme"],
+      "reaction": "fail",
+      "mood": "struggling",
+      "characters": ["SpongeBob"]
+    }
+  },
+  {
+    "id": "gif_0023",
+    "text": "Donald Duck puts his hand out, says NOPE, and walks away; hard pass",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/5C9vxD3O1coAAAAd/talk-to-the-hand-donald-duckn.gif",
+      "source": "tenor",
+      "tags": ["donald duck","nope","walk away","refuse","deny","meme"],
+      "reaction": "nope",
+      "mood": "dismissive",
+      "characters": ["Donald Duck"]
+    }
+  },
+  {
+    "id": "gif_0024",
+    "text": "Man with glasses shaking his head nope; disapproval; simple rejection loop",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/MbgVRPSAZrcAAAAd/shannon-sharpe-undisputed.gif",
+      "source": "tenor",
+      "tags": ["nope","shake head","glasses","disapprove","reject","loop"],
+      "reaction": "nope",
+      "mood": "unimpressed",
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0025",
+    "text": "Steve Urkel giddily walking over; excited approach; nerdy charm",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/maXDuOFVjxkAAAAd/steve-urkel-happy.gif",
+      "source": "tenor",
+      "tags": ["steve urkel","walk","approach","excited","happy","sitcom","meme"],
+      "reaction": "excited",
+      "mood": "happy",
+      "characters": ["Steve Urkel"]
+    }
+  },
+  {
+    "id": "gif_0026",
+    "text": "Dog nodding its head yes with YES caption; agreement and approval",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/x5mFHWz84BkAAAAd/ok-oh-yes-yes-o-yeah-yes-no-yes-go-on-yea-yes.gif",
+      "source": "tenor",
+      "tags": ["dog","nod","yes","agree","approve","animal","reaction"],
+      "reaction": "yes",
+      "mood": "approving",
+      "characters": ["Dog"]
+    }
+  },
+  {
+    "id": "gif_0027",
+    "text": "Man in a bathtub full of cash, holding a bottle, throwing money at the camera; lavish flex",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/KmKjHysDEbIAAAAd/money-dollars.gif",
+      "source": "tenor",
+      "tags": ["bathtub","cash","money","bottle","make it rain","flex","rich","baller"],
+      "reaction": "money",
+      "mood": "flashy",
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0028",
+    "text": "Dave Chappelle as Tyrone Biggums dancing like a crackhead; wild happy dance; comedian meme classic",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/e-buZIwMy2IAAAAC/happy-dance.gif",
+      "source": "tenor",
+      "tags": ["dave chappelle","tyrone biggums","dance","happy","comedian","chappelle's show","meme"],
+      "reaction": "celebration",
+      "mood": "hyped",
+      "characters": ["Tyrone Biggums","Dave Chappelle"]
+    }
+  },
+  {
+    "id": "gif_0029",
+    "text": "ritorhymes wearing a dog mask dancing through the scene with caption \"one more meme\" and a beware-of-dog sign in the background; playful promo/mascot moment",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/hwSwyujcWCsAAAAd/one-more-time-one-more-meme.gif",
+      "source": "tenor",
+      "tags": ["ritorhymes","dog mask","dance","one more meme","beware of dog","mascot","promo","loop","meme"],
+      "reaction": "hype",
+      "mood": "playful",
+      "characters": ["Ritorhymes"]
+    }
+  },
+  {
+    "id": "gif_0030",
+    "text": "massive explosion on Earth seen from space; a planet-scale detonation that shatters the globe; apocalyptic cinematic visual, shock and awe",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/jH-l7U1wBnQAAAAd/jeong43va.gif",
+      "source": "tenor",
+      "tags": ["explosion","earth","planet","space","nuke","apocalypse","cinematic","destruction","shock"],
+      "reaction": "shock",
+      "mood": "apocalyptic",
+      "characters": []
+    }
+  },
+  {
+    "id": "gif_0031",
+    "text": "Goku powering up to Super Saiyan 2, electricity crackling and energy beams flaring; furious anime transformation and power-up moment",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/62BOOahDCWUAAAAC/goku-super-saiyan-super-saiyan2.gif",
+      "source": "tenor",
+      "tags": ["goku","super saiyan","ssj2","power up","anime","dragon ball","electricity","energy","transformation"],
+      "reaction": "hype",
+      "mood": "intense",
+      "characters": ["Goku"]
+    }
+  },
+  {
+    "id": "gif_0032",
+    "text": "Emperor Palpatine unleashing Force lightning with the caption 'unlimited power' — ominous villain moment from Star Wars, dramatic and domineering",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/a5BfMS5dzHkAAAAd/you.gif",
+      "source": "tenor",
+      "tags": ["palpatine","emperor","star wars","force lightning","unlimited power","villain","evil","dominate"],
+      "reaction": "power",
+      "mood": "ominous",
+      "characters": ["Emperor Palpatine"]
+    }
+  },
+  {
+    "id": "gif_0033",
+    "text": "Indiana Jones and Short Round in Temple of Doom: grab-the-hat relief moment as the trap room closes — tense adventure + quick reflex save",
+    "metadata": {
+      "url": "https://media1.tenor.com/m/RaA-R94OPsEAAAAC/come-on-short-round.gif",
+      "source": "tenor",
+      "tags": ["indiana jones","short round","temple of doom","hat grab","relief","adventure","trap","classic movie","action"],
+      "reaction": "relief",
+      "mood": "triumphant",
+      "characters": ["Indiana Jones","Short Round"]
+    }
+  }
+]
